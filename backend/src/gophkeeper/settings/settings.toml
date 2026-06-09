@@ -1,0 +1,13 @@
+[default.api]
+application_name = "GophKeeper"
+description = "Zero-knowledge secret store. The server only ever sees ciphertext."
+trusted_hosts = ["*"]
+
+[default.run_settings]
+logging_level = "INFO"
+
+[default.server]
+host = "0.0.0.0"
+port = 8080
+reload = false
+workers = 1
