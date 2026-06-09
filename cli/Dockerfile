@@ -14,7 +14,7 @@ RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/goph .
 
 # --- runtime stage ---
 FROM alpine:3.20
-RUN adduser -D -h /home/goph goph
+RUN useradd -m goph
 USER goph
 WORKDIR /home/goph
 COPY --from=build /out/goph /usr/local/bin/goph
