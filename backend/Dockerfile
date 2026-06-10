@@ -18,15 +18,32 @@ COPY src ./src
 COPY README.md ./
 RUN uv sync --no-dev
 
+# --- dbmate source for database migrations ---
+FROM amacneil/dbmate:2.33.0 AS dbmate
+
 # --- Runtime stage: slim image with just the venv and source ---
 FROM python:3.12-slim AS runtime
 
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    postgresql-client \
+    && rm -rf /var/lib/apt/lists/*
+
 RUN useradd --create-home --uid 1001 app
 WORKDIR /app
+
+COPY --from=dbmate /usr/local/bin/dbmate /usr/local/bin/dbmate
+RUN echo '#!/bin/sh\n\
+echo "Running migrations..." && \n\
+dbmate -d /db/migrations up \n\
+echo "Starting application..." && \n\
+exec "$@"' > /app/entrypoint.sh && \
+    chmod +x /app/entrypoint.sh && \
+    chown app:app /app/entrypoint.sh
 
 COPY --from=builder --chown=app:app /app /app
 ENV PATH="/app/.venv/bin:$PATH"
 
 USER app
 EXPOSE 8080
+ENTRYPOINT [ "/app/entrypoint.sh" ]
 CMD ["uvicorn", "gophkeeper.main:app", "--host", "0.0.0.0", "--port", "8080"]
