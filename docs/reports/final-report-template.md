@@ -1,4 +1,4 @@
-# Sprint 2 Report Template
+# Final Report Template
 
 This template is used to document sprint progress, project planning, requirements, MVP development, and team contributions throughout the GophKeeper project.
 
