@@ -34,3 +34,14 @@ services:
       - ./db:/db
     command:
       ["uvicorn", "gophkeeper.main:app", "--host", "0.0.0.0", "--port", "8080", "--reload"]
+
+  migrations:
+    image: amacneil/dbmate:latest
+    environment:
+      DATABASE_URL: postgres://postgres:docker@postgres:5432/gophkeeper?sslmode=disable
+    volumes:
+      - ./db/migrations:/db/migrations
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: [ "up" ]
