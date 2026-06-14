@@ -37,6 +37,8 @@ services:
 
   migrations:
     image: amacneil/dbmate:latest
+    profiles:
+      - tools
     environment:
       DATABASE_URL: postgres://postgres:docker@postgres:5432/gophkeeper?sslmode=disable
     volumes:
