@@ -14,6 +14,11 @@ class SecretNotFound(DomainError):
         super().__init__(f"secret {secret_id!r} not found")
         self.secret_id = secret_id
 
+class DeviceNotFound(DomainError):
+    def __init__(self, device_id: str) -> None:
+        super().__init__(f"device {device_id!r} not found")
+        self.device_id = device_id
+
 
 class VersionConflict(DomainError):
     """Optimistic-concurrency guard: the client wrote against a stale version.
