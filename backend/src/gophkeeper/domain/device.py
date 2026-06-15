@@ -8,7 +8,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Protocol
 
-from gophkeeper.domain.errors import DomainError, VersionConflict
+from gophkeeper.domain.errors import DomainError
 
 
 def _now() -> datetime:
