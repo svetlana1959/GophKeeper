@@ -1,6 +1,8 @@
 -- migrate:up
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
 CREATE TABLE secrets (
-    id          TEXT        PRIMARY KEY,
+    id          UUID        PRIMARY KEY,
     account_id  TEXT        NOT NULL,
     ciphertext  BYTEA       NOT NULL,
     version     INTEGER     NOT NULL DEFAULT 1,

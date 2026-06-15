@@ -1,12 +1,13 @@
 -- migrate:up
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
 CREATE TABLE IF NOT EXISTS devices (
-    id          TEXT         PRIMARY KEY,
+    id          UUID         PRIMARY KEY,
     device_name VARCHAR(255) NOT NULL,
     public_key  TEXT         NOT NULL,
-    is_active   BOOLEAN      DEFAULT TRUE,
-    created_at  TIMESTAMPTZ   DEFAULT CURRENT_TIMESTAMP,
-    updated_at  TIMESTAMPTZ  DEFAULT CURRENT_TIMESTAMP
+    is_active   BOOLEAN      NOT NULL DEFAULT TRUE,
+    updated_at  TIMESTAMPTZ  NOT NULL DEFAULT now()
 );
 
 -- migrate:down
-DROP TABLE devices
+DROP TABLE devices;
