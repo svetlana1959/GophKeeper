@@ -2,59 +2,108 @@
 
 ## Project Information
 
-**Project:** GophKeeper
+### Project
+
+GophKeeper
 
 ### Team Members
 
 - Elina Akhmetzyanova
 - Svetlana Maltseva
-- Arseniy Lashkevich
+- Arseny Lashkevich
 - Aleksander Goncharov
 - Emil Nabiullin
+- Malik Nurullin
 
-**Sprint:** Week 2
+### Roles
+| Team Member | Role |
+|-------------|------|
+| Elina Akhmetzyanova | |
+| Svetlana Maltseva | |
+| Arseny Lashkevich | |
+| Aleksander Goncharov | |
+| Emil Nabiullin | |
+| Malik Nurullin | |
+
+### Sprint
+
+Week 2
 
 ---
 
 ## Sprint Goal
 
-**Main objective of Sprint 2:**
+---
+
+## What Was Implemented
+
+### Implemented Item
+
+### Related Issue / PR
+
+---
+
+## What Was Tested
+
+### Tested Area
+
+### Result
+
+---
+
+## Problems Encountered
+
+### Problem
+
+### Impact
+
+---
+
+## Decisions Made
+
+### Decision
+
+### Reason
+
+---
+
+## User Stories
+
+### User Story
+
+### Status
 
 ---
 
 ## Completed Tasks
 
-| Task | Status |
-|------|--------|
-| | |
+### Task
 
-### Achievements
+### Status
 
-- 
+---
+
+## Achievements
 
 ---
 
 ## Unfinished Tasks
 
-| Task | Reason |
-|------|--------|
-| | |
+### Task
 
-### Blockers
+### Reason
 
-- 
+---
+
+## Blockers
+
+---
+
+## Tasks Moved to Next Sprint
 
 ---
 
 ## Next Steps
-
-### Planned Tasks
-
-- 
-
-### Goals for Next Sprint
-
-- 
 
 ---
 
