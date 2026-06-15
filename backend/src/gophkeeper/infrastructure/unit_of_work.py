@@ -10,11 +10,9 @@ from typing import Self
 
 from gophkeeper.domain.unit_of_work import UnitOfWork
 from gophkeeper.infrastructure.adapters.database import DatabaseAdapter
-from gophkeeper.infrastructure.repositories.secret_repository import (
+from gophkeeper.infrastructure.repositories import (
     SqlAlchemySecretRepository,
-)
-from gophkeeper.infrastructure.repositories.device_repositroy import (
-    SqlAlchemyDeviceRepository
+    SqlAlchemyDeviceRepository,
 )
 
 
