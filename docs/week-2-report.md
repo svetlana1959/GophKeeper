@@ -10,16 +10,7 @@ Industrial
 
 GophKeeper - is a zero-knowledge secret management system designed to securely store, synchronize, and share sensitive information across trusted devices. The project focuses on client-side encryption, ensuring that secret contents are never accessible to the server.
 
-### Team Members
-
-- Elina Akhmetzyanova
-- Svetlana Maltseva
-- Arseny Lashkevich
-- Aleksander Goncharov
-- Emil Nabiullin
-- Malik Nurullin
-
-### Roles
+### Team Members and Roles
 
 | Team Member | Role |
 |-------------|------|
@@ -52,12 +43,13 @@ GophKeeper is a secure secret management system focused on storing and synchroni
 Some existing solutions in this area are Bitwarden, 1Password, HashiCorp Vault, and Infisical.
 
 ### Identified Gap
-Many existing secret management solutions can be difficult to use or require users to place a lot of trust in the service.
-GophKeeper aims to provide a simpler and more secure way to store and synchronize secrets using client-side encryption.
+
+Many existing secret management solutions rely on centralized access models and are primarily designed around web interfaces.
+GophKeeper focuses on distributed secret management and a CLI-first workflow for DevOps engineers, enabling secure synchronization and sharing of secrets between trusted devices while keeping sensitive data encrypted on the client side.
 
 ### Planned Contribution
 
-Develop a secure cloud secret manager that performs encryption on the client side and stores only encrypted data on the server.
+Develop a distributed secret management system for DevOps engineers and technical users, providing a CLI-first workflow, secure synchronization between trusted devices, and client-side encryption of sensitive data.
 
 ### Expected Impact
 
@@ -87,29 +79,32 @@ The roadmap is based on our current understanding of the project and may change 
 
 #### Week 3
 
-- Backend setup
-- Database setup
-- API design
-- CLI structure preparation
+- Implement local CRUD operations for secrets
+- Add secret version synchronization with the server
+- Support basic secret types: login/password pair and free-form text
+- Set up the VM for the backend server
+- Configure CI/CD
+- Create a basic static web application
 
 #### Week 4
 
-- Authentication implementation
-- Secret storage implementation
-- Encryption integration
+- Implement user authorization and user database
+- Connect real user data to the overview page
+- Collect initial user feedback
 
 #### Week 5
 
-- Trusted device management
-- Secret synchronization
-- Access request workflow
+- Implement multi-device functionality
+- Work on synchronization between trusted devices
+- Improve device access and trust workflow
 
 #### Week 6
 
-- Testing
-- Bug fixing
-- Documentation updates
-- Final project preparation
+- Polish the system
+- Fix remaining issues
+- Complete unfinished tasks
+- Update documentation
+- Prepare for the final demo
 
 ### Milestones
 
@@ -286,20 +281,6 @@ As a user, I want an overview of my secrets, trusted devices, and pending reques
 
 ---
 
-### Web Overview Application
-
-As a user, I want a web page showing my account overview, so that I can check account status without using the CLI.
-
-**Acceptance Criteria:**
-
-- Displays secret count.
-- Displays trusted devices.
-- Displays pending requests.
-- Displays last synchronization time.
-- Displays metadata only and never exposes secret contents.
-
----
-
 ## MVP Scope
 
 ### In Scope
@@ -309,7 +290,6 @@ As a user, I want a web page showing my account overview, so that I can check ac
 - Epic C — Multi-Device Trust & Sharing
 - Epic D — Synchronization
 - Epic E — Account Overview
-- Web Overview Application
 
 ### Out of Scope
 
@@ -335,7 +315,8 @@ Python + FastAPI is the most suitable stack for a simple API and an MVP, since i
 PostgreSQL with migrations for the global API, as it's designed to handle many users concurrently; and SQLite for local key storage, since in the CLI case we have only one user and therefore no need for a dedicated database server. SQLite stores the database in a local file, which can be easily encrypted
 
 ### Infrastructure
-Main project "svetlana1959" (https://github.com/svetlana1959), which contains the Kanban board and the repositories, with branches for the production and development stages.
+GitHub organization "svetlana1959" is used for project management, source code storage, issue tracking, pull requests, and sprint planning through GitHub Projects.
+A virtual machine (VM) will be used as the main production server. The VM will host the backend API, PostgreSQL database, and synchronization services responsible for communication between trusted devices.
 
 ---
 
@@ -393,24 +374,33 @@ User journeys are currently being developed based on the approved user stories a
 
 ## Baseline Comparison
 
-### Baseline Product
+## Baseline Comparison
 
-The project was analyzed against several existing secret management solutions:
+The project was compared with several existing secret management solutions: Bitwarden, 1Password, HashiCorp Vault, and Infisical.
 
-- Bitwarden
-- 1Password
-- HashiCorp Vault
-- Infisical
+| Dimension | Bitwarden | 1Password | HashiCorp Vault | Infisical | GophKeeper |
+|---|---|---|---|---|---|
+| Primary use case | Human password management | Human password management | Machine and DevOps secrets | Machine and DevOps secrets | Distributed secret management for technical users |
+| Zero-knowledge approach | Yes | Yes | No | Partial | Yes |
+| Client-side encryption | Yes | Yes | No | Partial | Yes |
+| Self-hosting | Yes | No | Yes | Yes | Planned |
+| DevOps-oriented workflow | Limited | Limited | Strong | Strong | CLI-first approach |
+| Trusted device synchronization | Limited | Limited | Not a core focus | Not a core focus | Core feature |
+| Ease of use | High | High | More complex | Medium | Planned to be simple for CLI users |
 
 ### Initial Measurement
 
-At the current stage of development, quantitative comparison is not yet available because the MVP implementation is still in progress.
+Existing tools usually focus either on human password management or on DevOps and machine secrets.
+
+Bitwarden and 1Password provide strong zero-knowledge protection, but they are primarily focused on human password management. HashiCorp Vault and Infisical offer more advanced functionality for DevOps workflows, but they are not centered around a zero-knowledge approach in all scenarios.
+GophKeeper combines distributed secret management, client-side encryption, trusted-device synchronization, and a CLI-first workflow for technical users.
+The project is designed to support secret storage and synchronization across multiple trusted devices while maintaining a zero-knowladge architecture.
 
 ---
 
 ## Sprint Goal
 
-Establish the project foundation, define requirements, prepare project documentation, create initial user stories, and begin designing the user interface for the MVP.
+Establish the project foundation, define functional requirements, prepare project documentation, create initial user stories, design the MVP architecture, plan the system structure, and set up the development environment for future implementation.
 
 ---
 
@@ -418,10 +408,17 @@ Establish the project foundation, define requirements, prepare project documenta
 
 ### Issues
 - Issue #50 – Prepare Web UI Design
+  https://github.com/orgs/svetlana1959/projects/4/views/1?pane=issue&itemId=198034715&issue=svetlana1959%7CGophKeeper%7C50
 - Issue #19 – Write Sprint 2 Report
-- Issue #27 – API Endpoints
+  https://github.com/orgs/svetlana1959/projects/4/views/1?pane=issue&itemId=196727524&issue=svetlana1959%7CGophKeeper%7C19
+- Issue #27 – Create /api/v1/store and /api/v1/device endpoints
+  https://github.com/orgs/svetlana1959/projects/4/views/1?pane=issue&itemId=197206217&issue=svetlana1959%7CGophKeeper%7C27
 - Issue #35 - Write User Stories
+  https://github.com/orgs/svetlana1959/projects/4/views/1?pane=issue&itemId=197587603&issue=svetlana1959%7CGophKeeper%7C35
 - Issue #20 - Create Backlog
+  https://github.com/orgs/svetlana1959/projects/4/views/1?pane=issue&itemId=196727719&issue=svetlana1959%7CGophKeeper%7C20
+- Issue #34 - Backend database setup
+  https://github.com/orgs/svetlana1959/projects/4/views/1?pane=issue&itemId=197278922&issue=svetlana1959%7CGophKeeper%7C34
 
 ### Pull Requests
 - PR #58 feat: api endpoints
@@ -436,6 +433,4 @@ Establish the project foundation, define requirements, prepare project documenta
 
 - Complete UI mockups
 - Finalize MVP scope
-- Begin backend implementation
-- Prepare API design
-- Set up the database
+- Finalize web design 
