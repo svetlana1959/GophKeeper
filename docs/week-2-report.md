@@ -353,10 +353,11 @@ The following wireframes were prepared:
 ### Mockups
 
 UI mockups were created in Figma to demonstrate the planned web interface and main user screens.
-
 ### User Flow Diagrams
 
-User flow diagrams are currently under development and will be updated as the implementation progresses.
+![User Flow](UserFlow.png)
+
+The image illustrates how users interact with GophKeeper through both the web application and the CLI client, including authentication, secret management, device access, and synchronization.
 
 ---
 
