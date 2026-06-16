@@ -375,8 +375,6 @@ User journeys are currently being developed based on the approved user stories a
 
 ## Baseline Comparison
 
-## Baseline Comparison
-
 The project was compared with several existing secret management solutions: Bitwarden, 1Password, HashiCorp Vault, and Infisical.
 
 | Dimension | Bitwarden | 1Password | HashiCorp Vault | Infisical | GophKeeper |
