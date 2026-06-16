@@ -21,9 +21,10 @@ GophKeeper - is a zero-knowledge secret management system designed to securely s
 | Emil Nabiullin | Frontend Developer |
 | Malik Nurullin | Backend Developer  |
 
-### Sprint
 
-Week 2
+## Sprint 2 Goal
+
+Establish the project foundation, define functional requirements, prepare project documentation, create initial user stories, design the MVP architecture, plan the system structure, and set up the development environment for future implementation.
 
 ---
 
@@ -398,12 +399,6 @@ The project is designed to support secret storage and synchronization across mul
 
 ---
 
-## Sprint Goal
-
-Establish the project foundation, define functional requirements, prepare project documentation, create initial user stories, design the MVP architecture, plan the system structure, and set up the development environment for future implementation.
-
----
-
 ## Relevant Links
 
 ### Issues
@@ -433,4 +428,10 @@ Establish the project foundation, define functional requirements, prepare projec
 
 - Complete UI mockups
 - Finalize MVP scope
-- Finalize web design 
+- Finalize web design
+- Implement local CRUD operations for secrets
+- Add secret version synchronization with the server
+- Support basic secret types: login/password pair and free-form text
+- Set up the VM for the backend server
+- Configure CI/CD
+- Create a basic static web application
