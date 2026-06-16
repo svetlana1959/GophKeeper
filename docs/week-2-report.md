@@ -38,11 +38,9 @@ Week 2
 
 ## Problem Statement
 
-Most password managers and secret storage systems require users to trust the service provider with sensitive information or rely on a single master password.
-
-The goal of GophKeeper is to develop a Zero-Knowledge cloud secret manager where the server never has access to the contents of user secrets.
-
-The system should provide secure storage, synchronization, and sharing of secrets across trusted user devices.
+Most password managers require users to trust the service with their passwords and other sensitive data.
+GophKeeper aims to solve this problem by using a Zero-Knowledge approach, where the server cannot read user secrets.
+The system will provide secure storage, synchronization, and sharing of secrets between trusted devices.
 
 ---
 
@@ -50,15 +48,12 @@ The system should provide secure storage, synchronization, and sharing of secret
 
 ### Existing Product / Project
 
-GophKeeper belongs to the Industrial Track and addresses the problem of secure secret management.
-
-Similar products include Bitwarden, 1Password, HashiCorp Vault, and Infisical.
+GophKeeper is a secure secret management system focused on storing and synchronizing sensitive information across trusted devices.
+Some existing solutions in this area are Bitwarden, 1Password, HashiCorp Vault, and Infisical.
 
 ### Identified Gap
-
-Existing solutions often rely on centralized trust models or provide complex key management workflows.
-
-GophKeeper aims to simplify secure secret management by combining client-side encryption with trusted device synchronization.
+Many existing secret management solutions can be difficult to use or require users to place a lot of trust in the service.
+GophKeeper aims to provide a simpler and more secure way to store and synchronize secrets using client-side encryption.
 
 ### Planned Contribution
 
@@ -357,11 +352,11 @@ The following wireframes were prepared:
 
 ### Mockups
 
-Initial UI mockups were created in Figma.
+UI mockups were created in Figma to demonstrate the planned web interface and main user screens.
 
 ### User Flow Diagrams
 
-Currently under development.
+User flow diagrams are currently under development and will be updated as the implementation progresses.
 
 ---
 
@@ -370,7 +365,6 @@ Currently under development.
 ### Implemented Features
 
 At this stage, the team has defined the project requirements, prepared user stories, identified the MVP scope, and started working on the UI design.
-
 Core functionality implementation is planned for the next stages of the project.
 
 ### Functional User Journeys
@@ -379,8 +373,21 @@ User journeys are currently being developed based on the approved user stories a
 
 ### Screenshots / GIFs
 
-Initial wireframes and UI mockups have been created and will be expanded during the implementation phase.
+#### Registration Screen
 
+![Registration Screen](Registration.png)
+
+#### Login Screen
+
+![Login Screen](Login.png)
+
+#### Dashboard
+
+![Dashboard](Dashboard.png)
+
+#### User Secrets List
+
+![User Secrets List](Secrets%20List.png)
 ---
 
 ## Baseline Comparison
@@ -409,17 +416,25 @@ Establish the project foundation, define requirements, prepare project documenta
 ## Relevant Links
 
 ### Issues
+- Issue #50 – Prepare Web UI Design
+- Issue #19 – Write Sprint 2 Report
+- Issue #27 – API Endpoints
+- Issue #35 - Write User Stories
+- Issue #20 - Create Backlog
 
 ### Pull Requests
-
+- PR #58 feat: api endpoints
+  https://github.com/svetlana1959/GophKeeper/pull/58
+- PR #59 docs: update user stories
+  https://github.com/svetlana1959/GophKeeper/pull/59
 ### API Documentation
 
 ---
 
 ## Next Steps
 
-- Complete user stories
 - Complete UI mockups
 - Finalize MVP scope
 - Begin backend implementation
 - Prepare API design
+- Set up the database
