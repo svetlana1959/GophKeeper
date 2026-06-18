@@ -1,8 +1,9 @@
 import pytest
 
 from gophkeeper.domain.device import Device
-from gophkeeper.domain.errors import DeviceNotFound
+from gophkeeper.domain.errors import DeviceNotFound, DeviceAlreadyExists
 from gophkeeper.services.device_service import DeviceService
+from uuid import UUID
 
 
 class FakeDeviceRepository:
@@ -12,10 +13,13 @@ class FakeDeviceRepository:
     async def add(self, device: Device) -> None:
         self.devices[device.id] = device
 
-    async def get(self, device_id: str) -> Device:
+    async def get(self, device_id: UUID) -> Device:
         if device_id not in self.devices:
             raise DeviceNotFound(device_id)
         return self.devices[device_id]
+
+    async def exists(self, device_id: UUID) -> bool:
+        return device_id in self.devices
 
     async def list_active(self) -> list[Device]:
         return [d for d in self.devices.values() if d.is_active]
@@ -59,7 +63,7 @@ async def test_register_creates_new_device():
     assert uow.committed is True
 
 
-async def test_register_returns_existing_device():
+async def test_register_duplicate_raises_device_already_exists():
     uow = FakeUnitOfWork()
 
     existing = Device(
@@ -73,14 +77,12 @@ async def test_register_returns_existing_device():
 
     service = DeviceService(uow)
 
-    result = await service.register(
-        device_id="dev-1",
-        device_name="Another Name",
-        public_key="another-key",
-    )
-
-    assert result is existing
-    assert result.device_name == "MacBook"
+    with pytest.raises(DeviceAlreadyExists):
+        await service.register(
+            device_id="dev-1",
+            device_name="Another Name",
+            public_key="another-key",
+        )
 
 
 async def test_fetch_returns_device():
