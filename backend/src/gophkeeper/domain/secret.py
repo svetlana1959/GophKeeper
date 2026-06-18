@@ -21,6 +21,7 @@ from datetime import UTC, datetime
 from typing import Protocol
 
 from gophkeeper.domain.errors import DomainError, VersionConflict
+from uuid import UUID
 
 
 def _now() -> datetime:
@@ -36,7 +37,7 @@ Also not using Pydantic make it impossible to use domain model as DTO in the API
 
 @dataclass
 class Secret:
-    id: str
+    id: UUID
     account_id: str
     ciphertext: bytes  # opaque to the server; encrypted on the client
     version: int = 1
@@ -112,7 +113,7 @@ class SecretRepository(Protocol):
         """Insert a new secret."""
         ...
 
-    async def get(self, secret_id: str) -> Secret:
+    async def get(self, secret_id: UUID) -> Secret:
         """Return a secret by id, or raise ``SecretNotFound``."""
         ...
 

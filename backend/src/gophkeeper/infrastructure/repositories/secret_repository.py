@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from gophkeeper.domain.errors import SecretNotFound
 from gophkeeper.domain.secret import Secret, SecretRepository
+from uuid import UUID
 
 _COLUMNS = "id, account_id, ciphertext, version, deleted, updated_at"
 
@@ -52,7 +53,7 @@ class SqlAlchemySecretRepository(SecretRepository):
             _to_params(secret),
         )
 
-    async def get(self, secret_id: str) -> Secret:
+    async def get(self, secret_id: UUID) -> Secret:
         result = await self._session.execute(
             text(f"SELECT {_COLUMNS} FROM secrets WHERE id = :id"),
             {"id": secret_id},

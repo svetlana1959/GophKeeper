@@ -10,10 +10,12 @@ import base64
 from pydantic import BaseModel, field_validator
 
 from gophkeeper.domain.secret import Secret
+from datetime import datetime
+from uuid import UUID
 
 
 class StoreSecretRequest(BaseModel):
-    id: str
+    id: UUID
     account_id: str
     ciphertext_b64: str
 
@@ -41,11 +43,11 @@ class UpdateSecretRequest(BaseModel):
 
 
 class SecretResponse(BaseModel):
-    id: str
+    id: UUID
     account_id: str
     version: int
     deleted: bool
-    updated_at: str
+    updated_at: datetime
     ciphertext_b64: str
 
     @classmethod

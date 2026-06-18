@@ -9,7 +9,7 @@ from datetime import UTC, datetime
 from typing import Protocol
 
 from gophkeeper.domain.errors import DomainError
-
+from uuid import UUID
 
 def _now() -> datetime:
     return datetime.now(UTC)
@@ -17,7 +17,7 @@ def _now() -> datetime:
 
 @dataclass
 class Device:
-    id: str
+    id: UUID
     device_name: str
     public_key: str
     is_active: bool
@@ -45,7 +45,10 @@ class DeviceRepository(Protocol):
     async def add(self, device: Device) -> None:
         ...
 
-    async def get(self, device_id: str) -> Device:
+    async def get(self, device_id: UUID) -> Device:
+        ...
+
+    async def exists(self, device_id: UUID) -> bool:
         ...
 
     async def list_active(self) -> list[Device]:

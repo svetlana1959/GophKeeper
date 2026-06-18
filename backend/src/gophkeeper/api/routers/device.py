@@ -8,6 +8,7 @@ from gophkeeper.api.schemas.device import (
     DeviceResponse,
 )
 from gophkeeper.services.device_service import DeviceService
+from uuid import UUID
 
 router = APIRouter(prefix="/devices", tags=["devices"])
 
@@ -27,7 +28,7 @@ async def register_device(
 
 @router.get("/{device_id}", response_model=DeviceResponse)
 async def fetch_device(
-    device_id: str,
+    device_id: UUID,
     service: DeviceService = Depends(provide(DeviceService)),
 ) -> DeviceResponse:
     device = await service.fetch(device_id)

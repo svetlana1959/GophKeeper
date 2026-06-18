@@ -14,6 +14,7 @@ from gophkeeper.api.schemas.secrets import (
     UpdateSecretRequest,
 )
 from gophkeeper.services.secret_service import SecretService
+from uuid import UUID
 
 router = APIRouter(prefix="/secrets", tags=["secrets"])
 
@@ -33,7 +34,7 @@ async def store_secret(
 
 @router.get("/{secret_id}", response_model=SecretResponse)
 async def fetch_secret(
-    secret_id: str,
+    secret_id: UUID,
     service: SecretService = Depends(provide(SecretService)),
 ) -> SecretResponse:
     secret = await service.fetch(secret_id)
@@ -42,7 +43,7 @@ async def fetch_secret(
 
 @router.put("/{secret_id}", response_model=SecretResponse)
 async def update_secret(
-    secret_id: str,
+    secret_id: UUID,
     body: UpdateSecretRequest,
     service: SecretService = Depends(provide(SecretService)),
 ) -> SecretResponse:

@@ -2,8 +2,8 @@
 
 from gophkeeper.domain.device import Device
 from gophkeeper.domain.unit_of_work import UnitOfWork
-
-from gophkeeper.domain.errors import DeviceNotFound
+from gophkeeper.domain.errors import DeviceAlreadyExists
+from uuid import UUID
 
 class DeviceService:
     def __init__(self, uow: UnitOfWork) -> None:
@@ -12,15 +12,13 @@ class DeviceService:
     async def register(
         self,
         *,
-        device_id: str,
+        device_id: UUID,
         device_name: str,
         public_key: str,
     ) -> Device:
         async with self._uow as uow:
-            try:
-                return await uow.devices.get(device_id)
-            except DeviceNotFound:
-                pass
+            if await uow.devices.exists(device_id):
+                raise DeviceAlreadyExists(device_id)
 
             device = Device(
                 id=device_id,
@@ -33,6 +31,6 @@ class DeviceService:
             await uow.commit()
             return device
 
-    async def fetch(self, device_id: str) -> Device:
+    async def fetch(self, device_id: UUID) -> Device:
         async with self._uow as uow:
             return await uow.devices.get(device_id)

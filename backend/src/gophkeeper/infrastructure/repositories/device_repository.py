@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from gophkeeper.domain.errors import DeviceNotFound
 from gophkeeper.domain.device import Device, DeviceRepository
+from uuid import UUID
 
 _COLUMNS = "id, device_name, public_key, is_active, updated_at"
 
@@ -42,7 +43,7 @@ class SqlAlchemyDeviceRepository(DeviceRepository):
             _to_params(device),
         )
 
-    async def get(self, device_id: str) -> Device:
+    async def get(self, device_id: UUID) -> Device:
         result = await self._session.execute(
             text(f"SELECT {_COLUMNS} FROM devices WHERE id = :id"),
             {"id": device_id},
@@ -51,6 +52,13 @@ class SqlAlchemyDeviceRepository(DeviceRepository):
         if row is None:
             raise DeviceNotFound(device_id)
         return _from_row(row)
+
+    async def exists(self, device_id: UUID) -> bool:
+        result = await self._session.execute(
+            text(f"SELECT 1 FROM DEVICES WHERE id = :id"),
+                 {"id": device_id},
+        )
+        return result.first() is not None
 
     async def list_active(self) -> list[Device]:
         query = f"SELECT {_COLUMNS} FROM devices WHERE is_active = TRUE ORDER BY device_name"
