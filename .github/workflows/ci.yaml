@@ -25,7 +25,7 @@ jobs:
           working-directory: "backend"
           enable-cache: "true"
           # cache-python: "true" # Python installation may be also cached
-          cache-dependency-glob: "backend/uv.lock"
+          cache-dependency-glob: "uv.lock"
 
       - name: Run unit tests
         working-directory: "backend"
