@@ -1,0 +1,48 @@
+.header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 2% 5%;
+    color: white;
+    max-height: 16.6%;
+}
+
+.logo {
+    display: flex;
+    align-items: center;
+    font-size: 1.5em;
+    font-weight: 200;
+    gap: 10px;
+}
+
+.logoImage {
+    width: 55px;
+    height: 55px;
+}
+
+.nav {
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    gap: 20px;
+    width: 40%;
+}
+
+.navLink {
+    color: white;
+    text-decoration: none;
+    font-size: 20px;
+    font-weight: 500;
+}
+
+.navBtn {
+    background-color: #008645;
+    font-size: 16px;
+    color: white;
+    padding: 14px 55px;
+    border: none;
+    border-radius: 16px;
+    cursor: pointer;
+    text-decoration: none;
+    font-weight: 500;
+}
