@@ -27,9 +27,11 @@ Week 3
 | Malik Nurullin | Backend Developer |
 ---
 
-# Sprint Goal
+## Sprint Goal
 
 Expand the MVP by implementing the next set of prioritized features, preparing the infrastructure for future development, and extending the functionality of the system.
+
+## Risks
 
 ---
 
