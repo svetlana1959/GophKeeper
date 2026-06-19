@@ -15,16 +15,20 @@ GophKeeper — a distributed zero-knowledge secret management system designed fo
 Week 3
 
 
-## Roles
+## Team Members and Contributions
 
-| Team Member | Role |
-| ----------- | ---- |
-| Svetlana Maltseva | Team Lead, Product Manager |
-| Elina Akhmetzyanova | Design, Documentation |
-| Arseny Lashkevich | DevOps Engineer |
-| Aleksander Goncharov | CLI Engineer |
-| Emil Nabiullin | Frontend Developer |
-| Malik Nurullin | Backend Developer |
+# Team Members and Contributions
+
+| Team Member | Role | Contribution |
+|-------------|------|-------------|
+| Svetlana Maltseva | Team Lead, Product Manager | |
+| Elina Akhmetzyanova | Design, Documentation | Landing page design, UI mockups, sprint documentation |
+| Arseny Lashkevich | DevOps Engineer | |
+| Aleksander Goncharov | CLI Engineer | |
+| Emil Nabiullin | Frontend Developer | |
+| Malik Nurullin | Backend Developer | |
+
+
 ---
 
 ## Sprint Goal
@@ -75,19 +79,6 @@ Expand the MVP by implementing the next set of prioritized features, preparing t
 
 ---
 
-# Team Contributions
-
-| Team Member | Contribution |
-|------------|------------|
-| Elina Akhmetzyanova | |
-| Svetlana Maltseva | |
-| Arseny Lashkevich | |
-| Aleksander Goncharov | |
-| Emil Nabiullin | |
-| Malik Nurullin | |
-
----
-
 # Daily Standups
 
 ## 17 June 2026
@@ -99,14 +90,6 @@ Expand the MVP by implementing the next set of prioritized features, preparing t
 ---
 
 ## 19 June 2026
-
----
-
-## 20 June 2026
-
----
-
-## 21 June 2026
 
 ---
 
