@@ -35,3 +35,56 @@ jobs:
         working-directory: "backend"
         run: uv run pytest tests/unit
 
+  backend-integration-tests:
+    name: Run integration tests for Python backend
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    services:
+      postgres:
+        image: postgres:18.4-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: docker
+          POSTGRES_DB: gophkeeper
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres -d gophkeeper"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+      
+      - name: Set up Uvicorn
+        uses: astral-sh/setup-uv@v8.2.0
+        with:
+          working-directory: "backend"
+          enable-cache: "true"
+          # cache-python: "true" # Python installation may be also cached
+          cache-dependency-glob: "uv.lock"
+
+      - name: Install dependencies
+        working-directory: "backend"
+        run: uv sync
+
+      - name: Install dbmate
+        run: |
+          mkdir -p /tmp/dbmate-bin
+          curl -fsSL -o /tmp/dbmate-bin/dbmate https://github.com/amacneil/dbmate/releases/latest/download/dbmate-linux-amd64
+          chmod +x /tmp/dbmate-bin/dbmate
+          echo "/tmp/dbmate-bin" >> $GITHUB_PATH
+
+      - name: Run db migrations
+        working-directory: "backend"
+        env:
+          DATABASE_URL: "postgres://postgres:docker@127.0.0.1:5432/gophkeeper?sslmode=disable"
+        run: dbmate up
+      
+      - name: Run integration tests
+        working-directory: "backend"
+        env:
+          TEST_DATABASE_URL: "postgresql+asyncpg://postgres:docker@127.0.0.1:5432/gophkeeper?ssl=disable"
+        run: uv run pytest tests/integration
