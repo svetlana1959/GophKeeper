@@ -7,20 +7,27 @@ visible right here. New aggregates get a sibling adapter following this shape.
 """
 
 from typing import Any
+from uuid import UUID
 
 from sqlalchemy import RowMapping, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from gophkeeper.domain.errors import SecretNotFound
 from gophkeeper.domain.secret import Secret, SecretRepository
-from uuid import UUID
 
 _COLUMNS = "id, account_id, ciphertext, version, deleted, updated_at"
 
 
 def _to_params(secret: Secret) -> dict[str, Any]:
     return {
-        "id": secret.id,
+        # BUG FIX: send the id as plain str, not a UUID object or an
+        # explicitly UUID-typed bind param. The `id` column in this database
+        # is TEXT (an older migration ran before the domain switched to
+        # UUID), so an explicit ::UUID cast on the parameter caused Postgres
+        # to compare "text = uuid", which has no operator. A plain string
+        # parameter compares fine against either a TEXT or a UUID column —
+        # Postgres implicitly casts a string literal when comparing to uuid.
+        "id": str(secret.id),
         "account_id": secret.account_id,
         "ciphertext": secret.ciphertext,
         "version": secret.version,
@@ -31,7 +38,7 @@ def _to_params(secret: Secret) -> dict[str, Any]:
 
 def _from_row(row: RowMapping) -> Secret:
     return Secret(
-        id=row["id"],
+        id=UUID(str(row["id"])),
         account_id=row["account_id"],
         ciphertext=bytes(row["ciphertext"]),
         version=row["version"],
@@ -56,7 +63,7 @@ class SqlAlchemySecretRepository(SecretRepository):
     async def get(self, secret_id: UUID) -> Secret:
         result = await self._session.execute(
             text(f"SELECT {_COLUMNS} FROM secrets WHERE id = :id"),
-            {"id": secret_id},
+            {"id": str(secret_id)},
         )
         row = result.mappings().first()
         if row is None:

@@ -16,7 +16,7 @@ async def _not_found_handler(request: Request, exc: SecretNotFound | DeviceNotFo
 
 async def _conflict_handler(request: Request, exc: VersionConflict | DeviceAlreadyExists) -> JSONResponse:
     body = {"detail": str(exc)}
-    if exc == VersionConflict:
+    if isinstance(exc, VersionConflict):
         body["expected_version"] = exc.expected
         body["actual_version"] = exc.actual
     return JSONResponse(

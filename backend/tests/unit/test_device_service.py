@@ -3,7 +3,7 @@ import pytest
 from gophkeeper.domain.device import Device
 from gophkeeper.domain.errors import DeviceNotFound, DeviceAlreadyExists
 from gophkeeper.services.device_service import DeviceService
-from uuid import UUID
+from uuid import UUID, uuid4
 
 
 class FakeDeviceRepository:
@@ -49,14 +49,15 @@ class FakeUnitOfWork:
 async def test_register_creates_new_device():
     uow = FakeUnitOfWork()
     service = DeviceService(uow)
+    device_id = uuid4()
 
     device = await service.register(
-        device_id="dev-1",
+        device_id=device_id,
         device_name="MacBook",
         public_key="pubkey",
     )
 
-    assert device.id == "dev-1"
+    assert device.id == device_id
     assert device.device_name == "MacBook"
     assert device.public_key == "pubkey"
     assert device.is_active is True
@@ -65,9 +66,10 @@ async def test_register_creates_new_device():
 
 async def test_register_duplicate_raises_device_already_exists():
     uow = FakeUnitOfWork()
+    device_id = uuid4()
 
     existing = Device(
-        id="dev-1",
+        id=device_id,
         device_name="MacBook",
         public_key="pubkey",
         is_active=True,
@@ -79,7 +81,7 @@ async def test_register_duplicate_raises_device_already_exists():
 
     with pytest.raises(DeviceAlreadyExists):
         await service.register(
-            device_id="dev-1",
+            device_id=device_id,
             device_name="Another Name",
             public_key="another-key",
         )
@@ -87,9 +89,10 @@ async def test_register_duplicate_raises_device_already_exists():
 
 async def test_fetch_returns_device():
     uow = FakeUnitOfWork()
+    device_id = uuid4()
 
     device = Device(
-        id="dev-1",
+        id=device_id,
         device_name="MacBook",
         public_key="pubkey",
         is_active=True,
@@ -99,9 +102,9 @@ async def test_fetch_returns_device():
 
     service = DeviceService(uow)
 
-    fetched = await service.fetch("dev-1")
+    fetched = await service.fetch(device_id)
 
-    assert fetched.id == "dev-1"
+    assert fetched.id == device_id
 
 
 async def test_fetch_missing_device_raises():
@@ -109,4 +112,4 @@ async def test_fetch_missing_device_raises():
     service = DeviceService(uow)
 
     with pytest.raises(DeviceNotFound):
-        await service.fetch("missing")
+        await service.fetch(uuid4())
