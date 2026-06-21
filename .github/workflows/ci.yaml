@@ -37,10 +37,9 @@ jobs:
       - name: Extract image name
         id: image-name
         run: |
-          # echo ${{ steps.meta.outputs.bake-file-tags }} | 
-          # jq -r '.target."docker-metadata-action".args.DOCKER_META_IMAGES' | 
-          # sed -e 's/^/name=\0/' >> "$GITHUB_OUTPUT"
-          cat ${{ steps.meta.outputs.bake-file }}
+          cat ${{ steps.meta.outputs.bake-file-tags }} |
+          jq -r '.target."docker-metadata-action".args.DOCKER_META_IMAGES' | 
+          sed -e 's/^/name=\0/' >> "$GITHUB_OUTPUT"
 
       - name: Build frontend image
         uses: docker/build-push-action@v7
