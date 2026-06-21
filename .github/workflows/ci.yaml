@@ -17,7 +17,7 @@ jobs:
       contents: read
     outputs:
       artifact-id: ${{ steps.artifact.outputs.artifact-id }}
-      image-name: ${{ fromJson(steps.meta.outputs.bake-bake-file-tags).target.docker-metadata-action.args.DOCKER_META_IMAGES }}
+      image-name: ${{ steps.image-name.outputs.name }}
     steps:
       - name: Setup Docker Buildx
         uses: docker/setup-buildx-action@v4
@@ -33,6 +33,13 @@ jobs:
             type=ref,event=pr
             type=raw,value=latest,enable=${{ github.ref_name == 'main' }}
             type=raw,value=staging,enable=${{ github.ref_name == 'dev' }}
+      
+      - name: Extract image name
+        id: image-name
+        run: |
+          echo ${{ steps.meta.outputs.bake-file-tags }} | 
+          jq -r '.target."docker-metadata-action".args.DOCKER_META_IMAGES' | 
+          sed -e 's/^/name=\0/' >> "$GITHUB_OUTPUT"
 
       - name: Build frontend image
         uses: docker/build-push-action@v7
