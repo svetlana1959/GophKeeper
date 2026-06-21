@@ -28,7 +28,7 @@
 - **Decision**: Layered configuration management for different deployment environments.
 - **Rationale**: It dynamically isolates settings for development, testing, staging, and production environments without modifying the system logic. It supports secure, dynamic injection of production configuration overrides directly from secret storage solutions or deployment orchestration systems.
 
-### Package and Workspace Tooling: uv
+### Package and Workspace Tooling: Uvicorn
 - **Decision**: Utilizing a high-speed, modern workspace compiler and environment runner.
 - **Rationale**: This dramatically accelerates deployment assembly pipelines, minimizes artifact container footprints, and ensures reproducible, locked runtime environments across both development and distributed staging servers.
 
@@ -53,4 +53,3 @@
 - **Rationale**: 
     - **Separation of Concerns**: Parameters that a user needs to modify (such as backend server endpoints, connection timeouts, log levels, or default profile names) are decoupled from the sensitive application state.
     - **Human-Readable Boundaries**: Storing these preferences in a readable layout prevents users from manually editing or inadvertently corrupting the internal database tables (`SQLite`). This acts as an operational boundary: the database is managed strictly via application logic, while the configuration file remains an exposed user interface.
-    
