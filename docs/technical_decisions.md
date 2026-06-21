@@ -4,7 +4,7 @@
 - **Decision**: Implementing a strict **Zero-Knowledge model** inside a unified **mono-repo** codebase, dividing the system into an isolated stateless server component and a stateful client binary.
 - **Rationale**: 
     - The server is architected as a "blind" storage orchestrator. It never processes unencrypted private keys or raw payloads. By keeping the cryptographic burden entirely on the client, the backend remains lightweight, scale-ready, and legally/technically resilient against data leaks.
-    - A mono-repo approach ensures tight synchronization of network communication protocols and API contracts. It simplifies localized builds, and artifact versioning.
+    - A mono-repo approach ensures tight synchronization of network communication protocols and API contracts. It simplifies localized builds and artifact versioning.
 
 ## 2. Backend API Stack Decisions
 
