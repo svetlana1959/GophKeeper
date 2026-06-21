@@ -288,7 +288,6 @@ Figma - https://www.figma.com/design/e9yJfGqSkREVk5sjPocKHN/Untitled?node-id=0-1
 - Issue #75 - [feat]: Frontend landing preview - https://github.com/orgs/svetlana1959/projects/4/views/1?pane=issue&itemId=201384138&issue=svetlana1959%7CGophKeeper%7C75
 - Issue #77 - Design Trusted Devices Management Page - https://github.com/orgs/svetlana1959/projects/4/views/1?pane=issue&itemId=202085670&issue=svetlana1959%7CGophKeeper%7C77
 - Issue #78 - Design Account Statistics Page - https://github.com/orgs/svetlana1959/projects/4/views/1?pane=issue&itemId=202086325&issue=svetlana1959%7CGophKeeper%7C78
-- Issue #92 - Document the feature: Digital Inheritance - https://github.com/orgs/svetlana1959/projects/4/views/1?pane=issue&itemId=202900266&issue=svetlana1959%7CGophKeeper%7C92
 ---
 
 ## Pull Requests
@@ -296,6 +295,7 @@ Figma - https://www.figma.com/design/e9yJfGqSkREVk5sjPocKHN/Untitled?node-id=0-1
 - PR #58 - feat: api endpoints -  https://github.com/svetlana1959/GophKeeper/pull/58
 - PR #55 - feat: backend database setup - https://github.com/svetlana1959/GophKeeper/pull/55
 - PR #91 - [docs]: document technical decisions -  https://github.com/svetlana1959/GophKeeper/pull/91
+- PR #93 - Create feature_description.md - https://github.com/svetlana1959/GophKeeper/pull/93
 
 ---
 
