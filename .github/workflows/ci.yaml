@@ -38,6 +38,13 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           annotations: ${{ steps.meta.outputs.annotations }}
-          push: false
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          outputs: type=docker,dest=${{ runner.temp }}/frontend.tar
+          push: false
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: frontend-image
+          path: ${{ runner.temp }}
