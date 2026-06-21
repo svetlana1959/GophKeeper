@@ -295,7 +295,7 @@ Figma - https://www.figma.com/design/e9yJfGqSkREVk5sjPocKHN/Untitled?node-id=0-1
 
 - PR #58 - feat: api endpoints -  https://github.com/svetlana1959/GophKeeper/pull/58
 - PR #55 - feat: backend database setup - https://github.com/svetlana1959/GophKeeper/pull/55
-- PR #XX
+- PR #91 - [docs]: document technical decisions -  https://github.com/svetlana1959/GophKeeper/pull/91
 
 ---
 
