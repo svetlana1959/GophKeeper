@@ -39,6 +39,8 @@ jobs:
         with:
           context: "frontend"
           tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          annotations: ${{ steps.meta.outputs.annotations }}
           push: false
           cache-from: type=gha
           cache-to: type=gha,mode=max
