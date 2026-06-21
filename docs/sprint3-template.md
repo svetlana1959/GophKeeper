@@ -26,7 +26,7 @@ Week 3
 | Arseny Lashkevich | DevOps Engineer | Configured CI for backend unit and integration tests, implemented automated build pipelines, and set up deployment to the VM |
 | Aleksander Goncharov | CLI Engineer | |
 | Emil Nabiullin | Frontend Developer | Frontend layout implementation, UI integration, web page development based on approved mockups |
-| Malik Nurullin | Backend Developer | |
+| Malik Nurullin | Backend Developer | Completed API endpoints implementation and fixed UUID and database connection issues that were causing test failures, started working on multi-device synchronization |
 
 
 ---
@@ -58,55 +58,121 @@ Expand the MVP by implementing the next-priority features, improving system usab
 ## New Functionality
 
 ### (1) Secret Creation
-The application now allows authenticated users to create and securely store secrets. Before being stored locally, secret data is encrypted to ensure confidentiality. The system validates required fields and provides feedback on successful or failed operations.
+- The application now allows authenticated users to create and securely store secrets. Before being stored locally, secret data is encrypted to ensure confidentiality. The system validates required fields and provides feedback on successful or failed operations.
 
 ### (2) Secret Management
-Users can now view all secrets available to them. displays secret names and contents, supports empty states when no secrets exist, and ensures that users can only access secrets they own or are authorized to view.
-
-Users can also update existing secrets. Changes are validated before being saved, invalid updates are rejected, and users may cancel modifications without affecting stored data.
+- Users can now view all secrets available to them. displays secret names and contents, supports empty states when no secrets exist, and ensures that users can only access secrets they own or are authorized to view.
+- Users can also update existing secrets. Changes are validated before being saved, invalid updates are rejected, and users may cancel modifications without affecting stored data.
 
 
 ### (3) Multi-Device Access
-Support for trusted devices has been added. Users can access their encrypted secrets from multiple approved devices. Synchronization ensures that data remains consistent across devices, while untrusted devices are denied access.
+- Support for trusted devices has been added. Users can access their encrypted secrets from multiple approved devices. Synchronization ensures that data remains consistent across devices, while untrusted devices are denied access.
 
 
 ### Digital Inheritance (Planned Feature)
-A new digital inheritance feature is planned for future releases. During registration, users will be able to designate a trusted beneficiary who may receive access to selected secrets in exceptional circumstances.
-
-The system will periodically verify the activity of the account owner. If prolonged inactivity is detected, additional verification requests will be sent to confirm that the owner is still active. If verification attempts remain unanswered for a predefined period, access to designated secrets may be transferred to the trusted beneficiary according to the user's predefined settings.
-
-This feature aims to provide secure digital legacy management while preserving user privacy and preventing unauthorized access.
+ - A new digital inheritance feature is planned for future releases. During registration, users will be able to designate a trusted beneficiary who may receive access to selected secrets in exceptional circumstances.
+ - The system will periodically verify the activity of the account owner. If prolonged inactivity is detected, additional verification requests will be sent to confirm that the owner is still active. If verification attempts remain unanswered for a predefined period, access to designated secrets may be transferred to the trusted beneficiary according to the user's predefined settings.
+ - This feature aims to provide secure digital legacy management while preserving user privacy and preventing unauthorized access.
 ---
 
 ## Frontend Updates
-
+- Implemented the initial frontend structure based on approved mockups
+- Completed layout implementation for the web application
+- Finished the Trusted Devices Management Page
+- Finished the Account Statistics Page
 ---
 
 ## Backend Updates
-
-
+- Completed implementation of the planned API endpoints
+- Fixed issues related to UUID handling and database connectivity
+- Resolved test failures caused by backend configuration problems
+- Started implementation of multi-device synchronization functionality
 ---
 
 ## Database Update
-
+- Configured database models and schema for users, devices, and secrets
+- Improved database connectivity and fixed integration issues
+- Verified backend interaction with the database through automated tests
 ---
 
 ## Infrastructure Updates
-
+- Configured CI pipelines for backend unit and integration tests.
+Implemented automated build pipelines
+- Set up deployment workflow for the VM environment
+- Improved project infrastructure and development automation
 
 ---
 
 # Screenshots / GIFs
 
 ---
+# Architecture & Technical Decisions
 
-# Architecture / Technical Decisions
+## 1. Core Architectural Paradign: Zero-Knowledge & Mono-Repo split
+- **Decision**: Implementing a strict **Zero-Knowledge model** inside a unified **mono-repo** codebase, dividing the system into an isolated stateless server component and a stateful client binary.
+- **Rationale**: 
+    - The server is architected as a "blind" storage orchestrator. It never processes unencrypted private keys or raw payloads. By keeping the cryptographic burden entirely on the client, the backend remains lightweight, scale-ready, and legally/technically resilient against data leaks.\
+    - A mono-repo approach ensures tight synchronization of network communication protocols and API contracts. It simplifies localized builds, artifact versioning, and developer experience while enforcing a strict boundary rule: the client application never imports anything from the backend and vice versa.
 
-## Decisions Made
+## 2. Backend API Stack Decisions
+
+### High-Performance Asynchronous Framework: FastAPI
+- **Decision**: Selected as the primary presentation layer framework for the server component.
+- **Rationale**: It leverages native asynchronous concurrent request processing, delivering high-throughput performance with low latency overhead. Automated serialization and runtime validation of input/output data transfer objects (DTOs) heavily reduce development overhead and eliminate a common vector for data-injection bugs.
+
+### Reactive Data Access: SQLAlchemy (Async) + asyncpg
+- **Decision**: Utilizing an asynchronous Object-Relational Mapper coupled with a high-performance, native-protocol driver.
+- **Rationale**: This ensures non-blocking database input/output execution paths across the entire service layer. The direct binary protocol mapping handles large-scale binary blocks (BYTEA) and connection pools effectively, preventing worker pool starvation under dense, high-load cryptographic storage operations.
+
+### Core Database: PostgreSQL
+- **Decision**: Adopted as the primary relational database system.
+- **Rationale**: The architectural requirements dictate strict enterprise compliance, operational atomicity, and native support for advanced binary fields (`BYTEA`) and logical tracking flags (`BOOLEAN`). Furthermore, its capability to handle high-concurrency safe updates (`ON CONFLICT DO UPDATE`) allows for reliable, idempotent distributed registration and atomic version increment logic.
+
+### Separate Database Migration Tooling: dbmate
+- **Decision**: Using a dedicated, framework-agnostic lightweight migration runner.
+- **Rationale**: Decoupling schema tracking from the application framework runtime ensures clean infrastructure deployments. It forces migrations to be written in native SQL, making them explicit, maintainable, easily testable via continuous integration pipelines, and safe against state corruption caused by application-level code mutations.
+
+### Configuration Management: Dynaconf
+- **Decision**: Layered configuration management for different deployment environments.
+- **Rationale**: It dynamically isolates settings for development, testing, staging, and production environments without modifying the system logic. It supports secure, dynamic injection of production configuration overrides directly from secret storage solutions or deployment orchestration systems.
+
+### Package and Workspace Tooling: Uvicorn
+- **Decision**: Utilizing a high-speed, modern workspace compiler and environment runner.
+- **Rationale**: This dramatically accelerates deployment assembly pipelines, minimizes artifact container footprints, and ensures reproducible, locked runtime environments across both development and distributed staging servers.
+
+## 3. Client Binary Tooling: Go Language (Golang)
+- **Decision**: Designing and building the client CLI entirely using Go.
+- **Rationale**:
+    - **Static Compilation & Zero Dependencies**: Compiles into a single, statically-linked binary executable. This guarantees immediate out-of-the-box local execution on user nodes without requiring pre-installed runtimes, specific shared libraries, or interpreter management tools.
+    - **Cryptographic Capability & Security**: Offers excellent access to low-level cryptographic extensions and multi-platform native compiling. Memory safety features drastically mitigate local side-channel or memory-corruption vulnerabilities common during key management and envelope encryption procedures.
+    - **Cross-Compilation**: Enables native compilation for multiple targets (Linux, macOS, Windows across different CPU architectures) from a single deployment script, ensuring seamless distribution for diverse operational environments.
+
+## 4. Client CLI Storage & Configuration Strategy
+
+### Local Relational Storage: SQLite
+- **Decision**: Utilizing a local embedded relational database engine for client-state tracking, cryptographic metadata, and the local trust graph.
+- **Rationale**: 
+    - **Zero-Administration & Single File**: It runs entirely within the CLI process memory space and stores all data in a single, compact local file. This eliminates the need to manage a separate local daemon or server process on the user's machine.
+    - **Relational Integrity for Trust Chains**: Tracking local devices, synchronization states, and complex trust graphs (e.g., verifying which local device identity signed which target node) requires a relational model with strict Foreign Key constraints and atomic transactions (ACID). This ensures the local state can never be partially written or corrupted during abrupt application termination.
+    - **Secure Binary Storage**: It naturally handles binary large objects (BLOB), which is essential for storing encrypted payload blocks and local keys without requiring brittle text encoding schemes.
+
+### User-Modifiable Settings: YAML Configuration
+- **Decision**: Separating application state from user configuration by keeping human-editable parameters in a clear text-based format.
+- **Rationale**: 
+    - **Separation of Concerns**: Parameters that a user needs to modify (such as backend server endpoints, connection timeouts, log levels, or default profile names) are decoupled from the sensitive application state.
+    - **Human-Readable Boundaries**: Storing these preferences in a readable layout prevents users from manually editing or inadvertently corrupting the internal database tables (`SQLite`). This acts as an operational boundary: the database is managed strictly via application logic, while the configuration file remains an exposed user interface.
 
 ---
 
 ## Challenges Encountered
+
+* The backend team encountered issues with UUID handling, which caused several API requests and tests to fail. The issue was investigated and resolved.
+
+* Database connectivity issues were discovered during integration and automated testing. Configuration changes were applied to ensure stable communication between the backend and the database.
+
+* Docker configuration problems slowed down backend development and testing. The container setup was adjusted to resolve environment-related issues.
+
+* Setting up CI pipelines required additional effort to ensure that automated unit and integration tests run correctly in the GitHub Actions environment.
 
 ---
 
@@ -173,7 +239,7 @@ During Sprint 2, the team completed the project planning phase. The MVP scope, s
 
 | Area | Sprint 2 | Sprint 3 |
 |--------|--------|--------|
-| Authentication | User stories and requirements defined | Not implemented yet |
+| Authentication | User stories and requirements defined | Not implemented yet(implementation in the next sprint) |
 | Secret Management | MVP scope and CRUD requirements prepared | |
 | Synchronization | Architecture and synchronization workflow designed | |
 | Infrastructure | Technology stack selected, VM and CI/CD planned | |
@@ -236,7 +302,7 @@ Figma - https://www.figma.com/design/e9yJfGqSkREVk5sjPocKHN/Untitled?node-id=0-1
 # Updated Backlog
 
 Project backlog and sprint planning are managed using GitHub Projects.
-Link: https://github.com/orgs/svetlana1959/projects/4/views/1
+Link: https://github.com/orgs/svetlana1959/projects/4/views/1 and https://github.com/orgs/svetlana1959/projects/6/views/1
 
 ## Completed
 ### Issue: #80, #79, #55
