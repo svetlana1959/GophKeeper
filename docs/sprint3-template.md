@@ -288,7 +288,7 @@ Figma - https://www.figma.com/design/e9yJfGqSkREVk5sjPocKHN/Untitled?node-id=0-1
 - Issue #75 - [feat]: Frontend landing preview - https://github.com/orgs/svetlana1959/projects/4/views/1?pane=issue&itemId=201384138&issue=svetlana1959%7CGophKeeper%7C75
 - Issue #77 - Design Trusted Devices Management Page - https://github.com/orgs/svetlana1959/projects/4/views/1?pane=issue&itemId=202085670&issue=svetlana1959%7CGophKeeper%7C77
 - Issue #78 - Design Account Statistics Page - https://github.com/orgs/svetlana1959/projects/4/views/1?pane=issue&itemId=202086325&issue=svetlana1959%7CGophKeeper%7C78
-
+- Issue #92 - Document the feature: Digital Inheritance - https://github.com/orgs/svetlana1959/projects/4/views/1?pane=issue&itemId=202900266&issue=svetlana1959%7CGophKeeper%7C92
 ---
 
 ## Pull Requests
@@ -305,7 +305,7 @@ Project backlog and sprint planning are managed using GitHub Projects.
 Link: https://github.com/orgs/svetlana1959/projects/4/views/1 and https://github.com/orgs/svetlana1959/projects/6/views/1
 
 ## Completed
-### Issue: #80, #79, #55
+### Issue: #80, #79, #55, #92
 ---
 
 ## In Progress
