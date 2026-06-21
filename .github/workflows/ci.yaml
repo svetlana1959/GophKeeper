@@ -11,6 +11,7 @@ on:
   workflow_dispatch:
 jobs:
   frontend-build:
+    name: Build frontend image
     runs-on: ubuntu-24.04
     permissions:
       contents: read
