@@ -22,10 +22,23 @@ jobs:
       - name: Setup Docker Buildx
         uses: docker/setup-buildx-action@v4
 
+      - name: Extract metadata
+        uses: docker/metadata-action@v6
+        id: meta
+        with:
+          images: ${{ github.repository_owner }}/${{ github.repository }}-frontend
+          tags: |
+            type=sha
+            type=ref,event=branch
+            type=ref,event=pr
+            type=raw,value=latest,enable=${{ github.ref_name == 'main' }}
+            type=raw,value=staging,enable=${{ github.ref_name == 'dev' }}
+
       - name: Build frontend image
         uses: docker/build-push-action@v7
         with:
           context: "frontend"
+          tags: ${{ steps.meta.outputs.tags }}
           push: false
           cache-from: type=gha
           cache-to: type=gha,mode=max
