@@ -5,8 +5,8 @@ device-name: laptop          		 # human-readable device identity
 default-folder: personal   			 # folder new secrets land in by default (categorization)
 */
 
-// Пакет config предоставляет адаптер для чтения и записи клиентской конфигурации.
-// Конфиг хранится в YAML по пути $HOME/.goph/config.yaml (или %USERPROFILE%\.goph\config.yaml в Windows).
+// Package config provides an adapter for reading and writing client configuration.
+// The config is stored in YAML at $HOME/.goph/config.yaml (or %USERPROFILE%\.goph\config.yaml on Windows).
 package config
 
 import (
@@ -19,12 +19,12 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// Config — структура, отражающая содержимое конфигурационного файла.
+// Config — structure reflecting the content of the configuration file.
 type Config struct {
-	Remote        string `yaml:"remote"`          // URL бэкенда (используется для push/pull)
-	SecretDB      string `yaml:"secret-db"`       // путь к локальной SQLite-базе секретов
-	DeviceName    string `yaml:"device-name"`      // человекочитаемое имя устройства
-	DefaultFolder string `yaml:"default-folder"`   // папка по умолчанию для новых секретов
+	Remote        string `yaml:"remote"`          // Backend URL (used for push/pull)
+	SecretDB      string `yaml:"secret-db"`       // Path to the local SQLite secret store
+	DeviceName    string `yaml:"device-name"`      // Human-readable device identity
+	DefaultFolder string `yaml:"default-folder"`   // Default folder for new secrets
 }
 
 // Default secret DB value
