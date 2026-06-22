@@ -249,10 +249,10 @@ During Sprint 2, the team completed the project planning phase. The MVP scope, s
 | Area | Sprint 2 | Sprint 3 |
 |--------|--------|--------|
 | Authentication | User stories and requirements defined | Not implemented yet(implementation in the next sprint) |
-| Secret Management | MVP scope and CRUD requirements prepared | |
+| Secret Management | MVP scope and CRUD requirements prepared | Secret management workflows refined, data model and API endpoints prepared |
 | Synchronization | Architecture and synchronization workflow designed | |
-| Infrastructure | Technology stack selected, VM and CI/CD planned | |
-| Web Application | Wireframes and UI mockups created | |
+| Infrastructure | Technology stack selected, VM and CI/CD planned | CI pipelines for unit and integration tests implemented, deployment infrastructure configured |
+| Web Application | Wireframes and UI mockups created | Landing page, Trusted Devices page, and Account Statistics page designed and implemented |
 
 ---
 
