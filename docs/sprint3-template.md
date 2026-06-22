@@ -70,7 +70,7 @@ Expand the MVP by implementing the next-priority features, improving system usab
 
 
 ### Digital Inheritance (Planned Feature)
- - A new digital inheritance feature is planned for future releases. During registration, users will be able to designate a trusted beneficiary who may receive access to selected secrets in exceptional circumstances.
+ - A Digital Inheritance feature is planned for future releases. After user registration and authentication are implemented, users will be able to designate a trusted beneficiary in their account settings. During registration, users will be able to designate a trusted beneficiary who may receive access to selected secrets in exceptional circumstances.
  - The system will periodically verify the activity of the account owner. If prolonged inactivity is detected, additional verification requests will be sent to confirm that the owner is still active. If verification attempts remain unanswered for a predefined period, access to designated secrets may be transferred to the trusted beneficiary according to the user's predefined settings.
  - This feature aims to provide secure digital legacy management while preserving user privacy and preventing unauthorized access.
 ---
@@ -210,6 +210,15 @@ The team discussed current progress and blockers.
 
 ## 22 June 2026
 
+| Team Member              | Progress Update                                                                                                                                                                         |
+| ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Elina**  | Completed the **Trusted Devices Management Page** design. Continued work on the **Account Statistics Page** and finalized the landing page design together with the frontend developer |
+| **Emil**       | Continued frontend development. Working on the landing page implementation and waiting for final design updates                                                                        |
+| **Arseny**    | Completed infrastructure tasks and prepared the current draft pull request for review. Waiting for backend updates with fixed integration tests before merging                         |
+| **Malik**       | Did not attend the standup                                                                                                                                                           |
+| **Aleksander** | Experienced internet connectivity issues that affected progress. Reported that all planned tasks should be completed by the end of the day                                             |
+| **Svetlana**    | Continued work on the sprint report and project documentation. Added new backlog tasks and identified potential stakeholders for next week's feedback sessions                         |
+
 ---
 
 ## 23 June 2026
@@ -252,6 +261,20 @@ During Sprint 2, the team completed the project planning phase. The MVP scope, s
 This sprint expanded the contribution to the GophKeeper product through implementation of additional functionality, infrastructure improvements, and preparation for future synchronization and trusted-device workflows.
 
 ### Progress Against Baseline
+
+At the beginning of the sprint, the project consisted mainly of requirements, user stories, design mockups, and architectural decisions
+
+By the end of the sprint:
+
+* Backend API endpoints were implemented and stabilized
+* Database integration issues were resolved
+* Automated unit and integration testing pipelines were configured
+* Frontend layouts for the main pages were completed
+* Trusted Devices and Account Statistics pages were designed
+* Deployment infrastructure and CI/CD workflows were prepared
+* The project moved from the planning and design phase to a working implementation phase
+
+Overall, the project achieved significant progress toward delivering a functional MVP and reduced the gap between the planned architecture and the actual implementation
 
 ---
 
