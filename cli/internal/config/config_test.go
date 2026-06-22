@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 )
 
@@ -76,6 +77,24 @@ default-folder: work
 	}
 }
 
+func TestLoadFromFile_UnknownField(t *testing.T) {
+	tmpDir := t.TempDir()
+	path := filepath.Join(tmpDir, "config.yaml")
+	content := `
+remote: https://example.com
+device-name: laptop
+typo-field: should-fail
+`
+	if err := os.WriteFile(path, []byte(content), 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err := LoadFromFile(path)
+	if err == nil {
+		t.Error("Expected error for unknown field, but got nil")
+	}
+}
+
 func TestSaveToFile(t *testing.T) {
 	tmpDir := t.TempDir()
 	path := filepath.Join(tmpDir, ".goph", "config.yaml")
@@ -95,15 +114,23 @@ func TestSaveToFile(t *testing.T) {
 	if err != nil {
 		t.Fatalf("File not created: %v", err)
 	}
-	if info.Mode().Perm() != 0600 {
-		t.Logf("File permissions: %v (expected 0600, but may differ on Windows)", info.Mode().Perm())
+
+	// Permission checks only work reliably on Unix-like systems
+	if runtime.GOOS != "windows" {
+		if info.Mode().Perm() != 0600 {
+			t.Errorf("File permissions: %v (expected 0600)", info.Mode().Perm())
+		}
 	}
+
 	dirInfo, err := os.Stat(filepath.Dir(path))
 	if err != nil {
 		t.Fatalf("Directory not created: %v", err)
 	}
-	if dirInfo.Mode().Perm() != 0700 {
-		t.Logf("Directory permissions: %v (expected 0700, but may differ on Windows)", dirInfo.Mode().Perm())
+
+	if runtime.GOOS != "windows" {
+		if dirInfo.Mode().Perm() != 0700 {
+			t.Errorf("Directory permissions: %v (expected 0700)", dirInfo.Mode().Perm())
+		}
 	}
 
 	loaded, err := LoadFromFile(path)

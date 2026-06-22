@@ -21,10 +21,10 @@ import (
 
 // Config — structure reflecting the content of the configuration file.
 type Config struct {
-	Remote        string `yaml:"remote"`          // Backend URL (used for push/pull)
-	SecretDB      string `yaml:"secret-db"`       // Path to the local SQLite secret store
-	DeviceName    string `yaml:"device-name"`      // Human-readable device identity
-	DefaultFolder string `yaml:"default-folder"`   // Default folder for new secrets
+	Remote        string `yaml:"remote"`         // Backend URL (used for push/pull)
+	SecretDB      string `yaml:"secret-db"`      // Path to the local SQLite secret store
+	DeviceName    string `yaml:"device-name"`    // Human-readable device identity
+	DefaultFolder string `yaml:"default-folder"` // Default folder for new secrets
 }
 
 // Default secret DB value
@@ -70,6 +70,25 @@ func LoadFromFile(path string) (*Config, error) {
 			return nil, fmt.Errorf("Config file not found: %w", err)
 		}
 		return nil, fmt.Errorf("Error reading config file: %w", err)
+	}
+
+	// Check for unknown fields
+	var rawMap map[string]interface{}
+	if err := yaml.Unmarshal(data, &rawMap); err != nil {
+		return nil, fmt.Errorf("Error parsing YAML: %w", err)
+	}
+
+	knownFields := map[string]bool{
+		"remote":         true,
+		"secret-db":      true,
+		"device-name":    true,
+		"default-folder": true,
+	}
+
+	for key := range rawMap {
+		if !knownFields[key] {
+			return nil, fmt.Errorf("Unknown field in config: %q", key)
+		}
 	}
 
 	var cfg Config
