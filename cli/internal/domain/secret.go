@@ -18,10 +18,12 @@ import (
 type Secret struct {
 	ID        string
 	Name      string // local-only lookup key; never sent to the server
+	FolderID  string
 	Payload   []byte // ciphertext
 	Nonce     []byte
 	Version   int
 	Deleted   bool
+	CreatedAt time.Time
 	UpdatedAt time.Time
 }
 
