@@ -296,6 +296,9 @@ Figma - https://www.figma.com/design/e9yJfGqSkREVk5sjPocKHN/Untitled?node-id=0-1
 - PR #55 - feat: backend database setup - https://github.com/svetlana1959/GophKeeper/pull/55
 - PR #91 - [docs]: document technical decisions -  https://github.com/svetlana1959/GophKeeper/pull/91
 - PR #93 - Create feature_description.md - https://github.com/svetlana1959/GophKeeper/pull/93
+- PR #81 - Landing Page Init - https://github.com/svetlana1959/GophKeeper/pull/81
+- PR #95 - Make Web Landing Application - https://github.com/svetlana1959/GophKeeper/pull/95
+  
 
 ---
 
