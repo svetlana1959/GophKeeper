@@ -18,7 +18,7 @@ func TestConfigPath(t *testing.T) {
 	}
 	expected := filepath.Join(home, ".goph", "config.yaml")
 	if path != expected {
-		t.Errorf("Expected path %q, got %q", expected, path)
+		t.Errorf("expected path %q, got %q", expected, path)
 	}
 }
 
@@ -28,7 +28,7 @@ func TestLoadFromFile_NotFound(t *testing.T) {
 
 	_, err := LoadFromFile(path)
 	if err == nil {
-		t.Error("Expected error for non-existent file, but got nil")
+		t.Error("expected error for non-existent file, but got nil")
 	}
 }
 
@@ -41,7 +41,7 @@ func TestLoadFromFile_Malformed(t *testing.T) {
 
 	_, err := LoadFromFile(path)
 	if err == nil {
-		t.Error("Expected parsing error, but got nil")
+		t.Error("expected parsing error, but got nil")
 	}
 }
 
@@ -64,16 +64,16 @@ default-folder: work
 	}
 
 	if cfg.Remote != "https://example.com" {
-		t.Errorf("Remote = %q, awaited = %q", cfg.Remote, "https://example.com")
+		t.Errorf("remote = %q, awaited = %q", cfg.Remote, "https://example.com")
 	}
 	if cfg.DeviceName != "laptop" {
-		t.Errorf("DeviceName = %q, awaited = %q", cfg.DeviceName, "laptop")
+		t.Errorf("deviceName = %q, awaited = %q", cfg.DeviceName, "laptop")
 	}
 	if cfg.DefaultFolder != "work" {
-		t.Errorf("DefaultFolder = %q, awaited = %q", cfg.DefaultFolder, "work")
+		t.Errorf("defaultFolder = %q, awaited = %q", cfg.DefaultFolder, "work")
 	}
 	if cfg.SecretDB != DefaultSecretDB {
-		t.Errorf("SecretDB = %q, awaited default value = %q", cfg.SecretDB, DefaultSecretDB)
+		t.Errorf("secretDB = %q, awaited default value = %q", cfg.SecretDB, DefaultSecretDB)
 	}
 }
 
@@ -91,7 +91,7 @@ typo-field: should-fail
 
 	_, err := LoadFromFile(path)
 	if err == nil {
-		t.Error("Expected error for unknown field, but got nil")
+		t.Error("expected error for unknown field, but got nil")
 	}
 }
 
@@ -118,7 +118,7 @@ func TestSaveToFile(t *testing.T) {
 	// Permission checks only work reliably on Unix-like systems
 	if runtime.GOOS != "windows" {
 		if info.Mode().Perm() != 0600 {
-			t.Errorf("File permissions: %v (expected 0600)", info.Mode().Perm())
+			t.Errorf("file permissions: %v (expected 0600)", info.Mode().Perm())
 		}
 	}
 
@@ -129,7 +129,7 @@ func TestSaveToFile(t *testing.T) {
 
 	if runtime.GOOS != "windows" {
 		if dirInfo.Mode().Perm() != 0700 {
-			t.Errorf("Directory permissions: %v (expected 0700)", dirInfo.Mode().Perm())
+			t.Errorf("directory permissions: %v (expected 0700)", dirInfo.Mode().Perm())
 		}
 	}
 
@@ -138,19 +138,19 @@ func TestSaveToFile(t *testing.T) {
 		t.Fatalf("Could not load saved config: %v", err)
 	}
 	if loaded.Remote != cfg.Remote || loaded.DeviceName != cfg.DeviceName {
-		t.Errorf("Loaded config does not match saved config")
+		t.Errorf("loaded config does not match saved config")
 	}
 }
 
 func TestValidateForSync(t *testing.T) {
 	cfg := &Config{Remote: ""}
 	if err := cfg.ValidateForSync(); err == nil {
-		t.Error("Expected error for empty remote URL")
+		t.Error("expected error for empty remote URL")
 	}
 
 	cfg.Remote = "https://valid.com"
 	if err := cfg.ValidateForSync(); err != nil {
-		t.Errorf("Unexpected error: %v", err)
+		t.Errorf("unexpected error: %v", err)
 	}
 }
 
@@ -162,11 +162,11 @@ func TestResolveSecretDB(t *testing.T) {
 	cfg := &Config{SecretDB: "~/secrets.db"}
 	resolved, err := cfg.ResolveSecretDB()
 	if err != nil {
-		t.Fatalf("ResolveSecretDB returned error: %v", err)
+		t.Fatalf("resolveSecretDB returned error: %v", err)
 	}
 	expected := filepath.Join(home, "secrets.db")
 	if resolved != expected {
-		t.Errorf("Resolved path %q, expected %q", resolved, expected)
+		t.Errorf("resolved path %q, expected %q", resolved, expected)
 	}
 
 	absPath := "/absolute/path.db"
@@ -176,6 +176,59 @@ func TestResolveSecretDB(t *testing.T) {
 		t.Fatalf("ResolveSecretDB returned error: %v", err)
 	}
 	if resolved != absPath {
-		t.Errorf("Absolute path was modified: %q instead of %q", resolved, absPath)
+		t.Errorf("absolute path was modified: %q instead of %q", resolved, absPath)
+	}
+}
+
+func TestSave_Load_Default(t *testing.T) {
+	// Use a temporary home directory for this test
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+
+	// Create original config
+	originalCfg := &Config{
+		Remote:        "https://api.example.com",
+		SecretDB:      "~/goph/secrets.db",
+		DeviceName:    "test-machine",
+		DefaultFolder: "personal",
+	}
+
+	// Save to default path
+	if err := originalCfg.Save(); err != nil {
+		t.Fatalf("Save returned error: %v", err)
+	}
+
+	// Load from default path
+	loadedCfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load returned error: %v", err)
+	}
+
+	// Verify loaded config matches original
+	if loadedCfg.Remote != originalCfg.Remote {
+		t.Errorf("remote mismatch: got %q, expected %q", loadedCfg.Remote, originalCfg.Remote)
+	}
+	if loadedCfg.DeviceName != originalCfg.DeviceName {
+		t.Errorf("deviceName mismatch: got %q, expected %q", loadedCfg.DeviceName, originalCfg.DeviceName)
+	}
+	if loadedCfg.DefaultFolder != originalCfg.DefaultFolder {
+		t.Errorf("defaultFolder mismatch: got %q, expected %q", loadedCfg.DefaultFolder, originalCfg.DefaultFolder)
+	}
+	if loadedCfg.SecretDB != originalCfg.SecretDB {
+		t.Errorf("secretDB mismatch: got %q, expected %q", loadedCfg.SecretDB, originalCfg.SecretDB)
+	}
+}
+
+func TestLoad_NotFound(t *testing.T) {
+	// Use a temporary home directory that has no config file
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+
+	// Try to load from non-existent default path
+	_, err := Load()
+	if err == nil {
+		t.Error("expected error for missing config file, but got nil")
 	}
 }
