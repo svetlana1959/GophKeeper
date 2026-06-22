@@ -34,7 +34,7 @@ const DefaultSecretDB = "~/.goph/secrets.db"
 func ConfigPath() (string, error) {
 	home, err := os.UserHomeDir()
 	if err != nil {
-		return "", fmt.Errorf("Could not get user home directory: %w", err)
+		return "", fmt.Errorf("could not get user home directory: %w", err)
 	}
 	return filepath.Join(home, ".goph", "config.yaml"), nil
 }
@@ -67,15 +67,15 @@ func LoadFromFile(path string) (*Config, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return nil, fmt.Errorf("Config file not found: %w", err)
+			return nil, fmt.Errorf("config file not found: %w", err)
 		}
-		return nil, fmt.Errorf("Error reading config file: %w", err)
+		return nil, fmt.Errorf("error reading config file: %w", err)
 	}
 
 	// Check for unknown fields
 	var rawMap map[string]interface{}
 	if err := yaml.Unmarshal(data, &rawMap); err != nil {
-		return nil, fmt.Errorf("Error parsing YAML: %w", err)
+		return nil, fmt.Errorf("error parsing YAML: %w", err)
 	}
 
 	knownFields := map[string]bool{
@@ -87,7 +87,7 @@ func LoadFromFile(path string) (*Config, error) {
 
 	for key := range rawMap {
 		if !knownFields[key] {
-			return nil, fmt.Errorf("Unknown field in config: %q", key)
+			return nil, fmt.Errorf("unknown field in config: %q", key)
 		}
 	}
 
@@ -120,16 +120,16 @@ func (c *Config) Save() error {
 func (c *Config) SaveToFile(path string) error {
 	dir := filepath.Dir(path)
 	if err := os.MkdirAll(dir, 0700); err != nil {
-		return fmt.Errorf("Could not create directory for config: %w", err)
+		return fmt.Errorf("could not create directory for config: %w", err)
 	}
 
 	data, err := yaml.Marshal(c)
 	if err != nil {
-		return fmt.Errorf("Error serializing config to YAML: %w", err)
+		return fmt.Errorf("error serializing config to YAML: %w", err)
 	}
 
 	if err := os.WriteFile(path, data, 0600); err != nil {
-		return fmt.Errorf("Error writing config file: %w", err)
+		return fmt.Errorf("error writing config file: %w", err)
 	}
 
 	return nil
@@ -138,7 +138,7 @@ func (c *Config) SaveToFile(path string) error {
 // ValidateForSync checks that the config has the necessary fields for synchronization
 func (c *Config) ValidateForSync() error {
 	if c.Remote == "" {
-		return errors.New("For synchronization you must specify a remote URL")
+		return errors.New("for synchronization you must specify a remote URL")
 	}
 	return nil
 }
@@ -146,7 +146,7 @@ func (c *Config) ValidateForSync() error {
 // ResolveSecretDB returns the absolute path to the secret database, expanding ~ if necessary.
 func (c *Config) ResolveSecretDB() (string, error) {
 	if c.SecretDB == "" {
-		return "", errors.New("For synchronization you must specify a path to the secret database")
+		return "", errors.New("for synchronization you must specify a path to the secret database")
 	}
 	return expandPath(c.SecretDB)
 }
