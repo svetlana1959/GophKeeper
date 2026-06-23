@@ -9,9 +9,9 @@ on:
       - main
       - dev
   workflow_dispatch:
-# concurrency:
-#   group: ci-frontend-${{ github.ref }}
-#   cancel-in-progress: true
+concurrency:
+  group: ci-frontend-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   frontend-lint:
     name: Run lint for frontend
@@ -35,7 +35,7 @@ jobs:
 
       - name: Run lint
         working-directory: frontend
-        run: npm run lint 2>&1 | tee -a $GITHUB_STEP_SUMMARY
+        run: npm run lint
 
   frontend-build:
     name: Build frontend image
