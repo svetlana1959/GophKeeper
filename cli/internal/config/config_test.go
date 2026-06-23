@@ -10,7 +10,7 @@ import (
 func TestConfigPath(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
-	t.Setenv("USERPROFILE", home) // для Windows
+	t.Setenv("USERPROFILE", home) // for Windows
 
 	path, err := ConfigPath()
 	if err != nil {
@@ -52,7 +52,7 @@ func TestLoadFromFile_Valid(t *testing.T) {
 remote: https://example.com
 device-name: laptop
 default-folder: work
-# secret-db отсутствует – должен подставиться дефолт
+# secret-db is omitted – the default should be applied
 `
 	if err := os.WriteFile(path, []byte(content), 0600); err != nil {
 		t.Fatal(err)
@@ -217,6 +217,29 @@ func TestSave_Load_Default(t *testing.T) {
 	}
 	if loadedCfg.SecretDB != originalCfg.SecretDB {
 		t.Errorf("secretDB mismatch: got %q, expected %q", loadedCfg.SecretDB, originalCfg.SecretDB)
+	}
+}
+
+func TestLoadFromFile_Empty(t *testing.T) {
+	tmpDir := t.TempDir()
+	path := filepath.Join(tmpDir, "config.yaml")
+	if err := os.WriteFile(path, []byte(""), 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := LoadFromFile(path)
+	if err != nil {
+		t.Fatalf("empty config should load with defaults, got error: %v", err)
+	}
+	if cfg.SecretDB != DefaultSecretDB {
+		t.Errorf("secretDB = %q, expected default %q", cfg.SecretDB, DefaultSecretDB)
+	}
+}
+
+func TestResolveSecretDB_RejectsUserPath(t *testing.T) {
+	cfg := &Config{SecretDB: "~bob/secrets.db"}
+	if _, err := cfg.ResolveSecretDB(); err == nil {
+		t.Error("expected error for ~user path, but got nil")
 	}
 }
 

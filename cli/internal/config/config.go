@@ -1,17 +1,18 @@
-/* Config example
-remote: https://example.com          # backend API URL (used by push/pull)
-secret-db: ~/.goph/secrets.db        # path to the local SQLite secret store (#33)
-device-name: laptop          		 # human-readable device identity
-default-folder: personal   			 # folder new secrets land in by default (categorization)
-*/
-
-// Package config provides an adapter for reading and writing client configuration.
-// The config is stored in YAML at $HOME/.goph/config.yaml (or %USERPROFILE%\.goph\config.yaml on Windows).
+// Package config is the adapter for reading and writing the non-secret client
+// configuration. The file lives at $HOME/.goph/config.yaml (or
+// %USERPROFILE%\.goph\config.yaml on Windows) and is YAML, for example:
+//
+//	remote: https://example.com    # backend API URL used by push/pull
+//	secret-db: ~/.goph/secrets.db  # path to the local SQLite secret store
+//	device-name: laptop            # human-readable device identity
+//	default-folder: personal       # folder new secrets land in by default
 package config
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -19,18 +20,18 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// Config — structure reflecting the content of the configuration file.
+// Config holds the non-secret client settings persisted in config.yaml.
 type Config struct {
-	Remote        string `yaml:"remote"`         // Backend URL (used for push/pull)
-	SecretDB      string `yaml:"secret-db"`      // Path to the local SQLite secret store
-	DeviceName    string `yaml:"device-name"`    // Human-readable device identity
-	DefaultFolder string `yaml:"default-folder"` // Default folder for new secrets
+	Remote        string `yaml:"remote"`         // backend URL used for push/pull
+	SecretDB      string `yaml:"secret-db"`      // path to the local SQLite secret store
+	DeviceName    string `yaml:"device-name"`    // human-readable device identity
+	DefaultFolder string `yaml:"default-folder"` // folder new secrets land in by default
 }
 
-// Default secret DB value
+// DefaultSecretDB is the secret store path used when none is configured.
 const DefaultSecretDB = "~/.goph/secrets.db"
 
-// Returns path to the config file, e.g. ~/.goph/config.yaml
+// ConfigPath returns the absolute path to the config file, e.g. ~/.goph/config.yaml.
 func ConfigPath() (string, error) {
 	home, err := os.UserHomeDir()
 	if err != nil {
@@ -39,21 +40,26 @@ func ConfigPath() (string, error) {
 	return filepath.Join(home, ".goph", "config.yaml"), nil
 }
 
-// expandPath replaces ~ with the user home dir
+// expandPath replaces a leading ~ (bare or ~/...) with the user home dir.
+// The ~user form is not supported and is rejected rather than silently
+// resolved to the wrong directory.
 func expandPath(path string) (string, error) {
-	if strings.HasPrefix(path, "~") {
-		home, err := os.UserHomeDir()
-		if err != nil {
-			return "", err
+	if path != "~" && !strings.HasPrefix(path, "~/") {
+		if strings.HasPrefix(path, "~") {
+			return "", fmt.Errorf("unsupported ~user path expansion: %q", path)
 		}
-		return filepath.Join(home, strings.TrimPrefix(path, "~")), nil
+		return path, nil
 	}
-	return path, nil
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(home, strings.TrimPrefix(path, "~")), nil
 }
 
-// Load loads config from default path defined by ConfigPath()
-// Applies default values if fields are missing
-// Returns an error if the file is not found or has an invalid format
+// Load reads the config from the default path returned by ConfigPath,
+// applying defaults for missing fields. It returns an error if the file is
+// missing or malformed.
 func Load() (*Config, error) {
 	path, err := ConfigPath()
 	if err != nil {
@@ -62,7 +68,8 @@ func Load() (*Config, error) {
 	return LoadFromFile(path)
 }
 
-// LoadFromFile reads config from a file
+// LoadFromFile reads and parses the config at path, applying defaults for
+// missing fields. Unknown keys are rejected.
 func LoadFromFile(path string) (*Config, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -72,31 +79,17 @@ func LoadFromFile(path string) (*Config, error) {
 		return nil, fmt.Errorf("error reading config file: %w", err)
 	}
 
-	// Check for unknown fields
-	var rawMap map[string]interface{}
-	if err := yaml.Unmarshal(data, &rawMap); err != nil {
-		return nil, fmt.Errorf("error parsing YAML: %w", err)
-	}
-
-	knownFields := map[string]bool{
-		"remote":         true,
-		"secret-db":      true,
-		"device-name":    true,
-		"default-folder": true,
-	}
-
-	for key := range rawMap {
-		if !knownFields[key] {
-			return nil, fmt.Errorf("unknown field in config: %q", key)
-		}
-	}
+	// KnownFields(true) rejects unknown keys, so the set of accepted fields
+	// stays defined solely by the Config struct tags.
+	dec := yaml.NewDecoder(bytes.NewReader(data))
+	dec.KnownFields(true)
 
 	var cfg Config
-	if err := yaml.Unmarshal(data, &cfg); err != nil {
+	// An empty file (io.EOF) is a valid config: all fields take their defaults.
+	if err := dec.Decode(&cfg); err != nil && !errors.Is(err, io.EOF) {
 		return nil, fmt.Errorf("error parsing YAML: %w", err)
 	}
 
-	// Setting default values for missing field SecretDB
 	if cfg.SecretDB == "" {
 		cfg.SecretDB = DefaultSecretDB
 	}
@@ -104,9 +97,7 @@ func LoadFromFile(path string) (*Config, error) {
 	return &cfg, nil
 }
 
-// Save writes the config to the default path defined by ConfigPath()
-// Creates the .goph directory with 0700 permissions if it doesn't exist
-// The file is saved with 0600 permissions
+// Save writes the config to the default path returned by ConfigPath.
 func (c *Config) Save() error {
 	path, err := ConfigPath()
 	if err != nil {
@@ -115,8 +106,8 @@ func (c *Config) Save() error {
 	return c.SaveToFile(path)
 }
 
-// SaveToFile writes the config to a specified file path
-// Creates the parent directory with 0700 permissions if it doesn't exist
+// SaveToFile writes the config to path, creating the parent directory with
+// 0700 permissions and the file itself with 0600.
 func (c *Config) SaveToFile(path string) error {
 	dir := filepath.Dir(path)
 	if err := os.MkdirAll(dir, 0700); err != nil {
@@ -135,7 +126,8 @@ func (c *Config) SaveToFile(path string) error {
 	return nil
 }
 
-// ValidateForSync checks that the config has the necessary fields for synchronization
+// ValidateForSync reports whether the config has the fields required to sync
+// with the remote backend.
 func (c *Config) ValidateForSync() error {
 	if c.Remote == "" {
 		return errors.New("for synchronization you must specify a remote URL")
@@ -146,7 +138,7 @@ func (c *Config) ValidateForSync() error {
 // ResolveSecretDB returns the absolute path to the secret database, expanding ~ if necessary.
 func (c *Config) ResolveSecretDB() (string, error) {
 	if c.SecretDB == "" {
-		return "", errors.New("for synchronization you must specify a path to the secret database")
+		return "", errors.New("no path to the secret database is configured")
 	}
 	return expandPath(c.SecretDB)
 }
