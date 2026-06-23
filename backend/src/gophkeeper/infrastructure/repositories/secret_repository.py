@@ -20,13 +20,6 @@ _COLUMNS = "id, account_id, ciphertext, version, deleted, updated_at"
 
 def _to_params(secret: Secret) -> dict[str, Any]:
     return {
-        # BUG FIX: send the id as plain str, not a UUID object or an
-        # explicitly UUID-typed bind param. The `id` column in this database
-        # is TEXT (an older migration ran before the domain switched to
-        # UUID), so an explicit ::UUID cast on the parameter caused Postgres
-        # to compare "text = uuid", which has no operator. A plain string
-        # parameter compares fine against either a TEXT or a UUID column —
-        # Postgres implicitly casts a string literal when comparing to uuid.
         "id": secret.id,
         "account_id": secret.account_id,
         "ciphertext": secret.ciphertext,
@@ -38,7 +31,7 @@ def _to_params(secret: Secret) -> dict[str, Any]:
 
 def _from_row(row: RowMapping) -> Secret:
     return Secret(
-        id=UUID(bytes=row["id"].bytes),
+        id=row["id"],
         account_id=row["account_id"],
         ciphertext=bytes(row["ciphertext"]),
         version=row["version"],

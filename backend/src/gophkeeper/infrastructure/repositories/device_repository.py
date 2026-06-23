@@ -25,7 +25,7 @@ def _to_params(device: Device) -> dict[str, Any]:
 
 def _from_row(row: RowMapping) -> Device:
     return Device(
-        id=UUID(bytes=row["id"].bytes),
+        id=row["id"],
         device_name=row["device_name"],
         public_key=row["public_key"],
         is_active=bool(row["is_active"]),
