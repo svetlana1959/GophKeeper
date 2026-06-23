@@ -27,7 +27,7 @@ def _to_params(secret: Secret) -> dict[str, Any]:
         # to compare "text = uuid", which has no operator. A plain string
         # parameter compares fine against either a TEXT or a UUID column —
         # Postgres implicitly casts a string literal when comparing to uuid.
-        "id": str(secret.id),
+        "id": secret.id,
         "account_id": secret.account_id,
         "ciphertext": secret.ciphertext,
         "version": secret.version,
@@ -38,7 +38,7 @@ def _to_params(secret: Secret) -> dict[str, Any]:
 
 def _from_row(row: RowMapping) -> Secret:
     return Secret(
-        id=UUID(str(row["id"])),
+        id=UUID(bytes=row["id"].bytes),
         account_id=row["account_id"],
         ciphertext=bytes(row["ciphertext"]),
         version=row["version"],
@@ -63,7 +63,7 @@ class SqlAlchemySecretRepository(SecretRepository):
     async def get(self, secret_id: UUID) -> Secret:
         result = await self._session.execute(
             text(f"SELECT {_COLUMNS} FROM secrets WHERE id = :id"),
-            {"id": str(secret_id)},
+            {"id": secret_id},
         )
         row = result.mappings().first()
         if row is None:

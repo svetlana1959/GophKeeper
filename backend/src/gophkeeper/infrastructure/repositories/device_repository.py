@@ -15,13 +15,7 @@ _COLUMNS = "id, device_name, public_key, is_active, updated_at"
 
 def _to_params(device: Device) -> dict[str, Any]:
     return {
-        # BUG FIX: same root cause as secret_repository.py — the `id` column
-        # in this database is TEXT, not UUID (an older migration created it
-        # before the domain model switched to UUID). Passing a plain str
-        # instead of a UUID-typed bind param works against either column
-        # type, since Postgres implicitly casts a string literal when
-        # comparing it to a uuid column.
-        "id": str(device.id),
+        "id": device.id,
         "device_name": device.device_name,
         "public_key": device.public_key,
         "is_active": device.is_active,
@@ -31,7 +25,7 @@ def _to_params(device: Device) -> dict[str, Any]:
 
 def _from_row(row: RowMapping) -> Device:
     return Device(
-        id=UUID(str(row["id"])),
+        id=UUID(bytes=row["id"].bytes),
         device_name=row["device_name"],
         public_key=row["public_key"],
         is_active=bool(row["is_active"]),
@@ -55,7 +49,7 @@ class SqlAlchemyDeviceRepository(DeviceRepository):
     async def get(self, device_id: UUID) -> Device:
         result = await self._session.execute(
             text(f"SELECT {_COLUMNS} FROM devices WHERE id = :id"),
-            {"id": str(device_id)},
+            {"id": device_id},
         )
         row = result.mappings().first()
         if row is None:
@@ -65,7 +59,7 @@ class SqlAlchemyDeviceRepository(DeviceRepository):
     async def exists(self, device_id: UUID) -> bool:
         result = await self._session.execute(
             text("SELECT 1 FROM devices WHERE id = :id"),
-            {"id": str(device_id)},
+            {"id": device_id},
         )
         return result.first() is not None
 
