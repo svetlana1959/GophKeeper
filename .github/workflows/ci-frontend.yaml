@@ -9,9 +9,9 @@ on:
       - main
       - dev
   workflow_dispatch:
-concurrency:
-  group: ci-frontend-${{ github.ref }}
-  cancel-in-progress: true
+# concurrency:
+#   group: ci-frontend-${{ github.ref }}
+#   cancel-in-progress: true
 jobs:
   frontend-lint:
     name: Run lint for frontend
