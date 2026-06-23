@@ -35,7 +35,7 @@ jobs:
 
       - name: Run lint
         working-directory: frontend
-        run: npm run lint
+        run: npm run lint 2>&1 | tee -a $GITHUB_STEP_SUMMARY
 
   frontend-build:
     name: Build frontend image
