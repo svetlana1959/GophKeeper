@@ -9,9 +9,11 @@ import pytest
 from gophkeeper.domain.errors import DomainError, VersionConflict
 from gophkeeper.domain.secret import Secret
 
+from uuid import uuid4
+
 
 def _make() -> Secret:
-    return Secret(id="s1", account_id="a1", ciphertext=b"v1")
+    return Secret(id=uuid4(), account_id="a1", ciphertext=b"v1")
 
 
 def test_update_bumps_version_and_replaces_ciphertext():
@@ -40,14 +42,13 @@ def test_delete_is_idempotent():
 @pytest.mark.parametrize(
     "kwargs",
     [
-        {"id": ""},
         {"account_id": ""},
         {"ciphertext": b""},
         {"version": 0},
     ],
 )
 def test_construction_rejects_invalid_state(kwargs):
-    valid = {"id": "s1", "account_id": "a1", "ciphertext": b"v1"}
+    valid = {"id": uuid4(), "account_id": "a1", "ciphertext": b"v1"}
     with pytest.raises(DomainError):
         Secret(**{**valid, **kwargs})
 

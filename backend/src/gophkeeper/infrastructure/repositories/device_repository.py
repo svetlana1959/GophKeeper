@@ -2,6 +2,7 @@
 """
 
 from typing import Any
+from uuid import UUID
 
 from sqlalchemy import RowMapping, text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -9,7 +10,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from gophkeeper.domain.errors import DeviceNotFound
 from gophkeeper.domain.device import Device, DeviceRepository
 
-_COLUMNS = "id, device_name, public_key, is_active, updated_at"
+_COLUMNS = ("id", "device_name", "public_key", "is_active", "updated_at")
+_COLUMN_LIST = ", ".join(_COLUMNS)
+_INSERT_VALUES = ", ".join(f":{c}" for c in _COLUMNS)
+
 
 def _to_params(device: Device) -> dict[str, Any]:
     return {
@@ -20,6 +24,7 @@ def _to_params(device: Device) -> dict[str, Any]:
         "updated_at": device.updated_at,
     }
 
+
 def _from_row(row: RowMapping) -> Device:
     return Device(
         id=row["id"],
@@ -29,22 +34,20 @@ def _from_row(row: RowMapping) -> Device:
         updated_at=row["updated_at"],
     )
 
+
 class SqlAlchemyDeviceRepository(DeviceRepository):
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
 
     async def add(self, device: Device) -> None:
         await self._session.execute(
-            text(
-                f"INSERT INTO devices ({_COLUMNS}) "
-                "VALUES (:id, :device_name, :public_key, :is_active, :updated_at)"
-            ),
+            text(f"INSERT INTO devices ({_COLUMN_LIST}) VALUES ({_INSERT_VALUES})"),
             _to_params(device),
         )
 
-    async def get(self, device_id: str) -> Device:
+    async def get(self, device_id: UUID) -> Device:
         result = await self._session.execute(
-            text(f"SELECT {_COLUMNS} FROM devices WHERE id = :id"),
+            text(f"SELECT {_COLUMN_LIST} FROM devices WHERE id = :id"),
             {"id": device_id},
         )
         row = result.mappings().first()
@@ -52,8 +55,15 @@ class SqlAlchemyDeviceRepository(DeviceRepository):
             raise DeviceNotFound(device_id)
         return _from_row(row)
 
+    async def exists(self, device_id: UUID) -> bool:
+        result = await self._session.execute(
+            text("SELECT 1 FROM devices WHERE id = :id"),
+            {"id": device_id},
+        )
+        return result.first() is not None
+
     async def list_active(self) -> list[Device]:
-        query = f"SELECT {_COLUMNS} FROM devices WHERE is_active = TRUE ORDER BY device_name"
+        query = f"SELECT {_COLUMN_LIST} FROM devices WHERE is_active = TRUE ORDER BY device_name"
         result = await self._session.execute(text(query))
         return [_from_row(row) for row in result.mappings().all()]
 

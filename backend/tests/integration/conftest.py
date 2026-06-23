@@ -28,6 +28,7 @@ async def database():
     # Start each test from a clean table.
     async with adapter.session() as session:
         await session.execute(text("DELETE FROM secrets"))
+        await session.execute(text("DELETE FROM devices"))
         await session.commit()
 
     yield adapter
