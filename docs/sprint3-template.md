@@ -10,6 +10,13 @@ Industrial
 
 GophKeeper — a distributed zero-knowledge secret management system designed for secure storage, synchronization, and management of sensitive information across trusted devices.
 
+## Deployment
+
+The current project version is deployed on the team VM and is accessible at:
+
+**VM Host:** 10.93.27.16  
+**Application URL:** http://10.93.27.16:80
+
 ### Sprint
 
 Week 3
@@ -23,18 +30,16 @@ Week 3
 |-------------|------|-------------|
 | Svetlana Maltseva | Team Lead, Product Manager | Project planning, backlog management, sprint coordination, requirements analysis, sprint documentation |
 | Elina Akhmetzyanova | Design, Documentation | Landing page design, UI mockups, sprint documentation |
-| Arseny Lashkevich | DevOps Engineer | Configured CI for backend unit and integration tests, implemented automated build pipelines, and set up deployment to the VM |
-| Aleksander Goncharov | CLI Engineer | |
+| Arseny Lashkevich | DevOps Engineer | Implemented CI pipelines for frontend and backend |
+| Aleksander Goncharov | CLI Engineer | Worked on local storage implementation for the CLI application and investigated Go-related technical issues |
 | Emil Nabiullin | Frontend Developer | Frontend layout implementation, UI integration, web page development based on approved mockups |
-| Malik Nurullin | Backend Developer | Completed API endpoints implementation and fixed UUID and database connection issues that were causing test failures, started working on multi-device synchronization |
+| Malik Nurullin | Backend Developer | Fixed UUID and database connection issues that were causing test failures, started working on multi-device synchronization |
 
 
 ---
-
 ## Sprint Goal
 
-Expand the MVP by implementing the next-priority features, improving system usability, strengthening integration between components, and delivering a more complete version of the product for internal review and testing.
-
+Build on the MVP by implementing the next set of prioritized features, improving integration between components, and delivering a more complete version of the product.
 
 ## Risks
 
@@ -57,15 +62,15 @@ Expand the MVP by implementing the next-priority features, improving system usab
 
 ## New Functionality
 
-### (1) Secret Creation
-- The application now allows authenticated users to create and securely store secrets. Before being stored locally, secret data is encrypted to ensure confidentiality. The system validates required fields and provides feedback on successful or failed operations.
+During this sprint, the team focused on improving the project's infrastructure, frontend experience, and backend stability.
+New frontend pages were completed, including the **Trusted Devices Management Page**, **Account Statistics Page**, and the project **Landing Page**. These pages provide the foundation for future user-facing functionality.
+On the backend side, UUID support was fully integrated, database connectivity issues were resolved, and error handling was improved, resulting in a more stable and reliable API.
+The infrastructure was significantly improved through the introduction of automated CI pipelines for both frontend and backend components, enabling automatic execution of unit and integration tests.
+Multi-device synchronization was originally planned for this sprint but was postponed to the next sprint due to backend, database, and infrastructure-related issues that required additional development effort.
 
-### (2) Secret Management
-- Users can now view all secrets available to them. displays secret names and contents, supports empty states when no secrets exist, and ensures that users can only access secrets they own or are authorized to view.
-- Users can also update existing secrets. Changes are validated before being saved, invalid updates are rejected, and users may cancel modifications without affecting stored data.
+---
 
-
-### Digital Inheritance (Planned Feature)
+## Digital Inheritance (Planned Feature)
  - A Digital Inheritance feature is planned for future releases. After user registration and authentication are implemented, users will be able to designate a trusted beneficiary in their account settings. During registration, users will be able to designate a trusted beneficiary who may receive access to selected secrets in exceptional circumstances.
  - The system will periodically verify the activity of the account owner. If prolonged inactivity is detected, additional verification requests will be sent to confirm that the owner is still active. If verification attempts remain unanswered for a predefined period, access to designated secrets may be transferred to the trusted beneficiary according to the user's predefined settings.
  - This feature aims to provide secure digital legacy management while preserving user privacy and preventing unauthorized access.
@@ -73,16 +78,15 @@ Expand the MVP by implementing the next-priority features, improving system usab
 
 ## Frontend Updates
 - Implemented the initial frontend structure based on approved mockups
-- Completed layout implementation for the web application
-- Finished the Trusted Devices Management Page
-- Finished the Account Statistics Page
+- Completed the landing page layout
+- Designed and implemented frontend layouts for the Trusted Devices page
+- Designed and implemented frontend layouts for the Account Statistics page
 ---
 
 ## Backend Updates
 - Completed implementation of the planned API endpoints
 - Fixed issues related to UUID handling and database connectivity
 - Resolved test failures caused by backend configuration problems
-- Started implementation of multi-device synchronization functionality
 ---
 
 ## Database Update
@@ -100,11 +104,22 @@ Implemented automated build pipelines
 ---
 
 # Screenshots 
+
 ### Account Statistics
 <img width="1440" height="1024" alt="Account Statistics (2)" src="https://github.com/user-attachments/assets/918d0836-3bae-40d7-bbe1-d2915deca46f" />
 
 ### Trusted Devices
 <img width="1440" height="1024" alt="Trusted Devices (2)" src="https://github.com/user-attachments/assets/8b6f5685-b8cf-48d4-b46a-2cf270b4c843" />
+
+
+
+## The landing page was developed using React with CSS Modules for component-based development and isolated styling:
+### Landing Page - Overview
+<img width="1280" height="636" alt="изображение" src="https://github.com/user-attachments/assets/16ef0876-c0eb-4d85-958b-c6b59e92a0fa" />
+
+
+### Landing Page - Feature Highlights
+<img width="1280" height="637" alt="изображение" src="https://github.com/user-attachments/assets/3383dde6-3450-4f0c-b863-269761b8e3d4" />
 
 
 ---
@@ -175,7 +190,7 @@ Implemented automated build pipelines
 * Docker configuration problems slowed down backend development and testing. The container setup was adjusted to resolve environment-related issues
 
 * Setting up CI pipelines required additional effort to ensure that automated unit and integration tests run correctly in the GitHub Actions environment
-* 
+  
 * The team originally planned to implement the Multi-Device Access functionality during this sprint. However, due to the time required to resolve backend, database, and infrastructure issues, the implementation was postponed to the next sprint
 
 ---
@@ -257,10 +272,21 @@ Based on the voting results, the team selected several focus areas for the next 
 
 ## Demo Summary
 
+The team reviewed the current implementation, demonstrated completed frontend pages, backend improvements, and CI infrastructure. Acceptance criteria were checked against the implemented functionality.
 
 ### Feedback
 
+- Frontend pages match the approved designs
+- Backend stability improved after UUID and database fixes
+- Multi-device synchronization remains the highest-priority unfinished feature
+- Additional integration testing is required before the next release
+
 ### Action Items
+
+- Complete multi-device synchronization
+- Finish deployment to the VM
+- Increase test coverage
+- Integrate frontend pages with real backend data
 
 ---
 
@@ -270,11 +296,16 @@ Based on the voting results, the team selected several focus areas for the next 
 
 During Sprint 2, the team completed the project planning phase. The MVP scope, system architecture, technology stack, user stories, acceptance criteria, backlog, risks, and milestones were defined. Initial UI mockups and user flow diagrams were prepared, and the first API endpoints and documentation were created.
 
----
+## Current State
 
+During Sprint 3, the project moved from planning and design into active implementation. The frontend team completed the main application screens, including the Landing Page, Trusted Devices page, and Account Statistics page. The backend team improved API stability, completed a migration from TEXT identifiers to UUIDs, resolved database connectivity issues, improved error handling, and updated automated tests. The infrastructure was strengthened through the implementation of CI pipelines for frontend and backend testing and preparation of the deployment environment.
+
+Compared to the previous baseline, the project now includes working frontend pages, a more stable backend foundation, automated testing infrastructure, and deployment preparation. Multi-device synchronization and secret management functionality were initially planned for this sprint but were postponed to the next sprint due to technical challenges and development delays.
+
+---
 ## Industrial Track Contribution
 
-This sprint expanded the contribution to the GophKeeper product through implementation of additional functionality, infrastructure improvements, and preparation for future synchronization and trusted-device workflows.
+This sprint expanded the GophKeeper product through new user-facing interfaces, backend stability improvements, database enhancements, and automated testing infrastructure. These improvements increased the project's readiness for future deployment, user validation, and multi-device functionality.
 
 ### Progress Against Baseline
 
@@ -343,6 +374,9 @@ Figma - https://www.figma.com/design/e9yJfGqSkREVk5sjPocKHN/Untitled?node-id=0-1
 - PR #93 - Create feature_description.md - https://github.com/svetlana1959/GophKeeper/pull/93
 - PR #81 - Landing Page Init - https://github.com/svetlana1959/GophKeeper/pull/81
 - PR #95 - Make Web Landing Application - https://github.com/svetlana1959/GophKeeper/pull/95
+- PR #94 - [CI]: frontend CI - https://github.com/svetlana1959/GophKeeper/pull/94
+- PR #97 - feature: added local configuration storage support - https://github.com/svetlana1959/GophKeeper/pull/97
+- PR #82 - [feature] CI: add backend unit testing - https://github.com/svetlana1959/GophKeeper/pull/82
   
 
 ---
@@ -353,16 +387,16 @@ Project backlog and sprint planning are managed using GitHub Projects.
 Link: https://github.com/orgs/svetlana1959/projects/4/views/1 and https://github.com/orgs/svetlana1959/projects/6/views/1
 
 ## Completed
-### Issue: #80, #79, #55, #92
+### Issue: #80, #79, #55, #92, #91, #50, #75, #78, #77, #95
 ---
 
 ## In Progress
-### Issue: #50, #58, #27, #78, #77, #75, #22, #33, #23, $32, #38, #37, #39, #74, #36
+### Issue: #27, #58, #94, #33, #23 
 ---
 
 ## Planned for Sprint 4
 
-Implemented user authorization and user database. Connected real user data to the dashboard. Collected initial user feedback
+Implement user authorization and user database. Connect real user data to the dashboard. Collect initial user feedback.
 
 ### User Registration: 
 - Implement user registration endpoint
@@ -397,19 +431,21 @@ Implemented user authorization and user database. Connected real user data to th
 - Create improvement tasks based on feedback
 - Document key findings in the sprint report
 
-### Additional Technical Tasks:
-- Configure database migrations
-- Create seed/test users
-- Improve API validation and error handling
-- Add unit tests for authentication
-- Add integration tests for registration and login flows
-- Update API documentation
 ---
 
 ## Sprint 4 Priorities
 
+The following features were originally planned for this sprint:
 
-### (1) User Registration - #83 - https://github.com/orgs/svetlana1959/projects/6/views/1?pane=issue&itemId=202877320&issue=svetlana1959%7CGophKeeper%7C83
+(1) Secret Creation
+The application allows authenticated users to create and securely store secrets. Secret data is encrypted before local storage, required fields are validated, and users receive feedback about successful or failed operations.
+(2) Secret Management
+Users can view, edit, and manage their secrets. The system displays available secrets, supports updates with validation, and ensures that users can only access data they are authorized to view.
+
+Due to development delays and technical issues encountered during CLI implementation, these features could not be completed within the sprint timeframe. As a result, their implementation has been moved to the next sprint and remains a high-priority item in the backlog.
+
+
+### (3) User Registration - #83 - https://github.com/orgs/svetlana1959/projects/6/views/1?pane=issue&itemId=202877320&issue=svetlana1959%7CGophKeeper%7C83
 
 As a new user
 I want to create an account
@@ -425,7 +461,7 @@ Acceptance criteria:
 - Given the registration data is valid, when the account is created, then the account is saved in the system.
 - Given required fields are empty or invalid, when the user submits the form, then the system rejects the request and shows a clear validation message
 
-### (2) User Login - #84 - https://github.com/orgs/svetlana1959/projects/6/views/1?pane=issue&itemId=202877456&issue=svetlana1959%7CGophKeeper%7C84
+### (4) User Login - #84 - https://github.com/orgs/svetlana1959/projects/6/views/1?pane=issue&itemId=202877456&issue=svetlana1959%7CGophKeeper%7C84
 
 As a registered user
 I want to log in to my account
@@ -440,7 +476,7 @@ Acceptance criteria:
 - Given a user is not authenticated, when the user tries to access encrypted secrets, then access is denied
 
  
-### (3) View Devices - #85 - https://github.com/orgs/svetlana1959/projects/6/views/1?pane=issue&itemId=202877908&issue=svetlana1959%7CGophKeeper%7C85
+### (5) View Devices - #85 - https://github.com/orgs/svetlana1959/projects/6/views/1?pane=issue&itemId=202877908&issue=svetlana1959%7CGophKeeper%7C85
 
 As a secret owner
 I want to see which devices have access to my secrets
@@ -455,7 +491,7 @@ Acceptance criteria:
 - Given the user is not authenticated, when the user tries to view devices, then access is denied
 
  
-### (4) Dashboard - #90 - https://github.com/orgs/svetlana1959/projects/6/views/1?pane=issue&itemId=202879314&issue=svetlana1959%7CGophKeeper%7C90
+### (6) Dashboard - #90 - https://github.com/orgs/svetlana1959/projects/6/views/1?pane=issue&itemId=202879314&issue=svetlana1959%7CGophKeeper%7C90
 
 As an authenticated user
 I want to view information about my secrets and requests
