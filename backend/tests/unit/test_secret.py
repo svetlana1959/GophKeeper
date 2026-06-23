@@ -42,7 +42,6 @@ def test_delete_is_idempotent():
 @pytest.mark.parametrize(
     "kwargs",
     [
-        {"id": None},
         {"account_id": ""},
         {"ciphertext": b""},
         {"version": 0},

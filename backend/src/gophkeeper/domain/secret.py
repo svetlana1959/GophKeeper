@@ -56,10 +56,6 @@ class Secret:
         vocabulary — not a framework's ValidationError. Called on construction
         and after any mutation, so the rules hold for the object's whole life.
         """
-        if self.id is None:
-            # NOTE: Probably should create separate Error for this,
-            # but can't be bothered with it rn
-            raise DomainError("secret id must not be empty")
         if not self.account_id:
             raise DomainError("secret account_id must not be empty")
         if not self.ciphertext:
