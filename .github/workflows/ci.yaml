@@ -63,6 +63,7 @@ jobs:
   frontend-publish:
     name: Publish frontend image
     runs-on: ubuntu-24.04
+    if: ${{ github.ref_name == 'main' || github.ref_name == 'dev' }}
     permissions:
       packages: write
     needs: frontend-build
