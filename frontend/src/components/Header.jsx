@@ -1,4 +1,3 @@
-import React from 'react'
 import styles from './Header.module.css'
 import logo from '../assets/logo.png'
 import Title from './Title';
@@ -20,4 +19,4 @@ function Header() {
   )
 }
 
-export default Header;
+export default Header; 
