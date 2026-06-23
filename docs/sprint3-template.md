@@ -65,10 +65,6 @@ Expand the MVP by implementing the next-priority features, improving system usab
 - Users can also update existing secrets. Changes are validated before being saved, invalid updates are rejected, and users may cancel modifications without affecting stored data.
 
 
-### (3) Multi-Device Access
-- Support for trusted devices has been added. Users can access their encrypted secrets from multiple approved devices. Synchronization ensures that data remains consistent across devices, while untrusted devices are denied access.
-
-
 ### Digital Inheritance (Planned Feature)
  - A Digital Inheritance feature is planned for future releases. After user registration and authentication are implemented, users will be able to designate a trusted beneficiary in their account settings. During registration, users will be able to designate a trusted beneficiary who may receive access to selected secrets in exceptional circumstances.
  - The system will periodically verify the activity of the account owner. If prolonged inactivity is detected, additional verification requests will be sent to confirm that the owner is still active. If verification attempts remain unanswered for a predefined period, access to designated secrets may be transferred to the trusted beneficiary according to the user's predefined settings.
@@ -90,7 +86,7 @@ Expand the MVP by implementing the next-priority features, improving system usab
 ---
 
 ## Database Update
-- Configured database models and schema for users, devices, and secrets
+- Configured database models
 - Improved database connectivity and fixed integration issues
 - Verified backend interaction with the database through automated tests
 ---
@@ -103,7 +99,13 @@ Implemented automated build pipelines
 
 ---
 
-# Screenshots / GIFs
+# Screenshots 
+### Account Statistics
+<img width="1440" height="1024" alt="Account Statistics (2)" src="https://github.com/user-attachments/assets/918d0836-3bae-40d7-bbe1-d2915deca46f" />
+
+### Trusted Devices
+<img width="1440" height="1024" alt="Trusted Devices (2)" src="https://github.com/user-attachments/assets/8b6f5685-b8cf-48d4-b46a-2cf270b4c843" />
+
 
 ---
 # Architecture & Technical Decisions
@@ -166,13 +168,15 @@ Implemented automated build pipelines
 
 ## Challenges Encountered
 
-* The backend team encountered issues with UUID handling, which caused several API requests and tests to fail. The issue was investigated and resolved.
+* The backend team encountered issues with UUID handling, which caused several API requests and tests to fail. The issue was investigated and resolved
 
-* Database connectivity issues were discovered during integration and automated testing. Configuration changes were applied to ensure stable communication between the backend and the database.
+* Database connectivity issues were discovered during integration and automated testing. Configuration changes were applied to ensure stable communication between the backend and the database
 
-* Docker configuration problems slowed down backend development and testing. The container setup was adjusted to resolve environment-related issues.
+* Docker configuration problems slowed down backend development and testing. The container setup was adjusted to resolve environment-related issues
 
-* Setting up CI pipelines required additional effort to ensure that automated unit and integration tests run correctly in the GitHub Actions environment.
+* Setting up CI pipelines required additional effort to ensure that automated unit and integration tests run correctly in the GitHub Actions environment
+* 
+* The team originally planned to implement the Multi-Device Access functionality during this sprint. However, due to the time required to resolve backend, database, and infrastructure issues, the implementation was postponed to the next sprint
 
 ---
 
@@ -223,6 +227,30 @@ The team discussed current progress and blockers.
 
 ## 23 June 2026
 
+| Team Member              | Contribution                                                                                                                                                                                         |
+| ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Svetlana**    | Prepared the sprint report and project documentation, maintained the backlog, coordinated team activities, organized stakeholder outreach for future feedback collection, and prepared the sprint retrospective for the team meeting                       |
+| **Elina**  | Completed the design of the main application screens, including the Trusted Devices and Account Statistics pages, and finalized the landing page design |
+| **Emil**       | Did not attend the standup                                                                                   |
+| **Malik**       | Fixed backend issues, updated and finalized the backend pull request, prepared backend documentation, and recorded a demonstration video of the implemented functionality                           |
+| **Arseny**    | Configured CI pipelines for unit and integration tests, completed infrastructure-related tasks, finalized frontend deployment preparation, and configured deployment to the VM                      |
+| **Aleksander** |  Resolving local storage implementation issues required to complete the remaining CLI functionality.                                                                                      |
+
+At the end of the sprint, the team conducted a retrospective using the **Sailboat Retrospective** format. The goal was to evaluate the team's progress, identify factors that helped or hindered development, discuss future risks, and agree on concrete improvements for the next sprint.
+
+The team first defined its destination (**Treasure**) — delivering a functional MVP with working backend services, frontend interfaces, CLI functionality, automated testing, and deployment infrastructure.
+
+Participants then filled out the remaining sections:
+
+* **Wind** — factors that helped the team move forward, such as effective communication, active collaboration during problem solving, completed UI designs, and progress on backend and infrastructure tasks.
+* **Stars** — acknowledgements of team members who made significant contributions during the sprint.
+* **Anchor** — challenges that slowed progress, including Docker configuration issues, backend integration problems, and technical difficulties affecting some development tasks.
+* **Sharks** — potential future risks, such as delays in implementing synchronization features, integration challenges between system components, and the possibility of not reaching the required test coverage.
+
+After collecting ideas, similar items were grouped into common themes. Team members then prioritized the most important topics using a voting process. The highest-priority topics focused on improving development coordination, reducing delays during code reviews, increasing testing reliability, and ensuring timely completion of integration tasks.
+
+Based on the voting results, the team selected several focus areas for the next sprint and defined concrete action items. The team also agreed to continue following established development practices, maintain regular communication, and address blockers as early as possible.
+
 ---
 
 # Internal Review
@@ -244,18 +272,6 @@ During Sprint 2, the team completed the project planning phase. The MVP scope, s
 
 ---
 
-## Improvements Added
-
-| Area | Sprint 2 | Sprint 3 |
-|--------|--------|--------|
-| Authentication | User stories and requirements defined | Not implemented yet(implementation in the next sprint) |
-| Secret Management | MVP scope and CRUD requirements prepared | Secret management workflows refined, data model and API endpoints prepared |
-| Synchronization | Architecture and synchronization workflow designed | |
-| Infrastructure | Technology stack selected, VM and CI/CD planned | CI pipelines for unit and integration tests implemented, deployment infrastructure configured |
-| Web Application | Wireframes and UI mockups created | Landing page, Trusted Devices page, and Account Statistics page designed and implemented |
-
----
-
 ## Industrial Track Contribution
 
 This sprint expanded the contribution to the GophKeeper product through implementation of additional functionality, infrastructure improvements, and preparation for future synchronization and trusted-device workflows.
@@ -266,7 +282,6 @@ At the beginning of the sprint, the project consisted mainly of requirements, us
 
 By the end of the sprint:
 
-* Backend API endpoints were implemented and stabilized
 * Database integration issues were resolved
 * Automated unit and integration testing pipelines were configured
 * Frontend layouts for the main pages were completed
@@ -280,13 +295,20 @@ Overall, the project achieved significant progress toward delivering a functiona
 
 # API Documentation
 
-## New Endpoints
+* Performed a global migration from `TEXT` identifiers to native `UUID` types in the database.
+* Refactored backend code to correctly handle UUID values.
+* Fixed Windows-specific connection issues and improved database stability.
+* Improved error handling and updated automated tests.
+* Addressed code review feedback and performed additional refactoring.
 
----
+The existing API endpoints remained unchanged, ensuring compatibility with the current CLI and frontend implementations.
 
-## Updated Endpoints
+Planned for the Next Sprint: Multi-Device Access
 
----
+Support for trusted devices and cross-device synchronization has been designed but not yet implemented. In the next sprint, users will be able to access encrypted secrets from multiple approved devices. Synchronization mechanisms will ensure data consistency across devices, while untrusted devices will be denied access.
+
+<img width="1280" height="621" alt="изображение" src="https://github.com/user-attachments/assets/d8f436e6-c23e-4adb-b97c-db20d7f19965" />
+
 
 # Relevant Links
 Figma - https://www.figma.com/design/e9yJfGqSkREVk5sjPocKHN/Untitled?node-id=0-1&t=edpuYY4hWFmTym6q-1
@@ -347,7 +369,6 @@ Implemented user authorization and user database. Connected real user data to th
 - Add user table to the database
 - Validate registration data
 - Store users in the database
-
   
 ### User Login: 
 - Implement login endpoint
