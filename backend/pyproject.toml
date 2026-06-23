@@ -1,0 +1,58 @@
+[project]
+name = "gophkeeper-backend"
+version = "0.1.0"
+description = "GophKeeper zero-knowledge store that only ever sees ciphertext."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.34",
+    "sqlalchemy[asyncio]>=2.0",
+    "asyncpg>=0.30",
+    "dynaconf>=3.2",
+    "pydantic>=2.10",
+]
+
+[project.scripts]
+gophkeeper-server = "gophkeeper.main:run"
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3",
+    "pytest-asyncio>=0.24",
+    "httpx>=0.28",
+    "ruff>=0.8",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/gophkeeper"]
+
+[tool.ruff]
+line-length = 100
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.ruff.lint.flake8-bugbear]
+# FastAPI uses callables as argument defaults by design (Depends, Query, ...).
+extend-immutable-calls = [
+    "fastapi.Depends",
+    "fastapi.Query",
+    "fastapi.Path",
+    "fastapi.Body",
+    "fastapi.Header",
+    "fastapi.Security",
+    "gophkeeper.api.deps.provide",
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+markers = [
+    "integration: requires a running PostgreSQL (set TEST_DATABASE_URL)",
+]

@@ -1,117 +1,116 @@
 # Contributing to GophKeeper
 
-Thank you for your interest in contributing to our project! This document outlines the guidelines, branching strategies, and architectural patterns required to keep our codebase clean, maintainable, and secure.
+Thanks for contributing. This guide covers commit signing, branching, and the
+architectural boundaries the project relies on. Please read it before opening a
+pull request.
 
-## 🔏 Commit Signing (SSH-based)
+## Getting Started
 
-To ensure the integrity of our codebase and prevent identity impersonation, **all developers must sign their Git commits**. We use native SSH signing, which is supported in Git 2.34+ and does not require setting up a separate GPG keyring.
+The repository holds two independent programs: the **CLI client** (Go, in `cli/`)
+and the **Backend API** (Python, in `backend/`). They share a git history and
+nothing else.
 
-### 0. Generate an SSH Key (If you don't have one)
-If you do not have an SSH key pair yet, or want to create a dedicated, secure key for this project, generate an **Ed25519** key (which is highly recommended for security and speed) by running:
+To build and test the CLI:
+
+```bash
+cd cli
+make build      # build ./bin/goph
+make test
+make vet
+```
+
+`make vet` and `make test` must pass before you open a pull request.
+
+## Commit Signing
+
+All commits must be signed. We use SSH signing (Git 2.34+), which does not
+require a separate GPG keyring. Unsigned commits will not be merged.
+
+### 1. Generate an Ed25519 key (if you don't have one)
 
 ```bash
 ssh-keygen -t ed25519 -C "your_email@example.com"
 ```
 
-### 1. Configure Git for SSH Signing
-Run the following commands on your local machine to configure Git globally to use your existing SSH key (preferably `Ed25519`) for signing commits and tags:
+### 2. Configure Git
+
 ```bash
-# Tell Git to use SSH format for signing instead of GPG
 git config --global gpg.format ssh
-
-# Specify the path to your PUBLIC SSH key to act as your signing identity
 git config --global user.signingkey ~/.ssh/id_ed25519.pub
-
-# Enable mandatory signing for all future commits and tags
 git config --global commit.gpgsign true
 git config --global tag.gpgsign true
 ```
 
-### 2. Register your Signing Key on Github Platform
+### 3. Register the key as a Signing Key on GitHub
 
-You must tell the platform that your SSH key is authorized to sign your commits, otherwise your PR commits will be marked as "Unverified".
+GitHub treats authentication keys and signing keys as separate roles. A key
+added for authentication will not verify signatures — add it again as a signing
+key, or your commits will show as "Unverified".
 
-1. Go to **Settings** → **SSH and GPG keys**.
-2. Click **New SSH key**.
-3. Change the **Key type** dropdown from *Authentication Key* to **Signing Key**.
-4. Paste the content of your public key (`~/.ssh/id_ed25519.pub`) and save.
+1. Go to **Settings → SSH and GPG keys → New SSH key**.
+2. Set **Key type** to **Signing Key**.
+3. Paste the contents of `~/.ssh/id_ed25519.pub` and save.
 
-### 3. Verification
+After this, commits should show a "Verified" badge on GitHub.
 
-Once configured, you can make a test commit. When you push to the remote repository, a green **Verified** badge should appear next to your commit in the Pull Request history.
+## Branching Model
 
-If you ever need to bypass or verify a single commit manually, you can use:
+We use GitFlow.
 
-```bash
-git commit -S -m "feat: manual signed commit test"
-```
+- `main` — production-ready releases only.
+- `dev` — integration branch; all work branches from and merges back into `dev`.
+- `feature/*` — new features. Branch from `dev`, merge into `dev`.
+- `hotfix/*` — urgent production fixes. Branch from `main`, merge into `main` and `dev`.
+- `docs/*` — documentation. Branch from `dev`, merge into `dev`.
 
----
+### Workflow
 
-## 🔄 Git Workflow: GitFlow Approach
-
-We adhere to the standard **GitFlow** branching model. All development is done in isolated feature branches and integrated into the ecosystem through strict environment tracking.
-
-### Core Branches:
-
-* `main`: Reflects the production-ready state. Only stable, tested releases are merged here.
-* `dev`: The main integration branch for development. All features are branched from and merged back into `dev`.
-
-### Supporting Branches:
-
-* `feature/*`: Used to develop new features. Branches off `dev`, merges back into `dev`.
-* `hotfix/*`: Used for quick production fixes. Branches off `main`, merges into both `main` and `dev`.
-* `docs/*`: Used for documentation. Branches off `dev`, merges back into `dev`.
-
-### Steps to Implement a New Feature:
-
-1. **Start with the latest development state:**
 ```bash
 git switch dev
 git pull origin dev
-```
-
-2. **Create your feature branch:**
-Use a descriptive name under the `feature/` namespace:
-```bash
 git switch -c feature/implement-secret-repository
-```
-
-3. **Commit your changes:**
-Write clean, meaningful commit messages using the imperative mood (e.g., `feat: add upsert method to SecretRepository using ON CONFLICT`).
-4. **Push your branch to the remote repository:**
-```bash
+# ... commits ...
 git push origin feature/implement-secret-repository
 ```
 
-5. **Open a Pull Request (PR):**
-Open a PR targets the **`dev`** branch (NOT `main`). At least one team member must review and approve the PR before merging.
+Write commit messages in the imperative mood
+(e.g. `feat: add upsert to SecretRepository using ON CONFLICT`). Open pull
+requests against `dev`, never `main`. Link the issue the PR resolves, and keep
+PRs small enough to review. At least one approval is required before merge.
 
----
+## Architecture
 
-## 🏗️ Architectural Guidelines
+### Directory Structure
 
-We manage both the **Backend API** and the **CLI Application** inside this single repository. To prevent tightly coupled code and maintain scalability, we enforce strict architectural boundaries for each component.
-
-### 📁 Codebase Directory Structure
 ```text
 .
-├── backend             # Backend API Service
-│   ├── api             # Presentation layer (HTTP server, Routers, DTOs)
-│   ├── domain          # Pure business entities
-│   ├── repositories    # Infrastructure layer
-│   └── services        # Application business logic layer
-├── cli                 # Client CLI Application
-│   ├── client          # HTTP API client layer
-│   ├── commands        # CLI command definitions and user interface
-│   ├── core            # Cryptographic core
-│   └── storage         # Local secret database handlers and schemas
+├── backend             # Backend API service (Python)
+├── cli                 # CLI client (Go)
+│   ├── main.go         # Entry point
+│   └── internal        # Private packages (not importable outside cli/)
+│       ├── commands    # CLI commands, flags, user I/O
+│       ├── domain      # Models, behavior, and repository interfaces (ports)
+│       ├── crypto      # age key generation and the DEK envelope
+│       ├── config      # Client configuration
+│       ├── vault       # Local SQLite store (implements domain ports)
+│       └── remote      # HTTP client for the backend
 ├── docs                # Documentation
-└── shared              # Shared components
+└── shared              # Wire-contract DTOs shared between CLI and backend
 ```
-### 🚫 1. Cross-Boundary Rule
 
-Since this is a mono-repo, it is easy to accidentally cross-import modules. We enforce a strict boundary rule:
+### Dependency Rule
 
-* **Code inside `cli/` must NEVER import anything from `backend/` and vice versa.**
-* They are two entirely isolated software systems that happen to live in the same git repository. Their only contract of interaction is the **network API layer**.
+`domain` defines the model and the interfaces (ports) it requires. It depends
+only on the standard library - never on age, SQLite, or HTTP. The other
+packages (`crypto`, `config`, `vault`, `remote`, `commands`) implement those
+interfaces and depend on `domain`, not the reverse. 
+
+```go
+var _ domain.SecretRepository = (*SecretRepo)(nil)
+```
+
+### Cross-Boundary Rule
+
+Code in `cli/` must never import from `backend/`, and vice versa. They are
+isolated systems that happen to share a repository; their only contract is the
+network API.

@@ -1,0 +1,49 @@
+services:
+  postgres:
+    image: postgres:18.4-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: docker
+      POSTGRES_DB: gophkeeper
+    volumes:
+      - ./postgres-data:/var/lib/postgresql
+    ports:
+      - "5432:5432"
+    restart: on-failure
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d gophkeeper"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      DATABASE_URL: postgresql://postgres:docker@postgres:5432/gophkeeper?sslmode=disable
+      ENV: dev
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./src:/app/src:delegated # Mount source for live reload in development.
+      - ./db:/db
+    command:
+      ["uvicorn", "gophkeeper.main:app", "--host", "0.0.0.0", "--port", "8080", "--reload"]
+
+  migrations:
+    image: amacneil/dbmate:latest
+    profiles:
+      - tools
+    environment:
+      DATABASE_URL: postgres://postgres:docker@postgres:5432/gophkeeper?sslmode=disable
+    volumes:
+      - ./db/migrations:/db/migrations
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: [ "up" ]
