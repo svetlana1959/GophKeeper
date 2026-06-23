@@ -60,7 +60,7 @@ default-folder: work
 
 	cfg, err := LoadFromFile(path)
 	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
+		t.Fatalf("unexpected error: %v", err)
 	}
 
 	if cfg.Remote != "https://example.com" {
@@ -107,12 +107,12 @@ func TestSaveToFile(t *testing.T) {
 	}
 
 	if err := cfg.SaveToFile(path); err != nil {
-		t.Fatalf("SaveToFile returned error: %v", err)
+		t.Fatalf("saveToFile returned error: %v", err)
 	}
 
 	info, err := os.Stat(path)
 	if err != nil {
-		t.Fatalf("File not created: %v", err)
+		t.Fatalf("file not created: %v", err)
 	}
 
 	// Permission checks only work reliably on Unix-like systems
@@ -124,7 +124,7 @@ func TestSaveToFile(t *testing.T) {
 
 	dirInfo, err := os.Stat(filepath.Dir(path))
 	if err != nil {
-		t.Fatalf("Directory not created: %v", err)
+		t.Fatalf("directory not created: %v", err)
 	}
 
 	if runtime.GOOS != "windows" {
@@ -135,7 +135,7 @@ func TestSaveToFile(t *testing.T) {
 
 	loaded, err := LoadFromFile(path)
 	if err != nil {
-		t.Fatalf("Could not load saved config: %v", err)
+		t.Fatalf("could not load saved config: %v", err)
 	}
 	if loaded.Remote != cfg.Remote || loaded.DeviceName != cfg.DeviceName {
 		t.Errorf("loaded config does not match saved config")
@@ -173,7 +173,7 @@ func TestResolveSecretDB(t *testing.T) {
 	cfg.SecretDB = absPath
 	resolved, err = cfg.ResolveSecretDB()
 	if err != nil {
-		t.Fatalf("ResolveSecretDB returned error: %v", err)
+		t.Fatalf("resolveSecretDB returned error: %v", err)
 	}
 	if resolved != absPath {
 		t.Errorf("absolute path was modified: %q instead of %q", resolved, absPath)
@@ -196,13 +196,13 @@ func TestSave_Load_Default(t *testing.T) {
 
 	// Save to default path
 	if err := originalCfg.Save(); err != nil {
-		t.Fatalf("Save returned error: %v", err)
+		t.Fatalf("save returned error: %v", err)
 	}
 
 	// Load from default path
 	loadedCfg, err := Load()
 	if err != nil {
-		t.Fatalf("Load returned error: %v", err)
+		t.Fatalf("load returned error: %v", err)
 	}
 
 	// Verify loaded config matches original

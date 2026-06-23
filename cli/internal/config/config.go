@@ -93,7 +93,7 @@ func LoadFromFile(path string) (*Config, error) {
 
 	var cfg Config
 	if err := yaml.Unmarshal(data, &cfg); err != nil {
-		return nil, fmt.Errorf("Error parsing YAML: %w", err)
+		return nil, fmt.Errorf("error parsing YAML: %w", err)
 	}
 
 	// Setting default values for missing field SecretDB
