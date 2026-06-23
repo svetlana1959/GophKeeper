@@ -1,4 +1,3 @@
-import React from 'react'
 import Header from '../components/Header'
 import styles from './Landing.module.css'
 import Title from '../components/Title';
@@ -35,26 +34,26 @@ function Landing() {
                 <div className={styles.whyUsContainer}>
                     <div className={styles.whyUsContainerChild}>
                         <div className={styles.whyUsIcon}>
-                            <img src={icon1} />
+                            <img src={icon1} alt="Zero-knowledge encryption icon" />
                         </div>
                         <div className={styles.whyUsContainerChildTitle}>
                             Zero-Knowledge Encryption
                         </div>
                         <div className={styles.whyUsContainerChildSubtitle}>
-                            Secters are encrypted on the client side before they leave your device. Only you can decrypt them.
+                            Secrets are encrypted on the client side before they leave your device. Only you can decrypt them.
                         </div>
                         <div className={styles.whyUsContainerChildFooterHelper}></div>
                         <div className={styles.whyUsContainerChildFooter}>
                             <div className={styles.whyUsContainerChildFooterHr}></div>
                             <div className={styles.whyUsContainerChildFooterContent}>
-                                <img src={safeIcon} alt="" />
+                                <img src={safeIcon} alt="Security shield icon" />
                                 <p>Your secrets stay yours</p>
                             </div>
                         </div>
                     </div>
                     <div className={styles.whyUsContainerChild}>
                         <div className={styles.whyUsIcon}>
-                            <img src={icon2} />
+                            <img src={icon2} alt="CLI-focused features icon" />
                         </div>
                         <div className={styles.whyUsContainerChildTitle}>
                             CLI First
@@ -66,14 +65,14 @@ function Landing() {
                         <div className={styles.whyUsContainerChildFooter}>
                             <div className={styles.whyUsContainerChildFooterHr}></div>
                             <div className={styles.whyUsContainerChildFooterContent}>
-                                <img src={safeIcon} alt="" />
+                                <img src={safeIcon} alt="Security shield icon" />
                                 <p>Fast. Powerful. Developer-friendly</p>
                             </div>
                         </div>
                     </div>
                     <div className={styles.whyUsContainerChild}>
                         <div className={styles.whyUsIcon}>
-                            <img src={icon3} />
+                            <img src={icon3} alt="Synchronization icon" />
                         </div>
                         <div className={styles.whyUsContainerChildTitle}>
                             Distributed Synchronization
@@ -85,14 +84,14 @@ function Landing() {
                         <div className={styles.whyUsContainerChildFooter}>
                             <div className={styles.whyUsContainerChildFooterHr}></div>
                             <div className={styles.whyUsContainerChildFooterContent}>
-                                <img src={safeIcon} alt="" />
+                                <img src={safeIcon} alt="Security shield icon" />
                                 <p>Sync anywhere, securely</p>
                             </div>
                         </div>
                     </div>
                     <div className={styles.whyUsContainerChild}>
                         <div className={styles.whyUsIcon}>
-                            <img src={icon4} />
+                            <img src={icon4} alt="Trusted devices icon" />
                         </div>
                         <div className={styles.whyUsContainerChildTitle}>
                             Trusted Devices
@@ -104,7 +103,7 @@ function Landing() {
                         <div className={styles.whyUsContainerChildFooter}>
                             <div className={styles.whyUsContainerChildFooterHr}></div>
                             <div className={styles.whyUsContainerChildFooterContent}>
-                                <img src={safeIcon} alt="" />
+                                <img src={safeIcon} alt="Security shield icon" />
                                 <p>Full access control</p>
                             </div>
                         </div>
@@ -112,7 +111,7 @@ function Landing() {
                 </div>
                 <div className={styles.whyUsFooter}>
                     <div className={styles.whyUsFooterIcon}>
-                        <img src={safeIcon} alt="" />
+                        <img src={safeIcon} alt="Security shield icon" />
                     </div>
                     <div className={styles.whyUsFooterContainer}>
                         <div className={styles.whyUsFooterContent}>Secure</div>
