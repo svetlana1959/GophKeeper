@@ -11,19 +11,19 @@ class DomainError(Exception):
 
 class SecretNotFound(DomainError):
     def __init__(self, secret_id: UUID) -> None:
-        super().__init__(f"secret {secret_id!r} not found")
+        super().__init__(f"secret {secret_id} not found")
         self.secret_id = secret_id
 
 
 class DeviceNotFound(DomainError):
     def __init__(self, device_id: UUID) -> None:
-        super().__init__(f"device {device_id!r} not found")
+        super().__init__(f"device {device_id} not found")
         self.device_id = device_id
 
 
 class DeviceAlreadyExists(DomainError):
     def __init__(self, device_id: UUID) -> None:
-        super().__init__(f"device {device_id!r} already exists")
+        super().__init__(f"device {device_id} already exists")
         self.device_id = device_id
 
 
@@ -35,7 +35,7 @@ class VersionConflict(DomainError):
 
     def __init__(self, secret_id: UUID, expected: int, actual: int) -> None:
         super().__init__(
-            f"secret {secret_id!r}: write expected version {expected}, "
+            f"secret {secret_id}: write expected version {expected}, "
             f"but current version is {actual}"
         )
         self.secret_id = secret_id

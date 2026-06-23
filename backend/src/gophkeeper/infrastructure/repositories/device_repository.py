@@ -10,7 +10,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from gophkeeper.domain.errors import DeviceNotFound
 from gophkeeper.domain.device import Device, DeviceRepository
 
-_COLUMNS = "id, device_name, public_key, is_active, updated_at"
+_COLUMNS = ("id", "device_name", "public_key", "is_active", "updated_at")
+_COLUMN_LIST = ", ".join(_COLUMNS)
+_INSERT_VALUES = ", ".join(f":{c}" for c in _COLUMNS)
 
 
 def _to_params(device: Device) -> dict[str, Any]:
@@ -39,16 +41,13 @@ class SqlAlchemyDeviceRepository(DeviceRepository):
 
     async def add(self, device: Device) -> None:
         await self._session.execute(
-            text(
-                f"INSERT INTO devices ({_COLUMNS}) "
-                "VALUES (:id, :device_name, :public_key, :is_active, :updated_at)"
-            ),
+            text(f"INSERT INTO devices ({_COLUMN_LIST}) VALUES ({_INSERT_VALUES})"),
             _to_params(device),
         )
 
     async def get(self, device_id: UUID) -> Device:
         result = await self._session.execute(
-            text(f"SELECT {_COLUMNS} FROM devices WHERE id = :id"),
+            text(f"SELECT {_COLUMN_LIST} FROM devices WHERE id = :id"),
             {"id": device_id},
         )
         row = result.mappings().first()
@@ -64,7 +63,7 @@ class SqlAlchemyDeviceRepository(DeviceRepository):
         return result.first() is not None
 
     async def list_active(self) -> list[Device]:
-        query = f"SELECT {_COLUMNS} FROM devices WHERE is_active = TRUE ORDER BY device_name"
+        query = f"SELECT {_COLUMN_LIST} FROM devices WHERE is_active = TRUE ORDER BY device_name"
         result = await self._session.execute(text(query))
         return [_from_row(row) for row in result.mappings().all()]
 
