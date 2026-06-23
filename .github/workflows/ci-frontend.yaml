@@ -85,6 +85,7 @@ jobs:
         id: artifact
         with:
           name: frontend-image
+          retention-days: 1
           path: ${{ runner.temp }}/frontend.tar
  
   frontend-publish:
