@@ -1,5 +1,3 @@
-import React from 'react'
-
 function Title({ style, styleBlock }) {
     return (
         <div style={{display: "flex", alignItems: "center", ...styleBlock}}>
@@ -9,4 +7,4 @@ function Title({ style, styleBlock }) {
     )
 }
 
-export default Title;
+export default Title; 
