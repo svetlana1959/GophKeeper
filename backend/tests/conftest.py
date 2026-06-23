@@ -1,5 +1,9 @@
-"""Shared pytest fixtures and setup for the whole test suite.
+"""Shared pytest fixtures and setup for the whole test suite."""
 
+import asyncio
+import sys
+
+"""
 Windows fix: asyncio's default event loop on Windows is the
 ``ProactorEventLoop``. It is great for subprocesses but has a known
 incompatibility with asyncpg — under load it can tear down a socket and raise
@@ -14,9 +18,5 @@ The standard fix is to switch to ``SelectorEventLoop`` for the test session.
 This has no effect on Linux/Mac, where asyncio already defaults to a
 selector-based loop.
 """
-
-import asyncio
-import sys
-
 if sys.platform == "win32":
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
