@@ -41,3 +41,20 @@ class VersionConflict(DomainError):
         self.secret_id = secret_id
         self.expected = expected
         self.actual = actual
+
+
+class AccessDenied(DomainError):
+    """Raised when a device that is not trusted for a secret tries to use it.
+
+    Covers issue #69's "untrusted device -> access denied" criterion.
+    ``secret_id`` is ``None`` for the device-level case (the device itself is
+    unknown or deactivated, before any specific secret comes into it).
+    """
+
+    def __init__(self, device_id: UUID, secret_id: UUID | None = None) -> None:
+        if secret_id is None:
+            super().__init__(f"device {device_id} is not trusted")
+        else:
+            super().__init__(f"device {device_id} has no access to secret {secret_id}")
+        self.device_id = device_id
+        self.secret_id = secret_id

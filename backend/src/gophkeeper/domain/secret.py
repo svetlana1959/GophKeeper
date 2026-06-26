@@ -122,3 +122,35 @@ class SecretRepository(Protocol):
     async def save(self, secret: Secret) -> None:
         """Persist changes to an existing secret (update)."""
         ...
+
+
+class SecretAccessRepository(Protocol):
+    """Port for the device <-> secret trust relationship (issue #69).
+
+    There is no account/auth layer yet, so "trust" is modeled directly: a
+    device may read or write a secret only if it has been granted access here.
+    The device that originally stores a secret is granted access by
+    ``SecretService.store``; any other device needs an explicit grant (e.g.
+    from a device that already has access, mirroring the mailbox/trust flow
+    described in the product concept docs).
+    """
+
+    async def grant(self, secret_id: UUID, device_id: UUID) -> None:
+        """Give a device access to a secret. Idempotent — granting twice is a no-op."""
+        ...
+
+    async def revoke(self, secret_id: UUID, device_id: UUID) -> None:
+        """Take away a device's access to a secret. Idempotent."""
+        ...
+
+    async def has_access(self, secret_id: UUID, device_id: UUID) -> bool:
+        """Whether this device currently has a grant for this secret."""
+        ...
+
+    async def list_secret_ids_for_device(self, device_id: UUID) -> list[UUID]:
+        """All secret ids this device is trusted to access (for sync)."""
+        ...
+
+    async def list_device_ids_for_secret(self, secret_id: UUID) -> list[UUID]:
+        """All devices currently trusted with this secret."""
+        ...
