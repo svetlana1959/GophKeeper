@@ -14,7 +14,7 @@ transaction.
 from types import TracebackType
 from typing import Protocol, Self
 
-from gophkeeper.domain.secret import SecretRepository
+from gophkeeper.domain.secret import SecretRepository, SecretAccessRepository
 from gophkeeper.domain.device import DeviceRepository
 
 
@@ -25,6 +25,7 @@ class UnitOfWork(Protocol):
 
     secrets: SecretRepository
     devices: DeviceRepository
+    access: SecretAccessRepository
 
     async def __aenter__(self) -> Self: ...
 

@@ -13,6 +13,7 @@ from gophkeeper.infrastructure.adapters.database import DatabaseAdapter
 from gophkeeper.infrastructure.repositories import (
     SqlAlchemySecretRepository,
     SqlAlchemyDeviceRepository,
+    SqlAlchemySecretAccessRepository,
 )
 
 
@@ -28,6 +29,7 @@ class SqlAlchemyUnitOfWork(UnitOfWork):
         """
         self.secrets = SqlAlchemySecretRepository(self._session)
         self.devices = SqlAlchemyDeviceRepository(self._session)
+        self.access = SqlAlchemySecretAccessRepository(self._session)
         return self
 
     async def __aexit__(
