@@ -84,7 +84,10 @@ jobs:
       - name: Install dbmate
         run: |
           mkdir -p /tmp/dbmate-bin
-          curl -fsSL -o /tmp/dbmate-bin/dbmate https://github.com/amacneil/dbmate/releases/latest/download/dbmate-linux-amd64
+          curl -fsSL -o /tmp/dbmate-bin/dbmate https://github.com/amacneil/dbmate/releases/download/v2.33.0/dbmate-linux-amd64
+
+          echo "dfd4027141b6e4357158099bdfe6c02b286af70f8e49057937744cf80b38ea1c /tmp/dbmate-bin/dbmate" | sha256sum --check --status
+
           chmod +x /tmp/dbmate-bin/dbmate
           echo "/tmp/dbmate-bin" >> $GITHUB_PATH
 
