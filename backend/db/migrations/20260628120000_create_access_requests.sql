@@ -23,7 +23,11 @@
 --      #58, pushes the re-encrypted payload. Untouched by this migration.
 --   4. Device A: POST /secrets/requests/{id}/approve -> THE ONLY place a row
 --      is written into secret_access. This is the sole path to a grant.
-CREATE TYPE access_request_status AS ENUM ('PENDING', 'APPROVED', 'REJECTED');
+DO $$ BEGIN
+    CREATE TYPE access_request_status AS ENUM ('PENDING', 'APPROVED', 'REJECTED');
+EXCEPTION
+    WHEN duplicate_object THEN NULL;
+END $$;
 
 CREATE TABLE IF NOT EXISTS access_requests (
     id          UUID PRIMARY KEY,
