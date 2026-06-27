@@ -16,7 +16,7 @@ on:
     #   - backend/**
   workflow_dispatch:
 concurrency:
-  group: ci-backend-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 jobs:
   unit-test:

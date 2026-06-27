@@ -16,7 +16,7 @@ on:
       - frontend/**
   workflow_dispatch:
 concurrency:
-  group: ci-frontend-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 jobs:
   lint:
