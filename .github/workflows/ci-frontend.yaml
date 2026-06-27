@@ -75,7 +75,7 @@ jobs:
           jq -r '.target."docker-metadata-action".args.DOCKER_META_IMAGES' | 
           sed -e 's/^/name=\0/' >> "$GITHUB_OUTPUT"
 
-      - name: Build frontend image
+      - name: Build image
         uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf # v7.2.0
         with:
           context: "{{defaultContext}}:frontend"
@@ -96,7 +96,7 @@ jobs:
           path: ${{ runner.temp }}/frontend.tar
  
   publish:
-    name: Publish frontend image
+    name: Publish container image
     runs-on: ubuntu-24.04
     if: ${{ github.ref_name == 'main' || github.ref_name == 'dev' }}
     permissions:
