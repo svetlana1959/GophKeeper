@@ -1,21 +1,27 @@
 """Unit tests for SecretService's multi-device access control (issue #69).
 
-Each test below maps to one acceptance criterion from the issue:
+REVISION per review: share()/revoke() are gone from SecretService — direct
+device-to-device grants bypassed the re-encryption step a Zero-Knowledge
+system requires. The replacement handshake-broker flow (request/list/approve/
+reject) is tested in test_access_request_service.py. The tests here cover
+what's left in SecretService: store/fetch/update/list_for_device and the
+access checks they share.
 
-- test_store_grants_creating_device_access            -> "trusted devices ... can use"
-- test_second_trusted_device_can_fetch_after_share     -> "data available on each trusted device"
-- test_access_maintained_after_update                  -> "access maintained after synchronization"
-- test_fetch_denied_for_untrusted_device                -> "not trusted ... access is denied"
-- test_list_for_device_returns_latest_after_reconnect   -> "connection restored ... latest available data"
+- test_store_grants_creating_device_access      -> "trusted devices ... can use"
+- test_access_maintained_after_update            -> "access maintained after synchronization"
+- test_fetch_denied_for_untrusted_device          -> "not trusted ... access is denied"
+- test_fetch_denied_for_deactivated_device        -> "not trusted ... access is denied"
+- test_list_for_device_returns_latest_after_reconnect -> "connection restored ... latest data"
 """
+
+from uuid import UUID, uuid4
 
 import pytest
 
 from gophkeeper.domain.device import Device
-from gophkeeper.domain.secret import Secret
 from gophkeeper.domain.errors import AccessDenied, DeviceNotFound, SecretNotFound
+from gophkeeper.domain.secret import Secret
 from gophkeeper.services.secret_service import SecretService
-from uuid import UUID, uuid4
 
 
 class FakeDeviceRepository:
@@ -114,33 +120,7 @@ async def test_store_grants_creating_device_access():
         account_id="acc", secret_id=secret_id, device_id=device.id, ciphertext=b"v1"
     )
 
-    # the device that stored it can immediately fetch it back
     fetched = await service.fetch(secret_id, device_id=device.id)
-    assert fetched.id == secret_id
-
-
-async def test_second_trusted_device_can_fetch_after_share():
-    uow = FakeUnitOfWork()
-    device_a = _device()
-    device_b = _device()
-    await uow.devices.add(device_a)
-    await uow.devices.add(device_b)
-    service = SecretService(uow)
-    secret_id = uuid4()
-
-    await service.store(
-        account_id="acc", secret_id=secret_id, device_id=device_a.id, ciphertext=b"v1"
-    )
-
-    # device_b has no access yet
-    with pytest.raises(AccessDenied):
-        await service.fetch(secret_id, device_id=device_b.id)
-
-    # device_a shares it with device_b
-    await service.share(secret_id, from_device_id=device_a.id, to_device_id=device_b.id)
-
-    # now device_b can see it too
-    fetched = await service.fetch(secret_id, device_id=device_b.id)
     assert fetched.id == secret_id
 
 
@@ -158,7 +138,6 @@ async def test_access_maintained_after_update():
         secret_id=secret_id, device_id=device.id, ciphertext=b"v2", base_version=1
     )
 
-    # access persists across the update — the grant is independent of version
     fetched = await service.fetch(secret_id, device_id=device.id)
     assert fetched.ciphertext == b"v2"
     assert fetched.version == 2
@@ -201,75 +180,22 @@ async def test_fetch_denied_for_deactivated_device():
 
 
 async def test_list_for_device_returns_latest_after_reconnect():
-    """Simulates a trusted device dropping off and reconnecting: it should see
-    every secret it has access to, with the latest version, regardless of
-    which device wrote the most recent update."""
+    """A trusted device reconnecting sees the latest version of everything it
+    has access to, regardless of which device wrote it most recently."""
     uow = FakeUnitOfWork()
     device_a = _device()
-    device_b = _device()
     await uow.devices.add(device_a)
-    await uow.devices.add(device_b)
     service = SecretService(uow)
 
     secret_id = uuid4()
     await service.store(
         account_id="acc", secret_id=secret_id, device_id=device_a.id, ciphertext=b"v1"
     )
-    await service.share(secret_id, from_device_id=device_a.id, to_device_id=device_b.id)
-
-    # device_b writes an update while device_a is "offline"
     await service.update(
-        secret_id=secret_id, device_id=device_b.id, ciphertext=b"v2", base_version=1
+        secret_id=secret_id, device_id=device_a.id, ciphertext=b"v2", base_version=1
     )
 
-    # device_a "reconnects" and syncs
     synced = await service.list_for_device(device_a.id)
     assert len(synced) == 1
     assert synced[0].ciphertext == b"v2"
     assert synced[0].version == 2
-
-
-async def test_owner_can_revoke_access_of_shared_device():
-    uow = FakeUnitOfWork()
-    owner = _device()
-    other = _device()
-    await uow.devices.add(owner)
-    await uow.devices.add(other)
-    service = SecretService(uow)
-    secret_id = uuid4()
-
-    await service.store(account_id="acc", secret_id=secret_id, device_id=owner.id, ciphertext=b"v1")
-    await service.share(secret_id, from_device_id=owner.id, to_device_id=other.id)
-
-    # confirm the share worked before revoking it
-    fetched = await service.fetch(secret_id, device_id=other.id)
-    assert fetched.id == secret_id
-
-    await service.revoke(secret_id, requesting_device_id=owner.id, target_device_id=other.id)
-
-    with pytest.raises(AccessDenied):
-        await service.fetch(secret_id, device_id=other.id)
-
-
-async def test_revoke_denied_for_device_without_access_to_secret():
-    uow = FakeUnitOfWork()
-    owner = _device()
-    other = _device()
-    stranger = _device()
-    await uow.devices.add(owner)
-    await uow.devices.add(other)
-    await uow.devices.add(stranger)
-    service = SecretService(uow)
-    secret_id = uuid4()
-
-    await service.store(account_id="acc", secret_id=secret_id, device_id=owner.id, ciphertext=b"v1")
-    await service.share(secret_id, from_device_id=owner.id, to_device_id=other.id)
-
-    # stranger never had access to this secret at all
-    with pytest.raises(AccessDenied):
-        await service.revoke(secret_id, requesting_device_id=stranger.id, target_device_id=other.id)
-
-    # and other's access must still be intact — the revoke attempt above
-    # must not have gone through
-    fetched = await service.fetch(secret_id, device_id=other.id)
-    assert fetched.id == secret_id
