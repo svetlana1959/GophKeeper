@@ -20,12 +20,13 @@ jobs:
       contents: read
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       
       - name: Set up Uvicorn
-        uses: astral-sh/setup-uv@v8.2.0
+        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
         with:
           working-directory: "backend"
+          version: "0.11.25"
           enable-cache: "true"
           # cache-python: "true" # Python installation may be also cached
           cache-dependency-glob: "uv.lock"
@@ -59,12 +60,13 @@ jobs:
           --health-retries=5
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       
       - name: Set up Uvicorn
-        uses: astral-sh/setup-uv@v8.2.0
+        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
         with:
           working-directory: "backend"
+          version: "0.11.25"
           enable-cache: "true"
           # cache-python: "true" # Python installation may be also cached
           cache-dependency-glob: "uv.lock"
