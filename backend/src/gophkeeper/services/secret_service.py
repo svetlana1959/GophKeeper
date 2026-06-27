@@ -9,11 +9,17 @@ Multi-device access (issue #69): there is no account/auth layer yet, so trust
 is modeled directly between devices and secrets via ``uow.access``. A device
 must be both *active* (not deactivated/revoked) and *granted* access to a
 secret before it can read or write it. The device that originally stores a
-secret is granted access automatically; any other device needs an explicit
-``share()`` call from a device that already has access — mirroring the
-device-to-device trust flow described in the product concept docs, just
-without the actual key exchange (no crypto happens server-side; the server
-only tracks *which* devices may sync *which* ciphertexts).
+secret is granted access automatically.
+
+REVISION per review: this used to also expose ``share()``/``revoke()``,
+letting any device with access grant another device access directly with no
+re-encryption step. That is wrong for a Zero-Knowledge system — see
+``services/access_request_service.py`` for the replacement, an asynchronous
+handshake broker where the server only relays requests and public keys, and a
+grant is created only after the owning device has re-encrypted the secret
+locally and pushed it through ``update()`` below (unchanged). ``update()``
+itself needed no changes for this: it was already the endpoint the owner
+re-pushes the re-encrypted payload through.
 """
 
 from uuid import UUID
@@ -47,6 +53,12 @@ class SecretService:
     async def update(
         self, *, secret_id: UUID, device_id: UUID, ciphertext: bytes, base_version: int
     ) -> Secret:
+        """Replace a secret's ciphertext.
+
+        This is also the endpoint a secret's owner re-uses to push a
+        re-encrypted payload after approving another device's access
+        request (issue #69) — no separate "share" write path exists.
+        """
         async with self._uow as uow:
             await self._ensure_access(uow, secret_id, device_id)
             secret = await uow.secrets.get(secret_id)
@@ -71,31 +83,6 @@ class SecretService:
             await self._ensure_device_trusted(uow, device_id)
             secret_ids = await uow.access.list_secret_ids_for_device(device_id)
             return [await uow.secrets.get(secret_id) for secret_id in secret_ids]
-
-    async def share(self, secret_id: UUID, *, from_device_id: UUID, to_device_id: UUID) -> None:
-        """Extend trust for a secret to another device.
-
-        ``from_device_id`` must already have access — a device can only
-        vouch for a secret it can itself see, it can't grant access to
-        something it doesn't hold. ``to_device_id`` must be a known, active
-        device (it still needs its own ``DeviceService.register`` call first;
-        this only extends *secret* access, it doesn't create devices).
-        """
-        async with self._uow as uow:
-            await self._ensure_access(uow, secret_id, from_device_id)
-            await self._ensure_device_trusted(uow, to_device_id)
-            await uow.access.grant(secret_id, to_device_id)
-            await uow.commit()
-
-    async def revoke(
-        self, secret_id: UUID, *, requesting_device_id: UUID, target_device_id: UUID
-    ) -> None:
-        """Remove a device's access to one secret (e.g. it was lost or compromised)."""
-
-        async with self._uow as uow:
-            await self._ensure_access(uow, secret_id, requesting_device_id)
-            await uow.access.revoke(secret_id, target_device_id)
-            await uow.commit()
 
     async def _ensure_device_trusted(self, uow: UnitOfWork, device_id: UUID) -> None:
         """A device must exist and be active to do anything at all.

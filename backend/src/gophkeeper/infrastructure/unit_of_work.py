@@ -11,9 +11,10 @@ from typing import Self
 from gophkeeper.domain.unit_of_work import UnitOfWork
 from gophkeeper.infrastructure.adapters.database import DatabaseAdapter
 from gophkeeper.infrastructure.repositories import (
-    SqlAlchemySecretRepository,
+    SqlAlchemyAccessRequestRepository,
     SqlAlchemyDeviceRepository,
     SqlAlchemySecretAccessRepository,
+    SqlAlchemySecretRepository,
 )
 
 
@@ -30,6 +31,7 @@ class SqlAlchemyUnitOfWork(UnitOfWork):
         self.secrets = SqlAlchemySecretRepository(self._session)
         self.devices = SqlAlchemyDeviceRepository(self._session)
         self.access = SqlAlchemySecretAccessRepository(self._session)
+        self.access_requests = SqlAlchemyAccessRequestRepository(self._session)
         return self
 
     async def __aexit__(
