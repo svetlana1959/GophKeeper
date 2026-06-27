@@ -7,6 +7,16 @@ domain errors, which the registered exception handlers turn into 403/404/409.
 Multi-device access (issue #69): every route identifies the calling device via
 the ``X-Device-Id`` header (see ``api/deps.get_device_id``) and the service
 layer checks that device's grant before doing anything.
+
+REVISION per review: the previous version of this router exposed
+``POST /secrets/{id}/share`` and ``DELETE /secrets/{id}/share/{device_id}``,
+letting any device with access grant another device access directly with no
+re-encryption step — wrong for a Zero-Knowledge system. Those two routes are
+gone. In their place: an asynchronous request queue. A device that wants
+access creates a request; the secret's owner reads the queue (getting the
+requester's public key along with it), re-encrypts the secret locally, pushes
+it through the unchanged ``PUT /secrets/{id}``, and only then approves the
+request — which is the sole place a grant gets created.
 """
 
 from uuid import UUID
@@ -14,12 +24,13 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, status
 
 from gophkeeper.api.deps import get_device_id, provide
+from gophkeeper.api.schemas.access_request import AccessRequestResponse
 from gophkeeper.api.schemas.secrets import (
     SecretResponse,
-    ShareSecretRequest,
     StoreSecretRequest,
     UpdateSecretRequest,
 )
+from gophkeeper.services.access_request_service import AccessRequestService
 from gophkeeper.services.secret_service import SecretService
 
 router = APIRouter(prefix="/secrets", tags=["secrets"])
@@ -72,6 +83,13 @@ async def update_secret(
     device_id: UUID = Depends(get_device_id),
     service: SecretService = Depends(provide(SecretService)),
 ) -> SecretResponse:
+    """Replace a secret's ciphertext.
+
+    Also the endpoint a secret's owner re-uses to push a re-encrypted payload
+    after approving another device's access request — see
+    ``POST /secrets/requests/{request_id}/approve`` below. No separate write
+    path exists for that case; this one is it.
+    """
     secret = await service.update(
         secret_id=secret_id,
         device_id=device_id,
@@ -81,30 +99,66 @@ async def update_secret(
     return SecretResponse.from_domain(secret)
 
 
-@router.post("/{secret_id}/share", status_code=status.HTTP_204_NO_CONTENT)
-async def share_secret(
+@router.post(
+    "/{secret_id}/requests",
+    response_model=AccessRequestResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def request_secret_access(
     secret_id: UUID,
-    body: ShareSecretRequest,
     device_id: UUID = Depends(get_device_id),
-    service: SecretService = Depends(provide(SecretService)),
-) -> None:
-    """Trust another device with this secret (issue #69).
+    service: AccessRequestService = Depends(provide(AccessRequestService)),
+) -> AccessRequestResponse:
+    """Ask to be trusted with a secret (issue #69 handshake broker).
 
-    The calling device must already have access; it can only extend trust it
-    holds itself, not grant access on behalf of a secret it can't see.
+    Queues a PENDING request the secret's owner can see and act on — this
+    endpoint does not grant anything by itself. The calling device does not
+    need existing access to call this; asking for access it doesn't have
+    yet is the whole point.
     """
-    await service.share(secret_id, from_device_id=device_id, to_device_id=body.device_id)
+    request = await service.request(secret_id, device_id=device_id)
+    return AccessRequestResponse.from_domain(request)
 
 
-@router.delete("/{secret_id}/share/{target_device_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def revoke_secret_access(
+@router.get("/{secret_id}/requests", response_model=list[AccessRequestResponse])
+async def list_secret_access_requests(
     secret_id: UUID,
-    target_device_id: UUID,
     device_id: UUID = Depends(get_device_id),
-    service: SecretService = Depends(provide(SecretService)),
-) -> None:
-    """Revoke a device's access to this secret (e.g. the device was lost)."""
+    service: AccessRequestService = Depends(provide(AccessRequestService)),
+) -> list[AccessRequestResponse]:
+    """The secret owner's view of who is currently asking for access.
 
-    await service.revoke(
-        secret_id, requesting_device_id=device_id, target_device_id=target_device_id
-    )
+    Only a device that already has access to this secret may call this — it
+    needs the requesters' public keys (looked up via the device_id on each
+    pending request) to do the client-side re-encryption.
+    """
+    requests = await service.list_pending(secret_id, owner_device_id=device_id)
+    return [AccessRequestResponse.from_domain(r) for r in requests]
+
+
+@router.post("/requests/{request_id}/approve", response_model=AccessRequestResponse)
+async def approve_secret_access_request(
+    request_id: UUID,
+    device_id: UUID = Depends(get_device_id),
+    service: AccessRequestService = Depends(provide(AccessRequestService)),
+) -> AccessRequestResponse:
+    """Confirm a handshake completed and create the grant.
+
+    Call this only AFTER pushing the re-encrypted secret via
+    ``PUT /secrets/{id}`` — this endpoint does not touch the secret's
+    ciphertext itself (the server cannot: Zero-Knowledge), it only records
+    that the requesting device may now be trusted.
+    """
+    request = await service.approve(request_id, owner_device_id=device_id)
+    return AccessRequestResponse.from_domain(request)
+
+
+@router.post("/requests/{request_id}/reject", response_model=AccessRequestResponse)
+async def reject_secret_access_request(
+    request_id: UUID,
+    device_id: UUID = Depends(get_device_id),
+    service: AccessRequestService = Depends(provide(AccessRequestService)),
+) -> AccessRequestResponse:
+    """Decline a handshake. No grant is created."""
+    request = await service.reject(request_id, owner_device_id=device_id)
+    return AccessRequestResponse.from_domain(request)
