@@ -1,4 +1,4 @@
-name: CI
+name: CI Backend
 on:
   push:
     branches:
@@ -10,8 +10,8 @@ on:
       - dev
   workflow_dispatch:
 jobs:
-  backend-unit-tests:
-    name: Run unit tests for Python backend
+  unit-test:
+    name: Run unit tests
     runs-on: ubuntu-24.04
     permissions:
       contents: read
@@ -35,8 +35,8 @@ jobs:
         working-directory: "backend"
         run: uv run pytest tests/unit
 
-  backend-integration-tests:
-    name: Run integration tests for Python backend
+  integration-test:
+    name: Run integration tests
     runs-on: ubuntu-24.04
     permissions:
       contents: read
@@ -87,4 +87,5 @@ jobs:
         working-directory: "backend"
         env:
           TEST_DATABASE_URL: "postgresql+asyncpg://postgres:docker@127.0.0.1:5432/gophkeeper?ssl=disable"
+          # TEST_DATABASE_URL: "postgres://postgres:docker@127.0.0.1:5432/gophkeeper?sslmode=disable"
         run: uv run pytest tests/integration
