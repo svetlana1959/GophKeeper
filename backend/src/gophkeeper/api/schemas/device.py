@@ -1,11 +1,12 @@
 """Devices DTOs"""
 
+from datetime import datetime
+from uuid import UUID
 
 from pydantic import BaseModel
 
 from gophkeeper.domain.device import Device
-from datetime import datetime
-from uuid import UUID
+
 
 class RegisterDeviceRequest(BaseModel):
     id: UUID

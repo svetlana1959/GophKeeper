@@ -6,12 +6,12 @@ object. Ciphertext travels base64-encoded so it survives JSON.
 """
 
 import base64
+from datetime import datetime
+from uuid import UUID
 
 from pydantic import BaseModel, field_validator
 
 from gophkeeper.domain.secret import Secret
-from datetime import datetime
-from uuid import UUID
 
 
 class StoreSecretRequest(BaseModel):

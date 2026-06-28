@@ -6,12 +6,13 @@ actually persist and read back through SQL, and that commit/rollback behave.
 Skipped unless ``TEST_DATABASE_URL`` is set (see conftest).
 """
 
+from uuid import uuid4
+
 import pytest
 
 from gophkeeper.domain.errors import SecretNotFound
 from gophkeeper.domain.secret import Secret
 from gophkeeper.infrastructure.unit_of_work import SqlAlchemyUnitOfWork
-from uuid import uuid4
 
 pytestmark = pytest.mark.integration
 
