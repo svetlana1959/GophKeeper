@@ -76,7 +76,7 @@ jobs:
         env:
           TEST_DATABASE_URL: "postgresql+asyncpg://postgres:docker@127.0.0.1:5432/gophkeeper?ssl=disable"
           # TEST_DATABASE_URL: "postgres://postgres:docker@127.0.0.1:5432/gophkeeper?sslmode=disable"
-        run: uv run pytest
+        run: uv run pytest --cov-report=xml:${{ runner.temp }}/coverage.xml --cov-report=markdown:${{ runner.temp }}/coverage.md
 
   build:
     name: Build container image
