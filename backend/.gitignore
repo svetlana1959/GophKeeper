@@ -6,3 +6,5 @@ __pycache__/
 postgres-data/
 .env
 .coverage
+coverage*.md
+coverage*.xml
