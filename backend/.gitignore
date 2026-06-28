@@ -5,3 +5,6 @@ __pycache__/
 .pytest_cache/
 postgres-data/
 .env
+.coverage
+coverage*.md
+coverage*.xml
