@@ -71,12 +71,17 @@ jobs:
           DATABASE_URL: "postgres://postgres:docker@127.0.0.1:5432/gophkeeper?sslmode=disable"
         run: dbmate up
       
-      - name: Run integration tests
+      - name: Run tests
         working-directory: "backend"
         env:
           TEST_DATABASE_URL: "postgresql+asyncpg://postgres:docker@127.0.0.1:5432/gophkeeper?ssl=disable"
           # TEST_DATABASE_URL: "postgres://postgres:docker@127.0.0.1:5432/gophkeeper?sslmode=disable"
         run: uv run pytest --cov-report=xml:${{ runner.temp }}/coverage.xml --cov-report=markdown:${{ runner.temp }}/coverage.md
+
+      - name: Add coverage report to summary
+        run: |
+          echo "## Pytest coverage report" >> "$GITHUB_STEP_SUMMARY"
+          cat ${{ runner.temp }}/coverage.md >> "$GITHUB_STEP_SUMMARY"
 
   build:
     name: Build container image
