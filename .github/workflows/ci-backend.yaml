@@ -19,34 +19,8 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 jobs:
-  unit-test:
-    name: Run unit tests
-    runs-on: ubuntu-24.04
-    permissions:
-      contents: read
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-      
-      - name: Set up uv
-        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
-        with:
-          working-directory: "backend"
-          version: "0.11.25"
-          enable-cache: "true"
-          # cache-python: "true" # Python installation may be also cached
-          cache-dependency-glob: "uv.lock"
-
-      - name: Install dependencies
-        working-directory: "backend"
-        run: uv sync
-      
-      - name: Run unit tests
-        working-directory: "backend"
-        run: uv run pytest tests/unit
-
-  integration-test:
-    name: Run integration tests
+  test:
+    name: Run tests
     runs-on: ubuntu-24.04
     permissions:
       contents: read
@@ -89,7 +63,7 @@ jobs:
           echo "dfd4027141b6e4357158099bdfe6c02b286af70f8e49057937744cf80b38ea1c /tmp/dbmate-bin/dbmate" | sha256sum --check --status
 
           chmod +x /tmp/dbmate-bin/dbmate
-          echo "/tmp/dbmate-bin" >> $GITHUB_PATH
+          echo "/tmp/dbmate-bin" >> "$GITHUB_PATH"
 
       - name: Run db migrations
         working-directory: "backend"
@@ -102,7 +76,7 @@ jobs:
         env:
           TEST_DATABASE_URL: "postgresql+asyncpg://postgres:docker@127.0.0.1:5432/gophkeeper?ssl=disable"
           # TEST_DATABASE_URL: "postgres://postgres:docker@127.0.0.1:5432/gophkeeper?sslmode=disable"
-        run: uv run pytest tests/integration
+        run: uv run pytest
 
   build:
     name: Build container image
