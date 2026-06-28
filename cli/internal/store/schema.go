@@ -1,6 +1,5 @@
 package store
 
-// schema is applied idempotently on first open. It matches the task DDL exactly.
 const schema = `
 CREATE TABLE IF NOT EXISTS trusted_devices (
     id TEXT PRIMARY KEY,
@@ -12,7 +11,7 @@ CREATE TABLE IF NOT EXISTS trusted_devices (
 
 CREATE TABLE IF NOT EXISTS local_device (
     device_id TEXT PRIMARY KEY,
-    private_key_encrypted TEXT NOT NULL,
+    private_key_encrypted BLOB NOT NULL,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (device_id) REFERENCES trusted_devices(id) ON DELETE CASCADE
 );

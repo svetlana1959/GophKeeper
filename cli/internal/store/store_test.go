@@ -35,7 +35,7 @@ func TestOpen_CreatesDirAndFilePerms(t *testing.T) {
 	if _, err := os.Stat(dbPath); err != nil {
 		t.Fatalf("db file not created: %v", err)
 	}
-	if runtime.GOOS != "windows" { // unix perms are meaningless on windows
+	if runtime.GOOS != "windows" { // Unix perms are meaningless on Windows
 		info, _ := os.Stat(dbPath)
 		if perm := info.Mode().Perm(); perm != 0o600 {
 			t.Fatalf("db perms = %o, want 600", perm)
@@ -48,7 +48,7 @@ func TestDevices_CRUDAndActivation(t *testing.T) {
 	repo := openTemp(t).Devices()
 
 	if err := repo.Save(ctx, store.TrustedDevice{
-		ID: "dev-1", Name: "laptop-arsenez", PublicKey: "age1xyz", IsActive: true,
+		ID: "dev-1", Name: "laptop-asus", PublicKey: "age1xyz", IsActive: true,
 	}); err != nil {
 		t.Fatalf("save: %v", err)
 	}
@@ -57,7 +57,7 @@ func TestDevices_CRUDAndActivation(t *testing.T) {
 	if err != nil {
 		t.Fatalf("get: %v", err)
 	}
-	if got.Name != "laptop-arsenez" || !got.IsActive {
+	if got.Name != "laptop-asus" || !got.IsActive {
 		t.Fatalf("unexpected: %+v", got)
 	}
 
@@ -167,7 +167,7 @@ func TestSecrets_Lifecycle(t *testing.T) {
 	got.EncryptedPayload = []byte("cipher2")
 	got.Nonce = []byte("nonce2")
 	got.Version = 2
-	if err := repo.Update(ctx, got); err != nil {
+	if err := repo.Update(ctx, &got); err != nil {
 		t.Fatalf("update: %v", err)
 	}
 	if got, _ = repo.Get(ctx, "sec-1"); got.Version != 2 || !bytes.Equal(got.Nonce, []byte("nonce2")) {
@@ -178,14 +178,19 @@ func TestSecrets_Lifecycle(t *testing.T) {
 	if err := repo.SoftDelete(ctx, "sec-1"); err != nil {
 		t.Fatalf("soft delete: %v", err)
 	}
-	if got, _ = repo.Get(ctx, "sec-1"); !got.IsDeleted {
+
+	got, err = repo.Get(ctx, "sec-1")
+	if err != nil {
+		t.Fatalf("get after soft delete: %v", err)
+	}
+	if !got.IsDeleted {
 		t.Fatal("expected tombstone")
 	}
 	if list, _ := repo.List(ctx); len(list) != 0 {
 		t.Fatalf("expected empty active list, got %d", len(list))
 	}
 
-	if err := repo.Update(ctx, store.Secret{
+	if err := repo.Update(ctx, &store.Secret{
 		ID: "ghost", EncryptedPayload: []byte("a"), Nonce: []byte("b"),
 	}); !errors.Is(err, store.ErrNotFound) {
 		t.Fatalf("want ErrNotFound, got %v", err)

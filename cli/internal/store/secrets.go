@@ -81,7 +81,7 @@ func (r *SecretRepository) List(ctx context.Context) ([]Secret, error) {
 
 // Update overwrites mutable columns. Caller is responsible for bumping Version.
 // Returns ErrNotFound if the secret does not exist.
-func (r *SecretRepository) Update(ctx context.Context, s Secret) error {
+func (r *SecretRepository) Update(ctx context.Context, s *Secret) error {
 	if s.ID == "" {
 		return errors.New("store: secret id is required")
 	}

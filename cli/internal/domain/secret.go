@@ -47,7 +47,7 @@ func (s *Secret) IsActive() bool { return !s.Deleted }
 
 // SecretRepository persists Secret aggregates. It lives here next to the type
 // it serves (the "port", in business terms, no infrastructure imports); the
-// SQLite implementation is the adapter in internal/vault (#33). Each aggregate
+// SQLite implementation is the adapter in internal/store (#33). Each aggregate
 // keeps its own repository interface in its own file — never a shared
 // repository.go grab-bag.
 //

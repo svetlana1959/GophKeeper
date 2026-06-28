@@ -1,4 +1,4 @@
-package vault
+package store
 
 import (
 	"database/sql"
@@ -23,7 +23,7 @@ func NewSecretRepo(db *sql.DB) *SecretRepo {
 	return &SecretRepo{db: db}
 }
 
-var errNotImplemented = errors.New("vault: not implemented yet")
+var errNotImplemented = errors.New("store: not implemented yet")
 
 func (r *SecretRepo) Get(id string) (*domain.Secret, error)          { return nil, errNotImplemented }
 func (r *SecretRepo) FindByName(name string) (*domain.Secret, error) { return nil, errNotImplemented }

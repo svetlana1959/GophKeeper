@@ -3,7 +3,6 @@ package store
 import (
 	"context"
 	"database/sql"
-	"encoding/base64"
 	"errors"
 	"fmt"
 )
@@ -12,8 +11,7 @@ import (
 //
 // The blob is opaque to the store. The CLI passes it already PIN-encrypted, or
 // as plaintext bytes when no PIN is set (protected by the 0600 file perms the
-// Adapter enforces). The schema column is TEXT, so we base64-encode on write
-// and decode on read; the original bytes round-trip exactly.
+// Adapter enforces). The schema column is BLOB, so we store the raw bytes directly.
 type LocalDeviceRepository struct {
 	db *sql.DB
 }
@@ -30,13 +28,14 @@ func (r *LocalDeviceRepository) Save(ctx context.Context, ld LocalDevice) error 
 	if ld.CreatedAt.IsZero() {
 		ld.CreatedAt = nowUTC()
 	}
-	encoded := base64.StdEncoding.EncodeToString(ld.PrivateKeyAtRest)
 	const q = `
 INSERT INTO local_device (device_id, private_key_encrypted, created_at)
 VALUES (?, ?, ?)
 ON CONFLICT(device_id) DO UPDATE SET
     private_key_encrypted = excluded.private_key_encrypted;`
-	if _, err := r.db.ExecContext(ctx, q, ld.DeviceID, encoded, fmtTime(ld.CreatedAt)); err != nil {
+
+	// Store []byte directly - no encoding needed
+	if _, err := r.db.ExecContext(ctx, q, ld.DeviceID, ld.PrivateKeyAtRest, fmtTime(ld.CreatedAt)); err != nil {
 		return fmt.Errorf("store: save local device: %w", err)
 	}
 	return nil
@@ -46,16 +45,14 @@ ON CONFLICT(device_id) DO UPDATE SET
 func (r *LocalDeviceRepository) Get(ctx context.Context) (LocalDevice, error) {
 	const q = `SELECT device_id, private_key_encrypted, created_at
 	           FROM local_device LIMIT 1;`
-	var id, encoded, created string
-	if err := r.db.QueryRowContext(ctx, q).Scan(&id, &encoded, &created); err != nil {
+	var id string
+	var raw []byte
+	var created string
+	if err := r.db.QueryRowContext(ctx, q).Scan(&id, &raw, &created); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return LocalDevice{}, ErrNotFound
 		}
 		return LocalDevice{}, fmt.Errorf("store: get local device: %w", err)
-	}
-	raw, err := base64.StdEncoding.DecodeString(encoded)
-	if err != nil {
-		return LocalDevice{}, fmt.Errorf("store: decode local key: %w", err)
 	}
 	ts, err := parseTime(created)
 	if err != nil {
