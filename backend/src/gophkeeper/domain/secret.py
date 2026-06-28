@@ -19,9 +19,9 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Protocol
+from uuid import UUID
 
 from gophkeeper.domain.errors import DomainError, VersionConflict
-from uuid import UUID
 
 
 def _now() -> datetime:
@@ -63,9 +63,7 @@ class Secret:
         if self.version < 1:
             raise DomainError(f"secret version must be >= 1, got {self.version}")
 
-    def update(
-        self, ciphertext: bytes, *, base_version: int, at: datetime | None = None
-    ) -> None:
+    def update(self, ciphertext: bytes, *, base_version: int, at: datetime | None = None) -> None:
         """Replace the ciphertext, rejecting a stale write.
 
         ``base_version`` is the version the client believed it was editing. If it

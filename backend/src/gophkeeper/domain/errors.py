@@ -3,7 +3,9 @@
 These are part of the domain's vocabulary and know nothing about HTTP. The API
 layer maps them to status codes (see ``gophkeeper.api.errors``).
 """
+
 from uuid import UUID
+
 
 class DomainError(Exception):
     """Base class for all domain rule violations."""

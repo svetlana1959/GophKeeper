@@ -4,12 +4,12 @@ Because the invariants live on the aggregate, they are tested in isolation. This
 is the payoff of keeping the domain free of infrastructure.
 """
 
+from uuid import uuid4
+
 import pytest
 
 from gophkeeper.domain.errors import DomainError, VersionConflict
 from gophkeeper.domain.secret import Secret
-
-from uuid import uuid4
 
 
 def _make() -> Secret:
