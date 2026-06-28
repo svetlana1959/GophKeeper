@@ -69,6 +69,8 @@
     background-repeat: no-repeat;
 }
 
+/* ~~~~~~~~ Why Us Section ~~~~~~~~ */
+
 .whyUs {
     display: flex;
     flex-direction: column;
@@ -98,10 +100,12 @@
 }
 
 .whyUsContainer {
+    position: relative;
     margin-top: 35px;
     display: flex;
     justify-content: space-between;
     gap: 4.5%;
+    width: 100%;
 }
 
 .whyUsContainerChild {
@@ -109,11 +113,10 @@
     display: flex;
     flex-direction: column;
     /* min-height: 40vh; */
-    min-width: 300px;
     background: linear-gradient(#0173364C, #00150A4C);
     border-radius: 40px;
     border: 1px solid #23BD21;
-    flex: 1 0 0;
+    width: calc((100% - (4.5% * 3)) / 4);
     padding: 4% 2% 2% 2%;
     box-sizing: border-box;
 }
@@ -129,6 +132,7 @@
     border-radius: 15px;
     padding: 20px 25px;
     box-sizing: border-box;
+
     img {
         width: 100%;
         height: 100%;
@@ -136,11 +140,12 @@
 }
 
 .whyUsContainerChildTitle {
-    height: 72px;
+    min-height: 72px;
     font-size: 32px;
     color: #F4F5F5;
     font-weight: 600;
     margin-top: 24px;
+    max-width: 100%;
 }
 
 .whyUsContainerChildSubtitle {
@@ -158,11 +163,12 @@
     flex-direction: column;
     gap: 24px;
     bottom: 0;
-    width: 100%;
+    width: 80%;
 }
 
 .whyUsContainerChildFooterHr {
     width: 16.6%;
+    min-width: 40px;
     background: #23BD21;
     height: 3px;
     border-radius: 1px;
@@ -234,4 +240,121 @@
 .whyUsFooterContent:last-child::after {
     height: 0;
     width: 0;
+}
+
+
+/* ~~~~~~~~ How It Works Section ~~~~~~~~ */
+
+.howItWorks {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 100px 10%;
+    box-sizing: border-box;
+    /* gap: 10px; */
+}
+
+.howItWorksTitle {
+    font-size: 64px;
+    color: #FFFFFF;
+    font-weight: 600;
+    display: flex;
+    gap: 20px;
+}
+
+.howItWorksSubtitle {
+    font-size: 24px;
+    color: #D9D9D9;
+    opacity: 0.65;
+    display: flex;
+    font-weight: 200;
+    text-align: center;
+}
+
+.howItWorksContainer {
+    position: relative;
+    display: flex;
+    justify-content: space-between;
+    align-items: start;
+    width: 100%;
+    gap: 10%;
+    margin-top: 102px;
+}
+
+.howItWorksContainerChildren {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    width: calc((100% - (10% * 3)) / 4);
+    /* background: red; */
+}
+
+.howItWorksContainerChildren::after {
+    content: "";
+    position: absolute;
+    top: 40px;
+    right: 0;
+    width: calc((100% / 25) * 10 * 1.4);
+    height: 2px;
+    background-image: linear-gradient(90deg, #23bd21 30%, transparent 30%);
+    background-position: bottom;
+    background-size: 5px 2px;
+    background-repeat: repeat-x;
+    border: none;
+    transform: translateX(80%);
+}
+
+.howItWorksContainerChildren:last-child:after {
+    content: "";
+    background: none;
+}
+
+.howItWorksContainerChildrenMain {
+    position: relative;
+    display: flex;
+    width: 80%;
+    align-items: center;
+    gap: 40px;
+}
+
+.howItWorksContainerChildrenMainNumber {
+    width: 62px;
+    height: 62px;
+    border-radius: 50%;
+    background: linear-gradient(#23BD21, #005C2B);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #FFFFFF;
+    font-size: 32px;
+    font-weight: 600;
+    margin-top: 12px;
+    margin-bottom: 7px;
+}
+
+
+.howItWorksContainerChildrenMainIcon {
+    flex: 1 0 0;
+    height: 81px;
+    background-repeat: no-repeat;
+    background-size: contain;
+    background-position: 0 center;
+}
+
+.howItWorksContainerChildrenTitle {
+    height: 38px;
+    color: #008645;
+    font-size: 32px;
+    font-weight: 600;
+    margin-top: 52px;
+    word-spacing: 10%;
+}
+
+.howItWorksContainerChildrenSubtitle {
+    color: #FEFDFD;
+    opacity: 0.7;
+    font-size: 20px;
+    margin-top: 48px;
+    font-weight: 200;
 }

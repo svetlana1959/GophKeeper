@@ -5,6 +5,10 @@ import icon1 from '../assets/Vector-3.png'
 import icon2 from '../assets/Vector-1.png'
 import icon3 from '../assets/Vector-2.png'
 import icon4 from '../assets/Vector.png'
+import icon5 from '../assets/hiw1.png'
+import icon6 from '../assets/hiw3.png'
+import icon7 from '../assets/hiw2.png'
+import icon8 from '../assets/hiw4.png'
 import safeIcon from '../assets/safe-icon.png'
 
 function Landing() {
@@ -117,6 +121,74 @@ function Landing() {
                         <div className={styles.whyUsFooterContent}>Secure</div>
                         <div className={styles.whyUsFooterContent}>Privacy by default</div>
                         <div className={styles.whyUsFooterContent}>End-to-end encryption</div>
+                    </div>
+                </div>
+            </section>
+            <section className={styles.howItWorks}>
+                <div className={styles.howItWorksTitle}>How It <span style={{color: "#008645"}}>Works</span></div>
+                <p className={styles.howItWorksSubtitle}>
+                    Simple. Secure. Distributed.
+                </p>
+                <div className={styles.howItWorksContainer}>
+                    <div className={styles.howItWorksContainerChildren}>
+                        <div className={styles.howItWorksContainerChildrenMain}>
+                            <div className={styles.howItWorksContainerChildrenMainNumber}>
+                                1
+                            </div>
+                            <div className={styles.howItWorksContainerChildrenMainIcon}
+                                 style={{backgroundImage: `url(${icon5})`}}></div>
+                        </div>
+                        <div className={styles.howItWorksContainerChildrenTitle}>
+                            Create a secret
+                        </div>
+                        <div className={styles.howItWorksContainerChildrenSubtitle}>
+                            Add your secret using CLI or the app. It’s encrypted on your device.
+                        </div>
+                    </div>
+                    <div className={styles.howItWorksContainerChildren}>
+                        <div className={styles.howItWorksContainerChildrenMain}>
+                            <div className={styles.howItWorksContainerChildrenMainNumber}>
+                                2
+                            </div>
+                            <div className={styles.howItWorksContainerChildrenMainIcon}
+                                 style={{backgroundImage: `url(${icon6})`}}></div>
+                        </div>
+                        <div className={styles.howItWorksContainerChildrenTitle}>
+                            Sync securely
+                        </div>
+                        <div className={styles.howItWorksContainerChildrenSubtitle}>
+                            Your secret is encrypted and synced to the network. We never see your data
+                        </div>
+                    </div>
+                    <div className={styles.howItWorksContainerChildren}>
+                        <div className={styles.howItWorksContainerChildrenMain}>
+                            <div className={styles.howItWorksContainerChildrenMainNumber}>
+                                3
+                            </div>
+                            <div className={styles.howItWorksContainerChildrenMainIcon}
+                                 style={{backgroundImage: `url(${icon7})`}}></div>
+                        </div>
+                        <div className={styles.howItWorksContainerChildrenTitle}>
+                            Access anywhere
+                        </div>
+                        <div className={styles.howItWorksContainerChildrenSubtitle}>
+                            Access your secrets from any trusted device in your trust chain.
+                        </div>
+                    </div>
+                    <div className={styles.howItWorksContainerChildren}>
+                        <div className={styles.howItWorksContainerChildrenMain}>
+                            <div className={styles.howItWorksContainerChildrenMainNumber}>
+                                4
+                            </div>
+                            <div className={styles.howItWorksContainerChildrenMainIcon}
+                                 style={{backgroundImage: `url(${icon8})`}}></div>
+                        </div>
+                        <div className={styles.howItWorksContainerChildrenTitle}>
+                            You’re in control
+                        </div>
+                        <div className={styles.howItWorksContainerChildrenSubtitle}>
+                            Manage devices, permissions and revoke access at any time. 
+                        </div>
                     </div>
                 </div>
             </section>
