@@ -358,3 +358,129 @@
     margin-top: 48px;
     font-weight: 200;
 }
+
+/* ~~~~~~~~ Built Section ~~~~~~~~ */
+
+.built {
+    position: relative;
+    display: flex;
+    width: 100%;
+    padding: 2% 10%;
+    box-sizing: border-box;
+    align-items: stretch;
+}
+
+.builtLeftBlock {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    width: 40%;
+}
+
+.builtTitle {
+    font-size: 58px;
+    font-weight: 600;
+    color: #FFFFFF;
+}
+
+.builtSubtitle {
+    font-size: 24px;
+    font-weight: 200;
+    color: #D9D9D9;
+    opacity: 0.65;
+    margin-top: 36px;
+}
+
+.builtTerminal {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    padding: 5% 7%;
+    box-sizing: border-box;
+    font-weight: 200;
+    font-size: 16px;
+    background: linear-gradient(140deg, #b1b1b136, #0f0f0f36);
+    border: 1px solid rgba(255, 255, 255, 0.29);
+    border-radius: 10px;
+    margin-top: 102px;
+    width: 85%;
+}
+
+.builtTerminalComment {
+    color: #23BD21;
+    margin-top: 20px;
+}
+
+.builtTerminalComment:first-child {
+    margin-top: 0;
+}
+
+.builtTerminalCode {
+    color: #FFFFFF;
+    margin-top: 5px;
+}
+
+.builtTerminalCopyButton {
+    position: absolute;
+    height: 23px;
+    width: 23px;
+    background: none;
+    border: none;
+    right: 4.55%;
+    top: 6%;
+    background-position: center;
+    background-repeat: no-repeat;
+    background-size: contain;
+    cursor: pointer;
+}
+
+.builtSecretsList {
+    position: relative;
+    display: flex;
+    padding: 5% 10%;
+    box-sizing: border-box;
+    height: 100%;
+    flex-direction: column;
+    background: linear-gradient(140deg, #b1b1b136, #0f0f0f36);
+    border: 1px solid rgba(255, 255, 255, 0.29);
+    border-radius: 10px;
+}
+
+.builtSecretsListTitle {
+    font-size: 32px;
+    font-weight: 600;
+    color: #FFFFFF;
+}
+
+.builtSecretsListActionPanel {
+    display: flex;
+    width: 100%;
+    margin-top: 36px;
+    gap: 20px;
+}
+
+.builtSecretsListActionPanelInput {
+    width: 80%;
+    outline: none;
+    background: rgba(0, 0, 0, 0.19);
+    border: 1px solid rgba(255, 255, 255, 0.5);
+    border-radius: 5px;
+    color: rgba(255, 255, 255, 0.5);
+    font-size: 14px;
+    padding: 10px 25px;
+    padding-left: 40px;
+    background-position: 15px center;
+    background-repeat: no-repeat;
+    background-size: 21px 21px;
+}
+
+.builtSecretsListActionPanelAddButton {
+    width: 20%;
+    background: #008645;
+    padding: 10px 28px;
+    border: none;
+    min-width: 120px;
+    color: #FFFFFF;
+    border-radius: 7px;
+}

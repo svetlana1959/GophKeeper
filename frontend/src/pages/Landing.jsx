@@ -1,3 +1,4 @@
+import { useRef, useState } from 'react';
 import Header from '../components/Header'
 import styles from './Landing.module.css'
 import Title from '../components/Title';
@@ -9,9 +10,60 @@ import icon5 from '../assets/hiw1.png'
 import icon6 from '../assets/hiw3.png'
 import icon7 from '../assets/hiw2.png'
 import icon8 from '../assets/hiw4.png'
+import copyButton from '../assets/copyButton.png'
+import checkIcon from '../assets/check.png'
 import safeIcon from '../assets/safe-icon.png'
+import searchIcon from '../assets/material-symbols_search.png'
 
 function Landing() {
+    const terminalRef = useRef(null);
+    const [isCopied, setIsCopied] = useState(false);
+
+    const handleCopy = async () => {
+        if (!terminalRef.current) return;
+
+        const textToCopy = terminalRef.current.innerText.trim();
+
+        try {
+            await navigator.clipboard.writeText(textToCopy);
+            setIsCopied(true);
+            
+            // Возвращаем исходную иконку через 2 секунды
+            setTimeout(() => {
+                setIsCopied(false);
+            }, 2000);
+        } catch (err) {
+            console.error('Не удалось скопировать текст: ', err);
+        }
+    };
+
+    const [secrets, setSecrets] = useState([
+        {
+            type: 'Password',
+            name: 'GitHub',
+            lastUpdated: 'Today, 12:45',
+            deviceAcces: ['laptop', 'mobile', 'windows'],
+        },
+        {
+            type: 'Password',
+            name: 'Gmail',
+            lastUpdated: 'Yesterday, 10:13',
+            deviceAcces: ['laptop', 'mobile'],
+        },
+        {
+            type: 'Bank Cards',
+            name: 'Mir',
+            lastUpdated: '3 days ago',
+            deviceAcces: ['mobile'],
+        },
+        {
+            type: 'File',
+            name: 'Passport scan.pdf',
+            lastUpdated: '1 week ago',
+            deviceAcces: ['laptop'],
+        },
+    ]);
+
     return (
         <>
             <Header />
@@ -125,7 +177,7 @@ function Landing() {
                 </div>
             </section>
             <section className={styles.howItWorks}>
-                <div className={styles.howItWorksTitle}>How It <span style={{color: "#008645"}}>Works</span></div>
+                <div className={styles.howItWorksTitle}>How It <span style={{ color: "#008645" }}>Works</span></div>
                 <p className={styles.howItWorksSubtitle}>
                     Simple. Secure. Distributed.
                 </p>
@@ -136,7 +188,7 @@ function Landing() {
                                 1
                             </div>
                             <div className={styles.howItWorksContainerChildrenMainIcon}
-                                 style={{backgroundImage: `url(${icon5})`}}></div>
+                                style={{ backgroundImage: `url(${icon5})` }}></div>
                         </div>
                         <div className={styles.howItWorksContainerChildrenTitle}>
                             Create a secret
@@ -151,7 +203,7 @@ function Landing() {
                                 2
                             </div>
                             <div className={styles.howItWorksContainerChildrenMainIcon}
-                                 style={{backgroundImage: `url(${icon6})`}}></div>
+                                style={{ backgroundImage: `url(${icon6})` }}></div>
                         </div>
                         <div className={styles.howItWorksContainerChildrenTitle}>
                             Sync securely
@@ -166,7 +218,7 @@ function Landing() {
                                 3
                             </div>
                             <div className={styles.howItWorksContainerChildrenMainIcon}
-                                 style={{backgroundImage: `url(${icon7})`}}></div>
+                                style={{ backgroundImage: `url(${icon7})` }}></div>
                         </div>
                         <div className={styles.howItWorksContainerChildrenTitle}>
                             Access anywhere
@@ -181,15 +233,51 @@ function Landing() {
                                 4
                             </div>
                             <div className={styles.howItWorksContainerChildrenMainIcon}
-                                 style={{backgroundImage: `url(${icon8})`}}></div>
+                                style={{ backgroundImage: `url(${icon8})` }}></div>
                         </div>
                         <div className={styles.howItWorksContainerChildrenTitle}>
                             You’re in control
                         </div>
                         <div className={styles.howItWorksContainerChildrenSubtitle}>
-                            Manage devices, permissions and revoke access at any time. 
+                            Manage devices, permissions and revoke access at any time.
                         </div>
                     </div>
+                </div>
+            </section>
+            <section className={styles.built}>
+                <div className={styles.builtLeftBlock}>
+                    <div>
+                        <div className={styles.builtTitle}>Built for <span style={{ color: "#008645" }}>developers</span></div>
+                        <div className={styles.builtSubtitle}>Everything you need in terminal.</div>
+                    </div>
+                    <div className={styles.builtTerminal} ref={terminalRef}>
+                        <span className={styles.builtTerminalComment}># Install GophKeeper</span>
+                        <span className={styles.builtTerminalCode}>$ gopher install</span>
+                        <span className={styles.builtTerminalComment}># Add a secret</span>
+                        <span className={styles.builtTerminalCode}>$ gopher secret set database/passwords</span>
+                        <span className={styles.builtTerminalComment}># View your secrets</span>
+                        <span className={styles.builtTerminalCode}>$ gopher secret list</span>
+                        <span className={styles.builtTerminalComment}># Sync across devices</span>
+                        <span className={styles.builtTerminalCode}>$ gopher sync</span>
+
+                        <button className={styles.builtTerminalCopyButton}
+                                style={{backgroundImage: `url(${isCopied ? checkIcon : copyButton})`}}
+                                onClick={handleCopy}
+                        ></button>
+                    </div>
+                </div>
+                <div className={styles.builtRightBlock}>
+                    <div className={styles.builtSecretsList}>
+                        <div className={styles.builtSecretsListTitle}>Secrets</div>
+                        <div className={styles.builtSecretsListActionPanel}>
+                            <input className={styles.builtSecretsListActionPanelInput}
+                                   style={{backgroundImage: `url(${searchIcon})`}}
+                                   placeholder='Search secrets...' />
+                            <button className={styles.builtSecretsListActionPanelAddButton}>+ New Secret</button>
+                        </div>
+                        <table className={styles.builtSecretsListTable}></table>
+                    </div>
+                    <div className={styles.builtSecret}></div>
                 </div>
             </section>
         </>
