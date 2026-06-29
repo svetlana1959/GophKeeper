@@ -57,9 +57,7 @@ class SqlAlchemyAdapter(DatabaseAdapter):
             return
         engine = create_async_engine(
             self._url,
-            connect_args={
-                "server_settings": {"application_name": self._application_name}
-            },
+            connect_args={"server_settings": {"application_name": self._application_name}},
         )
         # Fail here (not on first query) if the database is unreachable.
         async with engine.connect() as conn:

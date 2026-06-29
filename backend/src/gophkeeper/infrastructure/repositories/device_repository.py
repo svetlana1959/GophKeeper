@@ -1,5 +1,4 @@
-"""SQLAlchemy implementation of the DeviceRepository port.
-"""
+"""SQLAlchemy implementation of the DeviceRepository port."""
 
 from typing import Any
 from uuid import UUID
@@ -7,8 +6,8 @@ from uuid import UUID
 from sqlalchemy import RowMapping, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from gophkeeper.domain.errors import DeviceNotFound
 from gophkeeper.domain.device import Device, DeviceRepository
+from gophkeeper.domain.errors import DeviceNotFound
 
 _COLUMNS = ("id", "device_name", "public_key", "is_active", "updated_at")
 _COLUMN_LIST = ", ".join(_COLUMNS)
