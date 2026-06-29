@@ -68,15 +68,23 @@ class SyncService:
 
                 secret = await uow.secrets.get(secret_id)
                 if secret.version > entry.version:
-                    results.append(
-                        SyncResult(
-                            secret_id=secret_id,
-                            outcome=SyncOutcome.UPDATED,
-                            version=secret.version,
-                            ciphertext=secret.ciphertext,
-                            updated_at=secret.updated_at,
+                    if secret.deleted:
+                        # BUG FIX: Secret.delete() bumps version just like
+                        # Secret.update() — without this check a tombstoned
+                        # secret is indistinguishable from UPDATED, so the
+                        # client would receive the last ciphertext and keep
+                        # the secret forever, never learning it was deleted.
+                        results.append(SyncResult(secret_id=secret_id, outcome=SyncOutcome.DELETED))
+                    else:
+                        results.append(
+                            SyncResult(
+                                secret_id=secret_id,
+                                outcome=SyncOutcome.UPDATED,
+                                version=secret.version,
+                                ciphertext=secret.ciphertext,
+                                updated_at=secret.updated_at,
+                            )
                         )
-                    )
                 else:
                     # secret.version == entry.version: up to date.
                     # secret.version < entry.version would mean the client's
@@ -92,6 +100,13 @@ class SyncService:
             # granted access (issue #69) or simply never synced before.
             for secret_id in accessible_ids - client_by_id.keys():
                 secret = await uow.secrets.get(secret_id)
+                if secret.deleted:
+                    # BUG FIX: same issue — a secret could be tombstoned
+                    # before this device's first sync (granted then deleted).
+                    # Returning NEW with a stale ciphertext would hand the
+                    # client a "new" secret that's already gone.
+                    results.append(SyncResult(secret_id=secret_id, outcome=SyncOutcome.DELETED))
+                    continue
                 results.append(
                     SyncResult(
                         secret_id=secret_id,

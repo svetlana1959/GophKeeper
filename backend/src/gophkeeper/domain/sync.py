@@ -32,6 +32,12 @@ class SyncOutcome(StrEnum):
         another device created it, or this device just gained access via the
         issue #69 handshake. Treated as a normal sync outcome, not an error:
         discovering new secrets is the whole point of sync.
+    DELETED: the secret was tombstoned (``Secret.delete()``) on another
+        device since the client last synced. ``Secret.delete()`` bumps the
+        version exactly like a normal edit — without this explicit outcome a
+        deleted secret is indistinguishable from UPDATED, so the client
+        would receive and keep the secret's last ciphertext forever, never
+        learning it was deleted. No ciphertext is returned for DELETED.
     ACCESS_REVOKED: the client asked about a secret_id it no longer (or
         never did) have access to. This is the explicit failure case
         acceptance criterion #4 asks for — the caller is told exactly which
@@ -42,6 +48,7 @@ class SyncOutcome(StrEnum):
     UPDATED = "UPDATED"
     UP_TO_DATE = "UP_TO_DATE"
     NEW = "NEW"
+    DELETED = "DELETED"
     ACCESS_REVOKED = "ACCESS_REVOKED"
 
 
