@@ -41,8 +41,7 @@ class SqlAlchemySecretAccessRepository(SecretAccessRepository):
     async def revoke(self, secret_id: UUID, device_id: UUID) -> None:
         await self._session.execute(
             text(
-                "DELETE FROM secret_access "
-                "WHERE secret_id = :secret_id AND device_id = :device_id"
+                "DELETE FROM secret_access WHERE secret_id = :secret_id AND device_id = :device_id"
             ),
             _to_params(secret_id, device_id),
         )

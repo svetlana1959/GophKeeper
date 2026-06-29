@@ -81,9 +81,7 @@ class AccessRequestAlreadyPending(DomainError):
     """
 
     def __init__(self, secret_id: UUID, device_id: UUID) -> None:
-        super().__init__(
-            f"device {device_id} already has a pending request for secret {secret_id}"
-        )
+        super().__init__(f"device {device_id} already has a pending request for secret {secret_id}")
         self.secret_id = secret_id
         self.device_id = device_id
 
@@ -96,9 +94,7 @@ class AccessRequestNotPending(DomainError):
     """
 
     def __init__(self, request_id: UUID, current_status: str) -> None:
-        super().__init__(
-            f"access request {request_id} is {current_status}, not PENDING"
-        )
+        super().__init__(f"access request {request_id} is {current_status}, not PENDING")
         self.request_id = request_id
         self.current_status = current_status
 

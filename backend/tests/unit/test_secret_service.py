@@ -134,9 +134,7 @@ async def test_access_maintained_after_update():
     await service.store(
         account_id="acc", secret_id=secret_id, device_id=device.id, ciphertext=b"v1"
     )
-    await service.update(
-        secret_id=secret_id, device_id=device.id, ciphertext=b"v2", base_version=1
-    )
+    await service.update(secret_id=secret_id, device_id=device.id, ciphertext=b"v2", base_version=1)
 
     fetched = await service.fetch(secret_id, device_id=device.id)
     assert fetched.ciphertext == b"v2"
@@ -152,9 +150,7 @@ async def test_fetch_denied_for_untrusted_device():
     service = SecretService(uow)
     secret_id = uuid4()
 
-    await service.store(
-        account_id="acc", secret_id=secret_id, device_id=owner.id, ciphertext=b"v1"
-    )
+    await service.store(account_id="acc", secret_id=secret_id, device_id=owner.id, ciphertext=b"v1")
 
     with pytest.raises(AccessDenied):
         await service.fetch(secret_id, device_id=stranger.id)
