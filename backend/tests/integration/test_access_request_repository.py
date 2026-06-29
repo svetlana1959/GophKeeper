@@ -1,5 +1,6 @@
 """Integration tests for AccessRequestRepository (issue #69 handshake broker)."""
 
+import asyncio
 from uuid import uuid4
 
 import pytest
@@ -131,3 +132,43 @@ async def test_approving_frees_the_pair_for_a_new_request(database):
         second = AccessRequest(id=uuid4(), secret_id=secret.id, device_id=device.id)
         await uow.access_requests.add(second)  # must not raise
         await uow.commit()
+
+
+async def test_concurrent_inserts_for_same_pair_only_one_succeeds(database):
+    """REGRESSION TEST for a real race condition found during review:
+    SqlAlchemyUnitOfWork uses one session per `async with` block, each on its
+    own connection, so two concurrent add() calls for the same
+    (secret_id, device_id) can both pass the upfront SELECT-for-duplicates
+    check before either has committed an INSERT — classic check-then-act.
+    The partial unique index (uq_access_requests_pending) is the real
+    guarantee: the loser's INSERT raises a raw IntegrityError at the
+    database level, which add() must catch and re-raise as the same
+    AccessRequestAlreadyPending the SELECT path raises, not let escape as an
+    unhandled exception.
+    """
+    async with SqlAlchemyUnitOfWork(database) as uow:
+        device, secret = await _make_device_and_secret(uow)
+
+    async def attempt():
+        async with SqlAlchemyUnitOfWork(database) as uow:
+            request = AccessRequest(id=uuid4(), secret_id=secret.id, device_id=device.id)
+            await uow.access_requests.add(request)
+            await uow.commit()
+
+    results = await asyncio.gather(*[attempt() for _ in range(8)], return_exceptions=True)
+
+    successes = [r for r in results if r is None]
+    conflicts = [r for r in results if isinstance(r, AccessRequestAlreadyPending)]
+    other_exceptions = [
+        r
+        for r in results
+        if isinstance(r, Exception) and not isinstance(r, AccessRequestAlreadyPending)
+    ]
+
+    assert other_exceptions == [], f"unexpected exception leaked: {other_exceptions}"
+    assert len(successes) == 1, "exactly one concurrent insert should win"
+    assert len(conflicts) == 7, "every loser should see a clean domain error, not a crash"
+
+    async with SqlAlchemyUnitOfWork(database) as uow:
+        pending = await uow.access_requests.list_pending_for_secret(secret.id)
+    assert len(pending) == 1, "the database must end up with exactly one PENDING row"

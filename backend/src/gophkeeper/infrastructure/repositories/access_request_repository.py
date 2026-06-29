@@ -9,6 +9,7 @@ from typing import Any
 from uuid import UUID
 
 from sqlalchemy import RowMapping, text
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from gophkeeper.domain.access_request import (
@@ -48,16 +49,23 @@ class SqlAlchemyAccessRequestRepository(AccessRequestRepository):
         self._session = session
 
     async def add(self, request: AccessRequest) -> None:
-        # BUG AVOIDED: catching IntegrityError here and calling
-        # session.rollback() would roll back the *entire* UnitOfWork
-        # transaction, not just this insert — any other work already done
-        # in the same use case would be silently discarded too. Checking
-        # for an existing PENDING row up front keeps this method's failure
-        # mode local to itself, with no special transaction handling needed.
-        # The partial unique index in the migration remains the real
-        # guarantee against a race between two concurrent requests; this
-        # check only gives a clean domain error in the common, non-racing
-        # case.
+        # The upfront SELECT below closes the common, non-racing case with a
+        # clean domain error. It is NOT sufficient on its own: two concurrent
+        # requests for the same (secret_id, device_id) can both pass the
+        # SELECT before either INSERTs, a classic check-then-act race. The
+        # partial unique index in the migration is what actually prevents two
+        # PENDING rows from existing — the loser of the race hits it on
+        # INSERT and gets a raw IntegrityError, which we catch here and
+        # re-raise as the same domain error the SELECT path raises, so the
+        # caller sees one consistent error either way.
+        #
+        # Importantly we do NOT call session.rollback() ourselves here: that
+        # would discard the whole Unit-of-Work transaction, not just this
+        # insert. We let the exception propagate instead — the caller's
+        # `async with self._uow as uow:` block in the service layer exits
+        # via SqlAlchemyUnitOfWork.__aexit__, which already rolls back
+        # automatically on any exception. This mirrors exactly how
+        # VersionConflict is handled elsewhere in this codebase.
         existing = await self._session.execute(
             text(
                 "SELECT 1 FROM access_requests "
@@ -69,10 +77,14 @@ class SqlAlchemyAccessRequestRepository(AccessRequestRepository):
         if existing.first() is not None:
             raise AccessRequestAlreadyPending(request.secret_id, request.device_id)
 
-        await self._session.execute(
-            text(f"INSERT INTO access_requests ({_COLUMN_LIST}) VALUES ({_INSERT_VALUES})"),
-            _to_params(request),
-        )
+        try:
+            await self._session.execute(
+                text(f"INSERT INTO access_requests ({_COLUMN_LIST}) VALUES ({_INSERT_VALUES})"),
+                _to_params(request),
+            )
+            await self._session.flush()
+        except IntegrityError as exc:
+            raise AccessRequestAlreadyPending(request.secret_id, request.device_id) from exc
 
     async def get(self, request_id: UUID) -> AccessRequest:
         result = await self._session.execute(
