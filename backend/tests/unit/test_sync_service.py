@@ -301,3 +301,54 @@ async def test_empty_client_state_and_no_secrets_returns_ok_empty():
 
     assert report.status == SyncStatus.OK
     assert report.results == []
+
+
+async def test_deleted_secret_reported_as_deleted_not_updated():
+    """REGRESSION: Secret.delete() bumps version exactly like update() —
+    without an explicit DELETED outcome the client receives UPDATED with the
+    last ciphertext and never learns the secret was removed."""
+    uow = FakeUnitOfWork()
+    device = _device()
+    await uow.devices.add(device)
+    secret_id = uuid4()
+    secret = Secret(id=secret_id, account_id="acc", ciphertext=b"sensitive")
+    await uow.secrets.add(secret)
+    await uow.access.grant(secret_id, device.id)
+
+    # tombstone the secret (bumps version to 2)
+    secret.delete()
+    await uow.secrets.save(secret)
+
+    service = SyncService(uow)
+    report = await service.sync(
+        device_id=device.id,
+        client_state=[ClientSecretState(id=secret_id, version=1)],
+    )
+
+    result = report.results[0]
+    assert result.outcome == SyncOutcome.DELETED
+    # no ciphertext must ever be disclosed for a deleted secret
+    assert result.ciphertext is None
+    assert result.version is None
+    assert report.status == SyncStatus.OK  # DELETED is not a failure, it's a clean signal
+
+
+async def test_deleted_secret_never_mentioned_by_client_also_reported_as_deleted():
+    """A secret that was granted and then deleted before the device's first
+    sync must not come back as NEW with a stale ciphertext."""
+    uow = FakeUnitOfWork()
+    device = _device()
+    await uow.devices.add(device)
+    secret_id = uuid4()
+    secret = Secret(id=secret_id, account_id="acc", ciphertext=b"data")
+    secret.delete()  # deleted before any sync
+    await uow.secrets.add(secret)
+    await uow.access.grant(secret_id, device.id)
+
+    service = SyncService(uow)
+    # client sends empty state — never knew about this secret
+    report = await service.sync(device_id=device.id, client_state=[])
+
+    assert len(report.results) == 1
+    assert report.results[0].outcome == SyncOutcome.DELETED
+    assert report.results[0].ciphertext is None
