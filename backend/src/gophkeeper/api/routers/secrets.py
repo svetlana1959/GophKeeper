@@ -30,8 +30,10 @@ from gophkeeper.api.schemas.secrets import (
     StoreSecretRequest,
     UpdateSecretRequest,
 )
+from gophkeeper.api.schemas.sync import SyncReportResponse, SyncRequest
 from gophkeeper.services.access_request_service import AccessRequestService
 from gophkeeper.services.secret_service import SecretService
+from gophkeeper.services.sync_service import SyncService
 
 router = APIRouter(prefix="/secrets", tags=["secrets"])
 
@@ -64,6 +66,31 @@ async def list_secrets(
     """
     secrets = await service.list_for_device(device_id)
     return [SecretResponse.from_domain(secret) for secret in secrets]
+
+
+@router.post("/sync", response_model=SyncReportResponse)
+async def sync_secrets(
+    body: SyncRequest,
+    device_id: UUID = Depends(get_device_id),
+    service: SyncService = Depends(provide(SyncService)),
+) -> SyncReportResponse:
+    """Synchronize a device's local secret state against the server (issue #68).
+
+    The client sends what it believes it has — each secret's id and the
+    version it last saw — and gets back, per secret: UPDATED (apply the
+    returned ciphertext), UP_TO_DATE (nothing to do), NEW (a secret the
+    device has access to but never mentioned, e.g. just granted via the
+    issue #69 handshake), or ACCESS_REVOKED (the device asked about a
+    secret_id it can no longer see). The overall ``status`` is OK if every
+    item resolved cleanly, or PARTIAL if any came back ACCESS_REVOKED — the
+    explicit error notification acceptance criterion #4 asks for, rather
+    than the item silently disappearing from a plain ``GET /secrets`` list.
+
+    Unlike ``GET /secrets`` (issue #69, unchanged above), this is the active
+    sync call: it tells the client *what changed*, not just *what exists*.
+    """
+    report = await service.sync(device_id=device_id, client_state=body.to_domain())
+    return SyncReportResponse.from_domain(report)
 
 
 @router.get("/{secret_id}", response_model=SecretResponse)
