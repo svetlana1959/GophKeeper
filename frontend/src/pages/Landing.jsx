@@ -46,7 +46,7 @@ function Landing() {
         }
     };
 
-    const [secrets, _] = useState([
+    const secrets = [
         {
             type: 'password',
             name: 'GitHub',
@@ -71,7 +71,7 @@ function Landing() {
             lastUpdated: '1 week ago',
             deviceAccess: ['laptop'],
         },
-    ]);
+    ];
 
     const secretTypeToNameTextMap = {
         'password': 'Password',
