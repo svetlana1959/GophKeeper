@@ -95,10 +95,9 @@ async def test_save_persists_status_change(database):
 
     async with SqlAlchemyUnitOfWork(database) as uow:
         fetched = await uow.access_requests.get(request_id)
+        pending = await uow.access_requests.list_pending_for_secret(secret.id)
 
     assert fetched.status == AccessRequestStatus.APPROVED
-    # an approved request no longer shows up as pending
-    pending = await uow.access_requests.list_pending_for_secret(secret.id)
     assert pending == []
 
 
