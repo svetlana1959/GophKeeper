@@ -11,15 +11,24 @@ import icon6 from '../assets/hiw3.png'
 import icon7 from '../assets/hiw2.png'
 import icon8 from '../assets/hiw4.png'
 import copyButton from '../assets/copyButton.png'
-import checkIcon from '../assets/check.png'
+import checkIcon from '../assets/copied.svg'
 import safeIcon from '../assets/safe-icon.png'
 import searchIcon from '../assets/material-symbols_search.png'
+import bankCardIcon from '../assets/bankCardType.png'
+import fileIcon from '../assets/fileType.png'
+import passwordIcon from '../assets/passwordType.svg'
+import laptopIcon from '../assets/laptop.png'
+import laptopGreenIcon from '../assets/laptopGreen.svg'
+import mobileIcon from '../assets/mobile.png'
+import windowsIcon from '../assets/windows.png'
+import verifIcon from '../assets/verif.svg'
 
 function Landing() {
     const terminalRef = useRef(null);
     const [isCopied, setIsCopied] = useState(false);
 
     const handleCopy = async () => {
+        console.log("ded")
         if (!terminalRef.current) return;
 
         const textToCopy = terminalRef.current.innerText.trim();
@@ -27,7 +36,7 @@ function Landing() {
         try {
             await navigator.clipboard.writeText(textToCopy);
             setIsCopied(true);
-            
+
             // Возвращаем исходную иконку через 2 секунды
             setTimeout(() => {
                 setIsCopied(false);
@@ -37,32 +46,87 @@ function Landing() {
         }
     };
 
-    const [secrets, setSecrets] = useState([
+    const [secrets, _] = useState([
         {
-            type: 'Password',
+            type: 'password',
             name: 'GitHub',
             lastUpdated: 'Today, 12:45',
-            deviceAcces: ['laptop', 'mobile', 'windows'],
+            deviceAccess: ['laptop', 'mobile', 'windows'],
         },
         {
-            type: 'Password',
+            type: 'password',
             name: 'Gmail',
             lastUpdated: 'Yesterday, 10:13',
-            deviceAcces: ['laptop', 'mobile'],
+            deviceAccess: ['laptop', 'mobile'],
         },
         {
-            type: 'Bank Cards',
+            type: 'bankCard',
             name: 'Mir',
             lastUpdated: '3 days ago',
-            deviceAcces: ['mobile'],
+            deviceAccess: ['mobile'],
         },
         {
-            type: 'File',
+            type: 'file',
             name: 'Passport scan.pdf',
             lastUpdated: '1 week ago',
-            deviceAcces: ['laptop'],
+            deviceAccess: ['laptop'],
         },
     ]);
+
+    const secretTypeToNameTextMap = {
+        'password': 'Password',
+        'bankCard': 'Bank Cards',
+        'file': 'File'
+    }
+
+    const deviceTypeToIcon = {
+        'laptop': laptopIcon,
+        'mobile': mobileIcon,
+        'windows': windowsIcon
+    }
+
+    function passwordElement() {
+        return (
+            <div className={styles.builtSecretsListTableType}
+                style={{
+                    background: "#103C23",
+                }}
+            >
+                <img src={passwordIcon} />
+            </div>
+        )
+    }
+
+    function bankCardElement() {
+        return (
+            <div className={styles.builtSecretsListTableType}
+                style={{
+                    background: "#2C2504",
+                }}
+            >
+                <img src={bankCardIcon} />
+            </div>
+        )
+    }
+
+    function fileElement() {
+        return (
+            <div className={styles.builtSecretsListTableType}
+                style={{
+                    background: "#103C23",
+                }}
+            >
+                <img src={fileIcon} />
+            </div>
+        )
+    }
+
+
+    const secretTypeToIcon = {
+        'password': passwordElement,
+        'bankCard': bankCardElement,
+        'file': fileElement
+    }
 
     return (
         <>
@@ -81,7 +145,7 @@ function Landing() {
                 </div>
                 <div className={styles.heroImage}></div>
             </section>
-            <section className={styles.whyUs}>
+            <section className={styles.whyUs} id='features'>
                 <div className={styles.whyUsTitle}>Why <Title /></div>
                 <p className={styles.whyUsSubtitle}>
                     GophKeeper gives you powerful encryption and seamless <br />
@@ -176,7 +240,7 @@ function Landing() {
                     </div>
                 </div>
             </section>
-            <section className={styles.howItWorks}>
+            <section className={styles.howItWorks} id='howItWorks'>
                 <div className={styles.howItWorksTitle}>How It <span style={{ color: "#008645" }}>Works</span></div>
                 <p className={styles.howItWorksSubtitle}>
                     Simple. Secure. Distributed.
@@ -244,7 +308,7 @@ function Landing() {
                     </div>
                 </div>
             </section>
-            <section className={styles.built}>
+            <section className={styles.built} id='getStarted'>
                 <div className={styles.builtLeftBlock}>
                     <div>
                         <div className={styles.builtTitle}>Built for <span style={{ color: "#008645" }}>developers</span></div>
@@ -261,9 +325,8 @@ function Landing() {
                         <span className={styles.builtTerminalCode}>$ gopher sync</span>
 
                         <button className={styles.builtTerminalCopyButton}
-                                style={{backgroundImage: `url(${isCopied ? checkIcon : copyButton})`}}
-                                onClick={handleCopy}
-                        ></button>
+                            onClick={handleCopy}
+                        ><img src={isCopied ? checkIcon : copyButton} alt="" /></button>
                     </div>
                 </div>
                 <div className={styles.builtRightBlock}>
@@ -271,13 +334,134 @@ function Landing() {
                         <div className={styles.builtSecretsListTitle}>Secrets</div>
                         <div className={styles.builtSecretsListActionPanel}>
                             <input className={styles.builtSecretsListActionPanelInput}
-                                   style={{backgroundImage: `url(${searchIcon})`}}
-                                   placeholder='Search secrets...' />
-                            <button className={styles.builtSecretsListActionPanelAddButton}>+ New Secret</button>
+                                style={{ backgroundImage: `url(${searchIcon})` }}
+                                placeholder='Search secrets...' />
+                            <button
+                                className={styles.builtSecretsListActionPanelAddButton}
+                            >
+                                + New Secret
+                            </button>
                         </div>
-                        <table className={styles.builtSecretsListTable}></table>
+                        <div className={styles.builtSecretsListTableBlock}>
+                            <table className={styles.builtSecretsListTable}>
+                                <thead>
+                                    <tr className={styles.builtSecretsListTableHeadTr}>
+                                        <th className={styles.colType}>Type</th>
+                                        <th className={styles.colName}>Name</th>
+                                        <th className={styles.colLastUpdated}>Last Updated</th>
+                                        <th className={styles.colDeviceAccess}>Device Access</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {secrets.map((secret, ind) => (
+                                        <tr key={`table-row-${ind + 1}`} className={styles.builtSecretsListTableTr}>
+                                            <td className={styles.colType}>
+                                                <div className={`${styles.builtSecretsListTableType} ${styles[secret.type]}`}>
+                                                    {secretTypeToIcon[secret.type]()}
+                                                </div>
+                                            </td>
+                                            <td className={`${styles.colName} ${styles.builtSecretsListTableTdNameCell}`}>
+                                                <span className={styles.builtSecretsListTableTdNameText}>{secret.name}</span>
+                                                <span className={styles.builtSecretsListTableTdTypeText}>{secretTypeToNameTextMap[secret.type]}</span>
+                                            </td>
+                                            <td className={`${styles.colLastUpdated} ${styles.builtSecretsListTableTdContentLastUpdate}`}>
+                                                {secret.lastUpdated}
+                                            </td>
+                                            <td className={`${styles.colDeviceAccess} ${styles.builtSecretsListTableTdContentDevices}`}>
+                                                <div className={styles.deviceIconsGap}>
+                                                    {secret.deviceAccess.map((deviceType, indx) => (
+                                                        <img key={`row-${ind}-icon-${indx}`} src={deviceTypeToIcon[deviceType]} alt="" />
+                                                    ))}
+                                                </div>
+                                                <span className={styles.deviceCountText}>
+                                                    {secret.deviceAccess.length} {secret.deviceAccess.length === 1 ? 'device' : 'devices'}
+                                                </span>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
-                    <div className={styles.builtSecret}></div>
+                    <div className={styles.builtSecret}>
+                        <div className={styles.builtSecretHeader}>
+                            <div className={styles.builtSecretIcon}>
+                                <img src={passwordIcon} />
+                            </div>
+
+                            <div className={styles.builtSecretVerif}>
+                                <img src={verifIcon} alt="icon" />
+                            </div>
+                        </div>
+                        <div className={styles.builtSecretTitle}>Secret</div>
+                        <div className={styles.builtSecretSubtitle}>Password</div>
+
+                        <div className={styles.builtSecretDescription}>
+                            <div className={styles.builtSecretDescriptionType}>
+                                <div className={styles.builtSecretDescriptionLeft}>Type</div>
+                                <div className={styles.builtSecretDescriptionRight}>Password</div>
+                            </div>
+                            <div className={styles.builtSecretDescriptionType}>
+                                <div className={styles.builtSecretDescriptionLeft}>Created</div>
+                                <div className={styles.builtSecretDescriptionRight}>12 June 2026, 10:22</div>
+                            </div>
+                            <div className={styles.builtSecretDescriptionType}>
+                                <div className={styles.builtSecretDescriptionLeft}>Last Modified</div>
+                                <div className={styles.builtSecretDescriptionRight}>Today, 12:45</div>
+                            </div>
+                        </div>
+
+                        <div className={styles.builtSecretHr}></div>
+
+                        <div className={styles.builtSecretDevices}>
+                            <div className={styles.builtSecretDevicesTitle}>Devices with access</div>
+                            <div className={styles.builtSecretDevicesContent}>
+                                <div className={styles.builtSecretDevice}>
+                                    <div className={styles.builtSecretDeviceIcon}>
+                                        <img src={laptopGreenIcon} alt="Mac" />
+                                    </div>
+                                    <div className={styles.builtSecretDeviceNames}>
+                                        <div className={styles.builtSecretDeviceName}>Macbook Pro</div>
+                                        <div className={styles.builtSecretDeviceVersion}>macOS 14.4</div>
+                                    </div>
+                                </div>
+                                <div className={styles.builtSecretDeviceStatus}>Online</div>
+                            </div>
+                        </div>
+
+                        <div className={styles.builtSecretActionPanel}>
+                            <button className={styles.builtSecretActionPanelButton}
+                                style={{ background: "#008645" }}
+                                onClick={() => alert("fdsfd")}
+                            >
+                                View Secret
+                            </button>
+                            <button className={styles.builtSecretActionPanelButton}
+                                style={{ background: "#242424" }}
+                            >
+                                Share
+                            </button>
+                            <button className={styles.builtSecretActionPanelButton}
+                                style={{ background: "#242424" }}
+                            >
+                                Edit
+                            </button>
+                            <button className={styles.builtSecretActionPanelButton}
+                                style={{ background: "#690000" }}
+                            >
+                                Delete
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+            <section className={styles.getStarted}>
+                <div className={styles.getStartedTitle}>Ready to take <span style={{color: "#008645"}}>control</span> of your secrets?</div>
+                <div className={styles.getStartedSubtitle}>Join developers who trust GophKeeper for secure secret management.</div>
+                <div className={styles.getStartedHr}></div>
+                <div className={styles.getStartedActionPanel}>
+                    <div className={styles.getStartedActionPanelStartButton}>Get Started</div>
+                    <div className={styles.getStartedActionPanelGithubButton}>View on Github</div>
                 </div>
             </section>
         </>
