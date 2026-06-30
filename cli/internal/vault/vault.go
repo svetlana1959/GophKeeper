@@ -9,6 +9,7 @@ import (
 
 	"github.com/svetlana1959/GophKeeper/cli/internal/device"
 	"github.com/svetlana1959/GophKeeper/cli/internal/secret"
+	"github.com/svetlana1959/GophKeeper/cli/internal/syncstate"
 
 	_ "modernc.org/sqlite"
 )
@@ -71,3 +72,6 @@ func (db *DB) Devices() device.Repository { return &deviceRepo{db: db.sql} }
 
 // Local returns the local-device repository.
 func (db *DB) Local() device.LocalRepository { return &localRepo{db: db.sql} }
+
+// Sync returns the synchronization-state repository.
+func (db *DB) Sync() syncstate.Repository { return &syncRepo{db: db.sql} }

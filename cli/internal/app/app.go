@@ -234,7 +234,10 @@ func (s *Session) Set(p SetParams) error {
 		return err
 	}
 	sec.Reseal(ct, time.Now().UTC()) // sets payload, bumps version, refreshes updated_at
-	return s.secrets.Save(sec)
+	if err := s.secrets.Save(sec); err != nil {
+		return err
+	}
+	return s.db.Sync().MarkDirty(sec.ID) // queue for the next push
 }
 
 // Get decrypts a secret by name and returns the requested field (default
@@ -281,7 +284,10 @@ func (s *Session) Delete(name string) error {
 		return ErrSecretNotFound
 	}
 	sec.Delete(time.Now().UTC())
-	return s.secrets.Save(sec)
+	if err := s.secrets.Save(sec); err != nil {
+		return err
+	}
+	return s.db.Sync().MarkDirty(sec.ID) // queue the tombstone for the next push
 }
 
 // SecretInfo is metadata about a stored secret, with no decrypted value.

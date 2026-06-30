@@ -34,3 +34,20 @@ CREATE TABLE IF NOT EXISTS secret_recipients (
 );
 
 CREATE INDEX IF NOT EXISTS idx_recipients_device ON secret_recipients(device_id);
+
+-- This device's binding to the server account and the pull cursor (single row).
+CREATE TABLE IF NOT EXISTS sync_state (
+    id         INTEGER PRIMARY KEY CHECK (id = 1),
+    account_id TEXT NOT NULL,
+    device_id  TEXT NOT NULL,       -- server-assigned device id
+    cursor     INTEGER NOT NULL DEFAULT 0
+);
+
+-- Per-secret reconciliation state against the server. server_version is the
+-- version we last reconciled (0 = never pushed); dirty marks a local change
+-- awaiting push. A secret with no row here is treated as dirty (never synced).
+CREATE TABLE IF NOT EXISTS secret_sync (
+    secret_id      TEXT PRIMARY KEY REFERENCES secrets(id) ON DELETE CASCADE,
+    server_version INTEGER NOT NULL DEFAULT 0,
+    dirty          INTEGER NOT NULL DEFAULT 1
+);
