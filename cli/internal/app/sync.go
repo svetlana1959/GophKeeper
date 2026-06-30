@@ -151,12 +151,17 @@ func (s *Session) applyPull(
 		local.Deleted = cs.Deleted
 		local.UpdatedAt = time.Now().UTC()
 
-		// If we can decrypt it, recover the real name/folder from the payload and
-		// record that this device is a recipient (so a later edit can re-seal).
+		// If we can decrypt it, recover the real name/folder from the payload.
+		// Only seed recipients for a brand-new secret (to this device alone, as a
+		// placeholder reshare expands); for an existing one keep the recipient set
+		// already loaded from the vault, or pull would clobber it and reshare
+		// would ping-pong forever.
 		if meta, ok := s.metaFromPayload(cs.Ciphertext, priv); ok {
 			local.Name = meta.Name
 			local.FolderID = meta.Folder
-			local.Recipients = []string{s.localPub}
+			if isNew {
+				local.Recipients = []string{s.localPub}
+			}
 		}
 
 		if err := s.secrets.Save(local); err != nil {
