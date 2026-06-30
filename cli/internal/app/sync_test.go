@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
@@ -96,6 +97,41 @@ func (b *syncBackend) handler(t *testing.T) http.Handler {
 			results = append(results, map[string]any{"id": it.ID, "status": "applied", "version": ver, "seq": b.seq})
 		}
 		respond(w, http.StatusOK, map[string]any{"results": results})
+	})
+
+	mux.HandleFunc("GET /devices", func(w http.ResponseWriter, r *http.Request) {
+		if !b.authed(r) {
+			respond(w, http.StatusUnauthorized, map[string]any{"detail": "unauthorized"})
+			return
+		}
+		respond(w, http.StatusOK, []map[string]any{
+			{"id": "dev-1", "account_id": "acc-1", "device_name": "laptop",
+				"public_key": b.publicKey, "status": "active"},
+			{"id": "dev-2", "account_id": "acc-1", "device_name": "phone",
+				"public_key": "age1other", "status": "active"},
+		})
+	})
+
+	mux.HandleFunc("POST /enroll/invite", func(w http.ResponseWriter, r *http.Request) {
+		if !b.authed(r) {
+			respond(w, http.StatusUnauthorized, map[string]any{"detail": "unauthorized"})
+			return
+		}
+		respond(w, http.StatusOK, map[string]any{
+			"code": "GK-CODE", "expires_at": "2026-07-01T00:00:00Z",
+		})
+	})
+
+	mux.HandleFunc("POST /enroll/join", func(w http.ResponseWriter, r *http.Request) {
+		var body struct {
+			DeviceName string `json:"device_name"`
+			PublicKey  string `json:"public_key"`
+		}
+		_ = json.NewDecoder(r.Body).Decode(&body)
+		respond(w, http.StatusCreated, map[string]any{
+			"id": "dev-joined", "account_id": "acc-1", "device_name": body.DeviceName,
+			"public_key": body.PublicKey, "status": "active",
+		})
 	})
 
 	mux.HandleFunc("GET /sync/changes", func(w http.ResponseWriter, r *http.Request) {
@@ -223,6 +259,96 @@ func TestSync_PullsRemoteSecret(t *testing.T) {
 	}
 	if !found {
 		t.Fatalf("pulled secret not in vault: %+v", items)
+	}
+}
+
+func TestCreateInvite(t *testing.T) {
+	setHome(t)
+	be := newSyncBackend()
+	srv := httptest.NewServer(be.handler(t))
+	defer srv.Close()
+
+	res, err := app.Init(app.InitParams{DeviceName: "laptop", Remote: srv.URL})
+	if err != nil {
+		t.Fatalf("Init: %v", err)
+	}
+	be.publicKey = res.PublicKey
+
+	sess, err := app.Open()
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	defer sess.Close()
+
+	inv, err := sess.CreateInvite(context.Background(), "")
+	if err != nil {
+		t.Fatalf("CreateInvite: %v", err)
+	}
+	if inv.Code != "GK-CODE" {
+		t.Fatalf("invite code = %q, want GK-CODE", inv.Code)
+	}
+}
+
+func TestListDevices(t *testing.T) {
+	setHome(t)
+	be := newSyncBackend()
+	srv := httptest.NewServer(be.handler(t))
+	defer srv.Close()
+
+	res, err := app.Init(app.InitParams{DeviceName: "laptop", Remote: srv.URL})
+	if err != nil {
+		t.Fatalf("Init: %v", err)
+	}
+	be.publicKey = res.PublicKey
+
+	sess, err := app.Open()
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	defer sess.Close()
+
+	devices, err := sess.ListDevices(context.Background(), "")
+	if err != nil {
+		t.Fatalf("ListDevices: %v", err)
+	}
+	if len(devices) != 2 {
+		t.Fatalf("got %d devices, want 2", len(devices))
+	}
+	thisCount := 0
+	for _, d := range devices {
+		if d.This {
+			thisCount++
+		}
+	}
+	if thisCount != 1 {
+		t.Fatalf("expected exactly one local device, got %d", thisCount)
+	}
+}
+
+func TestLink(t *testing.T) {
+	setHome(t)
+	be := newSyncBackend()
+	srv := httptest.NewServer(be.handler(t))
+	defer srv.Close()
+
+	res, err := app.Init(app.InitParams{DeviceName: "phone", Remote: srv.URL})
+	if err != nil {
+		t.Fatalf("Init: %v", err)
+	}
+	be.publicKey = res.PublicKey
+
+	sess, err := app.Open()
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	defer sess.Close()
+
+	if err := sess.Link(context.Background(), "GK-CODE"); err != nil {
+		t.Fatalf("Link: %v", err)
+	}
+	// Already linked now.
+	if err := sess.Link(context.Background(), "GK-CODE"); !errors.Is(err, app.ErrAlreadyLinked) {
+		t.Fatalf("second Link err = %v, want ErrAlreadyLinked", err)
 	}
 }
 

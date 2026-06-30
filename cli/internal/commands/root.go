@@ -34,8 +34,19 @@ client-side encryption based on age.`,
 		newDeleteCmd(),
 		newListCmd(),
 		newSyncCmd(),
+		newLinkCmd(),
+		newDeviceCmd(),
 	)
 	return root
+}
+
+// pinIfNeeded prompts for the PIN when the local key is PIN-protected, returning
+// "" otherwise. Centralizes the prompt for every command that unlocks the key.
+func pinIfNeeded(cmd *cobra.Command, sess *app.Session) (string, error) {
+	if !sess.NeedsPIN() {
+		return "", nil
+	}
+	return promptHidden(cmd, "PIN: ")
 }
 
 // withSession opens the vault, runs fn against it, and closes it. It centralizes

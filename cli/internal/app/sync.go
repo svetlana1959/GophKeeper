@@ -28,28 +28,10 @@ type SyncResult struct {
 // payloads themselves move as opaque ciphertext and are never decrypted here.
 func (s *Session) Sync(ctx context.Context, pin string) (SyncResult, error) {
 	var res SyncResult
-	if s.cfg.Remote == "" {
-		return res, ErrNoRemote
-	}
 
-	priv, err := s.unlock(pin)
+	client, st, state, priv, err := s.connect(ctx, pin)
 	if err != nil {
 		return res, err
-	}
-
-	client := remote.New(s.cfg.Remote)
-	st := s.db.Sync()
-
-	state, err := s.ensureRegistered(ctx, client, st)
-	if err != nil {
-		return res, err
-	}
-
-	decrypt := func(ciphertext []byte) ([]byte, error) {
-		return s.cipher.Open(ciphertext, priv)
-	}
-	if err := client.Authenticate(ctx, s.localPub, decrypt); err != nil {
-		return res, fmt.Errorf("app: authenticate: %w", err)
 	}
 
 	// Pull before push, so local edits are pushed against the latest server state.
@@ -73,6 +55,37 @@ func (s *Session) Sync(ctx context.Context, pin string) (SyncResult, error) {
 		}
 	}
 	return res, nil
+}
+
+// connect prepares an authenticated remote session: it unlocks the key, builds
+// the client, ensures the device is bound to an account (registering on first
+// run), and authenticates. It returns the client, the sync-state repo, the
+// current state, and the unlocked private key.
+func (s *Session) connect(
+	ctx context.Context, pin string,
+) (*remote.Client, syncstate.Repository, *syncstate.State, string, error) {
+	if s.cfg.Remote == "" {
+		return nil, nil, nil, "", ErrNoRemote
+	}
+	priv, err := s.unlock(pin)
+	if err != nil {
+		return nil, nil, nil, "", err
+	}
+
+	client := remote.New(s.cfg.Remote)
+	st := s.db.Sync()
+	state, err := s.ensureRegistered(ctx, client, st)
+	if err != nil {
+		return nil, nil, nil, "", err
+	}
+
+	decrypt := func(ciphertext []byte) ([]byte, error) {
+		return s.cipher.Open(ciphertext, priv)
+	}
+	if err := client.Authenticate(ctx, s.localPub, decrypt); err != nil {
+		return nil, nil, nil, "", fmt.Errorf("app: authenticate: %w", err)
+	}
+	return client, st, state, priv, nil
 }
 
 // ensureRegistered loads the device's account binding, registering on first sync.
