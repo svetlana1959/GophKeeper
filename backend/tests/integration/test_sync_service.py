@@ -1,12 +1,4 @@
-"""Integration test for SyncService against real PostgreSQL (issue #68).
-
-SyncService itself introduces no new SQL — it composes the existing
-secrets/devices/access repositories, which already have their own
-integration coverage. This test exists to catch the class of bug seen
-earlier in this codebase: a service-level behavior that's correct against
-fakes but breaks against the real UUID/asyncpg wire format (e.g. comparing a
-raw asyncpg UUID type against a plain uuid.UUID).
-"""
+"""Integration test for SyncService against real PostgreSQL."""
 
 from uuid import uuid4
 
@@ -38,7 +30,6 @@ async def test_sync_round_trip_against_real_database(database):
         await uow.access.grant(secret_id, device_b_id)
         await uow.commit()
 
-    # device B syncs cold (no local state) -> discovers the secret as NEW
     report = await SyncService(SqlAlchemyUnitOfWork(database)).sync(
         device_id=device_b_id, client_state=[]
     )
@@ -47,14 +38,12 @@ async def test_sync_round_trip_against_real_database(database):
     assert report.results[0].secret_id == secret_id
     assert report.results[0].ciphertext == b"v1"
 
-    # device A updates the secret
     async with SqlAlchemyUnitOfWork(database) as uow:
         secret = await uow.secrets.get(secret_id)
         secret.update(b"v2", base_version=1)
         await uow.secrets.save(secret)
         await uow.commit()
 
-    # device B syncs again with its now-stale version=1 -> UPDATED
     report = await SyncService(SqlAlchemyUnitOfWork(database)).sync(
         device_id=device_b_id,
         client_state=[ClientSecretState(id=secret_id, version=1)],
@@ -72,7 +61,6 @@ async def test_sync_reports_access_revoked_against_real_database(database):
         await uow.devices.add(
             Device(id=device_id, device_name="D", public_key="kd", is_active=True)
         )
-        # secret exists, but this device is never granted access to it
         await uow.secrets.add(Secret(id=secret_id, account_id="acc", ciphertext=b"v1"))
         await uow.commit()
 

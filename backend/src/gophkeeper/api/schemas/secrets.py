@@ -1,9 +1,4 @@
-"""Wire-contract DTOs.
-
-These Pydantic models are the request/response shapes the CLI talks to — the
-published language of the HTTP API, kept separate from the ``Secret`` domain
-object. Ciphertext travels base64-encoded so it survives JSON.
-"""
+"""Wire-contract DTOs for secrets."""
 
 import base64
 from datetime import datetime

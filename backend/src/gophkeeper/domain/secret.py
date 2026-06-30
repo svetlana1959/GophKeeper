@@ -1,18 +1,4 @@
-"""The Secret aggregate and its repository port.
-
-EXAMPLE aggregate. This is the reference for the whole domain layer: a model
-that carries its own behavior and invariants, plus the repository *interface*
-(port) it needs — defined right next to the type it serves, never in a shared
-``repositories.py`` grab-bag. Device and the device-authorization mailbox will
-follow exactly this shape.
-
-The domain imports only the standard library and its own errors — never
-SQLAlchemy, FastAPI, or asyncpg. Storage and transport are details that depend
-on the domain, not the reverse.
-
-GophKeeper is a *blind* store: ``ciphertext`` is opaque bytes encrypted on the
-client. The server never holds a key and cannot read it.
-"""
+"""Secret aggregate and repository ports."""
 
 from __future__ import annotations
 
@@ -28,13 +14,6 @@ def _now() -> datetime:
     return datetime.now(UTC)
 
 
-"""
-We could use Pydantic, and it won't be wrong, though we have rule about domain
-importing only base libs.
-Also not using Pydantic make it impossible to use domain model as DTO in the API
-"""
-
-
 @dataclass
 class Secret:
     id: UUID
@@ -45,17 +24,11 @@ class Secret:
     updated_at: datetime = field(default_factory=_now)
 
     def __post_init__(self) -> None:
-        """Validate right after the dataclass __init__, so no Secret can exist in
-        an invalid state regardless of who built it (a use case, a repository
-        loading a row, a test).
-        """
+        """Validate after dataclass initialization."""
         self._validate()
 
     def _validate(self) -> None:
-        """The aggregate's invariants. Raises DomainError — the domain's own
-        vocabulary — not a framework's ValidationError. Called on construction
-        and after any mutation, so the rules hold for the object's whole life.
-        """
+        """Validate aggregate invariants."""
         if not self.account_id:
             raise DomainError("secret account_id must not be empty")
         if not self.ciphertext:
@@ -64,12 +37,7 @@ class Secret:
             raise DomainError(f"secret version must be >= 1, got {self.version}")
 
     def update(self, ciphertext: bytes, *, base_version: int, at: datetime | None = None) -> None:
-        """Replace the ciphertext, rejecting a stale write.
-
-        ``base_version`` is the version the client believed it was editing. If it
-        no longer matches, another device got there first and we raise rather
-        than silently clobber their write.
-        """
+        """Replace ciphertext, rejecting a stale write."""
         if base_version != self.version:
             raise VersionConflict(self.id, expected=base_version, actual=self.version)
         self.ciphertext = ciphertext
@@ -78,10 +46,7 @@ class Secret:
         self._validate()
 
     def delete(self, *, at: datetime | None = None) -> None:
-        """Tombstone the secret so the deletion syncs to other devices.
-
-        Idempotent: deleting an already-deleted secret is a no-op.
-        """
+        """Tombstone the secret."""
         if self.deleted:
             return
         self.deleted = True
@@ -94,14 +59,7 @@ class Secret:
 
 
 class SecretRepository(Protocol):
-    """Port for persisting Secret aggregates (a ``typing.Protocol``).
-
-    Lives in the domain next to the aggregate it serves. Any object with these
-    methods satisfies it: the SQLAlchemy adapter in
-    ``gophkeeper.infrastructure.repositories`` implements it, and a test can pass
-    a lightweight fake without subclassing anything. The type checker verifies
-    conformance wherever an implementation is used as a ``SecretRepository``.
-    """
+    """Port for persisting Secret aggregates."""
 
     async def add(self, secret: Secret) -> None:
         """Insert a new secret."""
@@ -123,15 +81,7 @@ class SecretRepository(Protocol):
 
 
 class SecretAccessRepository(Protocol):
-    """Port for the device <-> secret trust relationship (issue #69).
-
-    There is no account/auth layer yet, so "trust" is modeled directly: a
-    device may read or write a secret only if it has been granted access here.
-    The device that originally stores a secret is granted access by
-    ``SecretService.store``; any other device needs an explicit grant (e.g.
-    from a device that already has access, mirroring the mailbox/trust flow
-    described in the product concept docs).
-    """
+    """Port for device access grants to secrets."""
 
     async def grant(self, secret_id: UUID, device_id: UUID) -> None:
         """Give a device access to a secret. Idempotent — granting twice is a no-op."""

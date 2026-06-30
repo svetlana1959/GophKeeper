@@ -1,11 +1,4 @@
-"""Map domain errors to HTTP responses.
-
-The domain raises vocabulary errors (``SecretNotFound``, ``VersionConflict``,
-``DeviceNotFound``, ``DeviceAlreadyExists``, ``AccessDenied``,
-``AccessRequestNotFound``, ``AccessRequestAlreadyPending``,
-``AccessRequestNotPending``, ``NotSecretOwner``); only this layer knows they
-become 403, 404, and 409. Register once at app creation.
-"""
+"""Map domain errors to HTTP responses."""
 
 from fastapi import FastAPI, Request, status
 from fastapi.responses import JSONResponse

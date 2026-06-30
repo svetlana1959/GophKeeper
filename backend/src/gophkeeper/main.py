@@ -1,9 +1,4 @@
-"""ASGI entrypoint.
-
-``app`` is what uvicorn serves (``uvicorn gophkeeper.main:app``). ``run`` is the
-console-script entry (``gophkeeper-server``) for running without a separate
-uvicorn command line.
-"""
+"""ASGI entrypoint."""
 
 import uvicorn
 

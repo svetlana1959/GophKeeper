@@ -1,9 +1,4 @@
-"""Application factory.
-
-``create_app`` is the composition root: build the database adapter, wire it onto
-the app, register middleware, exception handlers, and routers. The lifespan
-context waits for the database on startup and disposes the pool on shutdown.
-"""
+"""Application factory."""
 
 import asyncio
 import logging

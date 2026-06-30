@@ -1,16 +1,4 @@
-"""Unit tests for AccessRequestService — the handshake broker (issue #69 revision).
-
-Covers the devops review's exact required flow:
-
-- test_device_b_can_request_access                     -> POST .../requests
-- test_duplicate_pending_request_rejected               -> one PENDING per pair
-- test_only_owner_can_list_pending_requests             -> GET .../requests guarded
-- test_owner_can_approve_and_grant_is_created            -> approve() is the only grant path
-- test_non_owner_cannot_approve                          -> POST .../approve guarded
-- test_approve_does_not_touch_secret_ciphertext          -> server stays Zero-Knowledge
-- test_reject_does_not_create_a_grant                    -> POST .../reject
-- test_cannot_approve_already_settled_request            -> terminal state is terminal
-"""
+"""Unit tests for AccessRequestService."""
 
 from uuid import UUID, uuid4
 
@@ -221,7 +209,6 @@ async def test_owner_can_approve_and_grant_is_created():
 
     assert approved.status == AccessRequestStatus.APPROVED
     assert await uow.access.has_access(secret_id, requester.id)
-    # the grant must be created exactly once, by approve(), and nowhere else
     assert uow.access.grant_calls.count((secret_id, requester.id)) == 1
 
 
@@ -234,17 +221,13 @@ async def test_non_owner_cannot_approve():
 
     request = await service.request(secret_id, device_id=requester.id)
 
-    # the requester cannot approve its own request
     with pytest.raises(NotSecretOwner):
         await service.approve(request.id, owner_device_id=requester.id)
 
-    # access must still not exist — the failed approval attempt changed nothing
     assert not await uow.access.has_access(secret_id, requester.id)
 
 
 async def test_approve_does_not_touch_secret_ciphertext():
-    """Zero-Knowledge guarantee: approving a request must not read or modify
-    the secret's ciphertext or version — the server never re-encrypts."""
     uow = FakeUnitOfWork()
     owner, secret_id = await _setup_owned_secret(uow)
     requester = _device()
@@ -275,7 +258,6 @@ async def test_reject_does_not_create_a_grant():
 
     assert rejected.status == AccessRequestStatus.REJECTED
     assert not await uow.access.has_access(secret_id, requester.id)
-    # the owner's own setup grant is expected; the requester must never appear
     assert (secret_id, requester.id) not in uow.access.grant_calls
 
 

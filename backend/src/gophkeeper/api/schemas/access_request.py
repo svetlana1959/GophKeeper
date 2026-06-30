@@ -1,4 +1,4 @@
-"""Wire-contract DTOs for the access-request handshake broker (issue #69)."""
+"""Wire-contract DTOs for access requests."""
 
 from datetime import datetime
 from uuid import UUID

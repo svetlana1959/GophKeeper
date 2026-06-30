@@ -1,9 +1,4 @@
-"""SQLAlchemy implementation of the SecretAccessRepository port.
-
-Translates between the ``SecretAccess`` domain object and the ``secret_access``
-table. We use SQLAlchemy Core text queries (not the ORM): the domain model stays
-a plain dataclass with no mapper, and the mapping is explicit and visible right here.
-"""
+"""SQLAlchemy implementation of the SecretAccessRepository port."""
 
 from uuid import UUID
 

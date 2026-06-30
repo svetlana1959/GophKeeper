@@ -1,10 +1,4 @@
-"""Example integration test — exercises the real adapter against PostgreSQL.
-
-Where the unit tests prove the domain rules in isolation, this proves the
-infrastructure: that ``SqlAlchemyUnitOfWork`` + ``SqlAlchemySecretRepository``
-actually persist and read back through SQL, and that commit/rollback behave.
-Skipped unless ``TEST_DATABASE_URL`` is set (see conftest).
-"""
+"""Integration tests for SecretRepository."""
 
 from uuid import uuid4
 

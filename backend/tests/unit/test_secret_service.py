@@ -1,18 +1,4 @@
-"""Unit tests for SecretService's multi-device access control (issue #69).
-
-REVISION per review: share()/revoke() are gone from SecretService — direct
-device-to-device grants bypassed the re-encryption step a Zero-Knowledge
-system requires. The replacement handshake-broker flow (request/list/approve/
-reject) is tested in test_access_request_service.py. The tests here cover
-what's left in SecretService: store/fetch/update/list_for_device and the
-access checks they share.
-
-- test_store_grants_creating_device_access      -> "trusted devices ... can use"
-- test_access_maintained_after_update            -> "access maintained after synchronization"
-- test_fetch_denied_for_untrusted_device          -> "not trusted ... access is denied"
-- test_fetch_denied_for_deactivated_device        -> "not trusted ... access is denied"
-- test_list_for_device_returns_latest_after_reconnect -> "connection restored ... latest data"
-"""
+"""Unit tests for SecretService."""
 
 from uuid import UUID, uuid4
 
@@ -157,7 +143,6 @@ async def test_fetch_denied_for_untrusted_device():
 
 
 async def test_fetch_denied_for_deactivated_device():
-    """A revoked device loses access immediately, even with an existing grant."""
     uow = FakeUnitOfWork()
     device = _device()
     await uow.devices.add(device)
@@ -176,8 +161,6 @@ async def test_fetch_denied_for_deactivated_device():
 
 
 async def test_list_for_device_returns_latest_after_reconnect():
-    """A trusted device reconnecting sees the latest version of everything it
-    has access to, regardless of which device wrote it most recently."""
     uow = FakeUnitOfWork()
     device_a = _device()
     await uow.devices.add(device_a)

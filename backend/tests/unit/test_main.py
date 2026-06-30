@@ -1,8 +1,4 @@
-"""Unit test for the command-line server entrypoint.
-
-uvicorn.run is replaced with a small fake, so this checks only that GophKeeper
-passes the configured application path and server settings to Uvicorn.
-"""
+"""Unit tests for the command-line server entrypoint."""
 
 from gophkeeper import main
 

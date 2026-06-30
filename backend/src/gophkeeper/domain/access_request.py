@@ -1,19 +1,4 @@
-"""The AccessRequest aggregate and its repository port.
-
-Multi-device access (issue #69), revised per review: GophKeeper is
-Zero-Knowledge, so the server cannot decide that a new device may read a
-secret — only the device that already holds the decryption key can, by
-re-encrypting the secret's payload for the new device locally and pushing the
-result through the existing ``PUT /secrets/{id}``. The server's role here is
-purely as an asynchronous broker: it relays *that a device is asking* and
-*its public key*, and nothing else. It never inspects, re-encrypts, or
-approves anything on its own.
-
-``AccessRequest`` is that relayed message. Its lifecycle is exactly three
-states — pending, approved, rejected — and approval/rejection are the only
-mutations, mirroring ``Secret.delete()``'s tombstone pattern: a terminal state
-is reached once and stays reached.
-"""
+"""AccessRequest aggregate and repository port."""
 
 from __future__ import annotations
 
@@ -54,13 +39,7 @@ class AccessRequest:
             raise DomainError("access request device_id must not be empty")
 
     def approve(self, *, at: datetime | None = None) -> None:
-        """Mark this request approved.
-
-        Only valid from PENDING — the caller (the service layer) is
-        responsible for having just pushed the re-encrypted secret via
-        ``PUT /secrets/{id}`` first; this method only records that the
-        handshake completed, it does not touch the secret itself.
-        """
+        """Mark this request approved."""
         if self.status != AccessRequestStatus.PENDING:
             raise AccessRequestNotPending(self.id, current_status=self.status)
         self.status = AccessRequestStatus.APPROVED
@@ -79,19 +58,10 @@ class AccessRequest:
 
 
 class AccessRequestRepository(Protocol):
-    """Port for persisting AccessRequest aggregates.
-
-    Lives in the domain next to the aggregate it serves, same shape as every
-    other repository port in this codebase.
-    """
+    """Port for persisting AccessRequest aggregates."""
 
     async def add(self, request: AccessRequest) -> None:
-        """Insert a new request. Raises ``AccessRequestAlreadyPending`` if the
-        same (secret_id, device_id) pair already has a PENDING row — mirrors
-        the partial unique index in the migration, checked here too so the
-        domain raises its own vocabulary error instead of surfacing a raw
-        constraint violation.
-        """
+        """Insert a new request."""
         ...
 
     async def get(self, request_id: UUID) -> AccessRequest:
@@ -99,7 +69,7 @@ class AccessRequestRepository(Protocol):
         ...
 
     async def list_pending_for_secret(self, secret_id: UUID) -> list[AccessRequest]:
-        """All PENDING requests for a secret — what its owner needs to act on."""
+        """Return pending requests for a secret."""
         ...
 
     async def save(self, request: AccessRequest) -> None:

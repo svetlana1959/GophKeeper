@@ -1,13 +1,4 @@
-"""Unit tests for typed application settings.
-
-The tests use the existing local configuration only to validate conversion into
-Pydantic models. They do not start the app or connect to Postgres.
-
-Covers:
-- building an asyncpg SQLAlchemy URL;
-- default values for run/server models;
-- loading ENV into the typed settings object.
-"""
+"""Unit tests for typed application settings."""
 
 from gophkeeper.settings.settings import (
     APISettings,

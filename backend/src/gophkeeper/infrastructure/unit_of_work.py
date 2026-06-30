@@ -1,9 +1,4 @@
-"""SQLAlchemy Unit of Work — the adapter for the domain UoW port.
-
-Owns one session for the duration of a use case and exposes the repositories
-bound to it. Commit is explicit: the application service decides when work is
-done. On exit we roll back if the block raised, and always close the session.
-"""
+"""SQLAlchemy Unit of Work implementation."""
 
 from types import TracebackType
 from typing import Self
@@ -24,10 +19,6 @@ class SqlAlchemyUnitOfWork(UnitOfWork):
 
     async def __aenter__(self) -> Self:
         self._session = self._database.session()
-
-        """
-        New repositories are added here
-        """
         self.secrets = SqlAlchemySecretRepository(self._session)
         self.devices = SqlAlchemyDeviceRepository(self._session)
         self.access = SqlAlchemySecretAccessRepository(self._session)

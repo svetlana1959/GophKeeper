@@ -1,14 +1,4 @@
-"""Pure unit tests for the Device aggregate.
-
-Device owns its own validation and state transitions, so these tests do not
-need a database, FastAPI, a repository, or a Unit of Work.
-
-Covers:
-- required device_name and public_key fields;
-- deactivation;
-- reactivation;
-- updated_at changing on each state transition.
-"""
+"""Unit tests for the Device aggregate."""
 
 from datetime import UTC, datetime
 from uuid import uuid4
@@ -36,7 +26,6 @@ def _make_device(*, is_active: bool = True) -> Device:
     ],
 )
 def test_device_rejects_empty_required_fields(field: str, value: str) -> None:
-    """A device must always have a display name and a public key."""
     values = {
         "id": uuid4(),
         "device_name": "MacBook",
@@ -52,7 +41,6 @@ def test_device_rejects_empty_required_fields(field: str, value: str) -> None:
 def test_deactivate_marks_device_inactive_and_updates_timestamp(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Revoking a device changes both its active flag and modification time."""
     device = _make_device()
     deactivated_at = datetime(2026, 6, 30, 12, 0, tzinfo=UTC)
     monkeypatch.setattr("gophkeeper.domain.device._now", lambda: deactivated_at)
@@ -66,7 +54,6 @@ def test_deactivate_marks_device_inactive_and_updates_timestamp(
 def test_activate_marks_device_active_and_updates_timestamp(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """An inactive device can be activated again without changing its identity."""
     device = _make_device(is_active=False)
     activated_at = datetime(2026, 6, 30, 12, 5, tzinfo=UTC)
     monkeypatch.setattr("gophkeeper.domain.device._now", lambda: activated_at)

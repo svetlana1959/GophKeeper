@@ -1,8 +1,4 @@
-"""Domain errors — raised when a business rule is violated.
-
-These are part of the domain's vocabulary and know nothing about HTTP. The API
-layer maps them to status codes (see ``gophkeeper.api.errors``).
-"""
+"""Domain errors."""
 
 from uuid import UUID
 
@@ -30,10 +26,7 @@ class DeviceAlreadyExists(DomainError):
 
 
 class VersionConflict(DomainError):
-    """Optimistic-concurrency guard: the client wrote against a stale version.
-
-    The client must pull the current version, re-apply its change, and retry.
-    """
+    """Raised when the client writes against a stale version."""
 
     def __init__(self, secret_id: UUID, expected: int, actual: int) -> None:
         super().__init__(
@@ -46,16 +39,7 @@ class VersionConflict(DomainError):
 
 
 class AccessDenied(DomainError):
-    """Raised when a device that is not trusted for a secret tries to use it.
-
-    Covers issue #69's "untrusted device -> access denied" criterion.
-    ``secret_id`` is ``None`` for the device-level case (the device itself is
-    unknown or deactivated, before any specific secret comes into it).
-
-    This is checked on every ``fetch``/``update``/``store`` — it is unrelated
-    to the access-request handshake below, which is the only way a device
-    that does *not* yet have access can come to have it.
-    """
+    """Raised when a device is not trusted for an operation."""
 
     def __init__(self, device_id: UUID, secret_id: UUID | None = None) -> None:
         if secret_id is None:
@@ -73,12 +57,7 @@ class AccessRequestNotFound(DomainError):
 
 
 class AccessRequestAlreadyPending(DomainError):
-    """A device may have only one outstanding PENDING request per secret.
-
-    Mirrors the partial unique index on the ``access_requests`` table —
-    checked here too so callers see the domain's own error, not a raw
-    database constraint violation.
-    """
+    """Raised when a pending request already exists."""
 
     def __init__(self, secret_id: UUID, device_id: UUID) -> None:
         super().__init__(f"device {device_id} already has a pending request for secret {secret_id}")
@@ -87,11 +66,7 @@ class AccessRequestAlreadyPending(DomainError):
 
 
 class AccessRequestNotPending(DomainError):
-    """Raised when approve()/reject() is called on a request already settled.
-
-    Approval and rejection are one-way: once a request leaves PENDING it is
-    history, not something to act on again.
-    """
+    """Raised when a settled request is approved or rejected again."""
 
     def __init__(self, request_id: UUID, current_status: str) -> None:
         super().__init__(f"access request {request_id} is {current_status}, not PENDING")
@@ -100,14 +75,7 @@ class AccessRequestNotPending(DomainError):
 
 
 class NotSecretOwner(DomainError):
-    """Raised when a device that does not itself have access to a secret tries
-    to act on requests for that secret (list/approve/reject).
-
-    Only a device that can already decrypt a secret is in a position to
-    re-encrypt it for someone else — a device with no access has no standing
-    to manage who else gets it, mirroring the same rule the old direct-share
-    flow enforced, just applied to the request queue instead.
-    """
+    """Raised when a device cannot manage requests for a secret."""
 
     def __init__(self, device_id: UUID, secret_id: UUID) -> None:
         super().__init__(f"device {device_id} does not own secret {secret_id}")

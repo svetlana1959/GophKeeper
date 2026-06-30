@@ -1,17 +1,4 @@
-"""Unit tests for SyncService (issue #68 — multi-device synchronization).
-
-Each test maps to one acceptance criterion:
-
-- test_syncs_between_multiple_devices              -> criterion 1
-- test_synced_data_is_latest_version                -> criterion 2
-- test_sync_report_carries_overall_status            -> criterion 3
-- test_access_revoked_reported_as_explicit_failure   -> criterion 4
-- test_change_on_one_device_visible_on_sync_for_other -> criterion 5
-
-Plus edge cases found during review: mixed-outcome batches, an entirely
-untrusted caller (total failure, not embedded in the report), and a
-deactivated device.
-"""
+"""Unit tests for SyncService."""
 
 from uuid import UUID, uuid4
 
@@ -110,7 +97,6 @@ def _device(*, is_active: bool = True) -> Device:
 
 
 async def test_syncs_between_multiple_devices():
-    """Criterion 1: with more than one trusted device, both can sync."""
     uow = FakeUnitOfWork()
     device_a = _device()
     device_b = _device()
@@ -134,7 +120,6 @@ async def test_syncs_between_multiple_devices():
 
 
 async def test_synced_data_is_latest_version():
-    """Criterion 2: after sync, the most current version is what's returned."""
     uow = FakeUnitOfWork()
     device = _device()
     await uow.devices.add(device)
@@ -156,7 +141,6 @@ async def test_synced_data_is_latest_version():
 
 
 async def test_sync_report_carries_overall_status():
-    """Criterion 3: the caller receives a sync status, not just raw data."""
     uow = FakeUnitOfWork()
     device = _device()
     await uow.devices.add(device)
@@ -174,12 +158,9 @@ async def test_sync_report_carries_overall_status():
 
 
 async def test_access_revoked_reported_as_explicit_failure():
-    """Criterion 4: a sync failure for one item is surfaced explicitly, not
-    silently dropped, and the overall status reflects it."""
     uow = FakeUnitOfWork()
     device = _device()
     await uow.devices.add(device)
-    # the device asks about a secret it was never granted access to
     phantom_secret_id = uuid4()
 
     service = SyncService(uow)
@@ -191,13 +172,11 @@ async def test_access_revoked_reported_as_explicit_failure():
     assert report.status == SyncStatus.PARTIAL
     assert report.has_failures is True
     assert report.results[0].outcome == SyncOutcome.ACCESS_REVOKED
-    # no ciphertext should ever be disclosed for a denied item
     assert report.results[0].ciphertext is None
     assert report.results[0].version is None
 
 
 async def test_change_on_one_device_visible_on_sync_for_other():
-    """Criterion 5: device A changes data, device B's next sync sees it."""
     uow = FakeUnitOfWork()
     device_a = _device()
     device_b = _device()
@@ -211,16 +190,13 @@ async def test_change_on_one_device_visible_on_sync_for_other():
 
     service = SyncService(uow)
 
-    # both devices start in sync at version 1
     await service.sync(
         device_id=device_b.id, client_state=[ClientSecretState(id=secret_id, version=1)]
     )
 
-    # device A changes the secret
     secret.update(b"v2-from-A", base_version=1)
     await uow.secrets.save(secret)
 
-    # device B syncs again with its now-stale version=1
     report = await service.sync(
         device_id=device_b.id, client_state=[ClientSecretState(id=secret_id, version=1)]
     )
@@ -231,8 +207,6 @@ async def test_change_on_one_device_visible_on_sync_for_other():
 
 
 async def test_mixed_batch_reports_every_outcome_independently():
-    """A single sync call can contain UPDATED, UP_TO_DATE, NEW, and
-    ACCESS_REVOKED items simultaneously, each reported on its own."""
     uow = FakeUnitOfWork()
     device = _device()
     await uow.devices.add(device)
@@ -268,9 +242,6 @@ async def test_mixed_batch_reports_every_outcome_independently():
 
 
 async def test_untrusted_device_raises_instead_of_partial_report():
-    """An entirely unknown calling device is a total failure (raises), not a
-    PARTIAL report — that distinction matters at the HTTP layer (403/404
-    instead of 200 with an empty/odd body)."""
     uow = FakeUnitOfWork()
     service = SyncService(uow)
 

@@ -1,14 +1,4 @@
-"""Application settings.
-
-Dynaconf loads layered TOML (``settings.toml`` + ``settings.<env>.toml``) and
-environment variables; the values are then validated into plain Pydantic models
-so the rest of the app gets typed, autocomplete-friendly settings. We construct
-each section explicitly rather than reflecting over fields — it is a handful of
-lines and far easier to follow.
-
-Switch environments with ``ENV`` (defaults to ``dev``). Override any value via
-environment variables, e.g. ``GOPH_DATABASE__PASSWORD=...``.
-"""
+"""Application settings."""
 
 import os
 from pathlib import Path

@@ -1,8 +1,4 @@
-"""Example domain test — pure, no database, no FastAPI.
-
-Because the invariants live on the aggregate, they are tested in isolation. This
-is the payoff of keeping the domain free of infrastructure.
-"""
+"""Unit tests for the Secret aggregate."""
 
 from uuid import uuid4
 

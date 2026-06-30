@@ -1,14 +1,4 @@
-"""Pure unit tests for the AccessRequest aggregate.
-
-AccessRequest is a small domain state machine: PENDING can become APPROVED or
-REJECTED exactly once. It has no infrastructure dependencies, so no fake
-repository is needed here.
-
-Covers:
-- required secret_id and device_id;
-- approval and rejection transitions;
-- terminal requests rejecting further changes.
-"""
+"""Unit tests for the AccessRequest aggregate."""
 
 from datetime import UTC, datetime
 from uuid import uuid4
@@ -28,7 +18,6 @@ def _make_request() -> AccessRequest:
     ["secret_id", "device_id"],
 )
 def test_access_request_rejects_missing_identifiers(field: str) -> None:
-    """A request cannot exist without both sides of the requested access."""
     values = {"id": uuid4(), "secret_id": uuid4(), "device_id": uuid4()}
     values[field] = None
 
@@ -60,7 +49,6 @@ def test_reject_marks_request_rejected_and_updates_timestamp() -> None:
 
 @pytest.mark.parametrize("action", ["approve", "reject"])
 def test_settled_request_cannot_be_changed_again(action: str) -> None:
-    """Approval and rejection are terminal states, not reversible toggles."""
     request = _make_request()
     request.approve()
 

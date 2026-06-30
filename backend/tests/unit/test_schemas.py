@@ -1,13 +1,4 @@
-"""Unit tests for API schemas and domain-to-response conversion.
-
-These are pure Pydantic/DTO tests. They verify the HTTP wire format without
-starting FastAPI or connecting to a database.
-
-Covers:
-- base64 decoding and validation for ciphertext;
-- request DTO conversion to domain sync values;
-- response DTO conversion from Device, Secret, AccessRequest, and Sync data.
-"""
+"""Unit tests for API schemas and domain-to-response conversion."""
 
 import base64
 from datetime import UTC, datetime

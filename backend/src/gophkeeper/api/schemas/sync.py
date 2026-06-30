@@ -1,4 +1,4 @@
-"""Wire-contract DTOs for synchronization (issue #68)."""
+"""Wire-contract DTOs for synchronization."""
 
 import base64
 from datetime import datetime

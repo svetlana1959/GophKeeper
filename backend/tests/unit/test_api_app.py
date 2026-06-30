@@ -1,13 +1,4 @@
-"""Unit tests for the FastAPI application factory and lifespan.
-
-The application is built with a fake database adapter. No PostgreSQL server is
-started: the tests only verify app wiring, retry behaviour, and clean shutdown.
-
-Covers:
-- application state, middleware, health route, and router registration;
-- retrying a database connection once it is ready;
-- disconnecting the adapter during shutdown.
-"""
+"""Unit tests for the FastAPI application factory."""
 
 from gophkeeper.api import app as app_module
 

@@ -1,10 +1,4 @@
-"""SQLAlchemy implementation of the SecretRepository port.
-
-EXAMPLE adapter. It translates between the ``Secret`` domain object and the
-``secrets`` table. We use SQLAlchemy Core text queries (not the ORM): the domain
-model stays a plain dataclass with no mapper, and the mapping is explicit and
-visible right here. New aggregates get a sibling adapter following this shape.
-"""
+"""SQLAlchemy implementation of the SecretRepository port."""
 
 from typing import Any
 from uuid import UUID

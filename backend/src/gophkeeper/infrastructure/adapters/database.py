@@ -1,16 +1,4 @@
-"""Database adapter.
-
-The connection pool is a technical concern, so it sits behind an adapter rather
-than being passed around as a raw engine. ``DatabaseAdapter`` is the contract
-(lifecycle + session provisioning); ``SqlAlchemyAdapter`` is the SQLAlchemy/
-asyncpg implementation. Anything that needs the database — the Unit of Work,
-tests — depends on the contract, so the engine can be swapped or faked without
-touching callers.
-
-The engine is built lazily via ``connect()`` (called once at startup) rather
-than in ``__init__``, so constructing the adapter is cheap and connecting can be
-retried while Postgres comes up.
-"""
+"""Database adapter."""
 
 from abc import ABC, abstractmethod
 
@@ -21,14 +9,6 @@ from sqlalchemy.ext.asyncio import (
     async_sessionmaker,
     create_async_engine,
 )
-
-"""
-Ideally it would sit in a separate "abstact db adapter" file, 
-but tbh for such small codebase it doesn't make much of a difference
-
-In the future, if you'll have more adapters you might wanna create adapter repository
-and split this file into abastract and SqlAlchemy adapters
-"""
 
 
 class DatabaseAdapter(ABC):

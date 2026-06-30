@@ -1,13 +1,4 @@
-"""Unit tests for router functions with fake services.
-
-The endpoints are called directly instead of through TestClient. This keeps
-these as unit tests: FastAPI dependency injection, HTTP transport, and the
-database are not involved. Each router receives a fake service and is checked
-only for delegation and DTO conversion.
-
-Covers device registration/fetching, secret store/list/fetch/update/sync, and
-the access-request endpoints.
-"""
+"""Unit tests for router functions."""
 
 import base64
 from datetime import UTC, datetime
@@ -169,7 +160,6 @@ async def test_device_router_delegates_registration_and_fetch_to_fake_service() 
 
 
 async def test_secret_routes_delegate_store_list_fetch_and_update_to_fake_service() -> None:
-    """The router only converts request/response data; service logic stays out of it."""
     secret = _secret()
     device_id = uuid4()
     service = FakeSecretService(secret)

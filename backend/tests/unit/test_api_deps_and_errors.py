@@ -1,14 +1,4 @@
-"""Unit tests for small FastAPI dependencies and domain-error mapping.
-
-The handlers and dependencies are called directly. There is no HTTP client,
-running application, database, or real Unit of Work in these tests.
-
-Covers:
-- reading the database from app state;
-- required X-Device-Id validation;
-- generic service providers;
-- 404, 409, and 403 response mapping for domain errors.
-"""
+"""Unit tests for FastAPI dependencies and domain-error mapping."""
 
 import json
 from types import SimpleNamespace
@@ -33,8 +23,6 @@ from gophkeeper.infrastructure.unit_of_work import SqlAlchemyUnitOfWork
 
 
 class FakeService:
-    """Small service double used only to prove provide() passes its UoW through."""
-
     def __init__(self, uow: object) -> None:
         self.uow = uow
 

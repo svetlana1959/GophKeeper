@@ -1,6 +1,4 @@
-"""The Device part
-
-Basically the same features as Secret class, but remade for device needs"""
+"""Device aggregate and repository port."""
 
 from __future__ import annotations
 

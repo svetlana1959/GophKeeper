@@ -1,4 +1,4 @@
-"""Integration tests for AccessRequestRepository (issue #69 handshake broker)."""
+"""Integration tests for AccessRequestRepository."""
 
 import asyncio
 from uuid import uuid4
@@ -109,9 +109,6 @@ async def test_get_missing_request_raises(database):
 
 
 async def test_approving_frees_the_pair_for_a_new_request(database):
-    """After a request is settled, the partial unique index should allow a
-    brand new PENDING request for the same (secret, device) pair — e.g. the
-    device lost access later and is asking again."""
     async with SqlAlchemyUnitOfWork(database) as uow:
         device, secret = await _make_device_and_secret(uow)
 
@@ -129,22 +126,12 @@ async def test_approving_frees_the_pair_for_a_new_request(database):
 
     async with SqlAlchemyUnitOfWork(database) as uow:
         second = AccessRequest(id=uuid4(), secret_id=secret.id, device_id=device.id)
-        await uow.access_requests.add(second)  # must not raise
+        await uow.access_requests.add(second)
         await uow.commit()
 
 
 async def test_concurrent_inserts_for_same_pair_only_one_succeeds(database):
-    """REGRESSION TEST for a real race condition found during review:
-    SqlAlchemyUnitOfWork uses one session per `async with` block, each on its
-    own connection, so two concurrent add() calls for the same
-    (secret_id, device_id) can both pass the upfront SELECT-for-duplicates
-    check before either has committed an INSERT — classic check-then-act.
-    The partial unique index (uq_access_requests_pending) is the real
-    guarantee: the loser's INSERT raises a raw IntegrityError at the
-    database level, which add() must catch and re-raise as the same
-    AccessRequestAlreadyPending the SELECT path raises, not let escape as an
-    unhandled exception.
-    """
+    """Concurrent inserts must collapse to one row and domain errors."""
     async with SqlAlchemyUnitOfWork(database) as uow:
         device, secret = await _make_device_and_secret(uow)
 
