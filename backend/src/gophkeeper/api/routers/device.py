@@ -4,11 +4,12 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, status
 
-from gophkeeper.api.deps import provide
+from gophkeeper.api.deps import get_principal, provide
 from gophkeeper.api.schemas.device import (
     DeviceResponse,
     RegisterDeviceRequest,
 )
+from gophkeeper.security.principal import DevicePrincipal
 from gophkeeper.services.device_service import DeviceService
 
 router = APIRouter(prefix="/devices", tags=["devices"])
@@ -24,6 +25,15 @@ async def register_device(
         public_key=body.public_key,
     )
     return DeviceResponse.from_domain(device)
+
+
+@router.get("", response_model=list[DeviceResponse])
+async def list_devices(
+    principal: DevicePrincipal = Depends(get_principal),
+    service: DeviceService = Depends(provide(DeviceService)),
+) -> list[DeviceResponse]:
+    devices = await service.list_for_account(principal.account_id)
+    return [DeviceResponse.from_domain(d) for d in devices]
 
 
 @router.get("/{device_id}", response_model=DeviceResponse)

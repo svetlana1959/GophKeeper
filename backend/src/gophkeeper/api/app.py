@@ -14,7 +14,7 @@ from fastapi import FastAPI
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from gophkeeper.api.errors import register_exception_handlers
-from gophkeeper.api.routers import auth, device, secrets, sync
+from gophkeeper.api.routers import auth, device, enroll, secrets, sync
 from gophkeeper.infrastructure.adapters.database import SqlAlchemyAdapter
 from gophkeeper.settings.settings import settings
 
@@ -54,6 +54,7 @@ def create_app() -> FastAPI:
 
     app.include_router(auth.router)
     app.include_router(sync.router)
+    app.include_router(enroll.router)
     app.include_router(secrets.router)
     app.include_router(device.router)
 

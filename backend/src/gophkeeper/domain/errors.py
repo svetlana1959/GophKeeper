@@ -16,6 +16,10 @@ class AuthenticationError(DomainError):
     or a failed challenge. Maps to 401."""
 
 
+class InvalidInvite(DomainError):
+    """The pairing code is unknown, already used, or expired. Maps to 400."""
+
+
 class AccountNotFound(DomainError):
     def __init__(self, account_id: UUID) -> None:
         super().__init__(f"account {account_id} not found")

@@ -47,3 +47,7 @@ class DeviceService:
     async def fetch(self, device_id: UUID) -> Device:
         async with self._uow as uow:
             return await uow.devices.get(device_id)
+
+    async def list_for_account(self, account_id: UUID) -> list[Device]:
+        async with self._uow as uow:
+            return await uow.devices.list_for_account(account_id)

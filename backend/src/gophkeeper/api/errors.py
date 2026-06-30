@@ -12,6 +12,7 @@ from gophkeeper.domain.errors import (
     AuthenticationError,
     DeviceAlreadyExists,
     DeviceNotFound,
+    InvalidInvite,
     SecretNotFound,
     VersionConflict,
 )
@@ -23,6 +24,10 @@ async def _unauthorized_handler(request: Request, exc: AuthenticationError) -> J
         content={"detail": str(exc)},
         headers={"WWW-Authenticate": "Bearer"},
     )
+
+
+async def _bad_request_handler(request: Request, exc: InvalidInvite) -> JSONResponse:
+    return JSONResponse(status_code=status.HTTP_400_BAD_REQUEST, content={"detail": str(exc)})
 
 
 async def _not_found_handler(
@@ -46,6 +51,7 @@ async def _conflict_handler(
 
 def register_exception_handlers(app: FastAPI) -> None:
     app.add_exception_handler(AuthenticationError, _unauthorized_handler)  # type: ignore[arg-type]
+    app.add_exception_handler(InvalidInvite, _bad_request_handler)  # type: ignore[arg-type]
     app.add_exception_handler(SecretNotFound, _not_found_handler)  # type: ignore[arg-type]
     app.add_exception_handler(DeviceNotFound, _not_found_handler)
     app.add_exception_handler(DeviceAlreadyExists, _conflict_handler)

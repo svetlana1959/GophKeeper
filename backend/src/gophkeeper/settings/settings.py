@@ -45,6 +45,7 @@ class SecuritySettings(BaseModel):
     secret_key: str
     challenge_ttl_seconds: int = 120
     session_ttl_seconds: int = 3600
+    invite_ttl_seconds: int = 600
 
 
 class RunSettings(BaseModel):
