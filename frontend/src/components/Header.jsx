@@ -11,9 +11,9 @@ function Header() {
         </div>
         <div className={styles.nav}>
             <a href="#features" className={styles.navLink}>Features</a>
-            <a href="#how-it-works" className={styles.navLink}>How it works</a>
+            <a href="#howItWorks" className={styles.navLink}>How it works</a>
             <a href="#github" className={styles.navLink}>GitHub</a>
-            <a href="#contact" className={styles.navBtn}>Get Started</a>
+            <a href="#getStarted" className={styles.navBtn}>Get Started</a>
         </div>
     </header>
   )
