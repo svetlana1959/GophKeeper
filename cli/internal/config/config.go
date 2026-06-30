@@ -31,6 +31,12 @@ type Config struct {
 // DefaultSecretDB is the secret store path used when none is configured.
 const DefaultSecretDB = "~/.goph/secrets.db"
 
+func Default() *Config {
+	return &Config{
+		SecretDB: DefaultSecretDB,
+	}
+}
+
 // ConfigPath returns the absolute path to the config file, e.g. ~/.goph/config.yaml.
 func ConfigPath() (string, error) {
 	home, err := os.UserHomeDir()
@@ -84,17 +90,12 @@ func LoadFromFile(path string) (*Config, error) {
 	dec := yaml.NewDecoder(bytes.NewReader(data))
 	dec.KnownFields(true)
 
-	var cfg Config
-	// An empty file (io.EOF) is a valid config: all fields take their defaults.
-	if err := dec.Decode(&cfg); err != nil && !errors.Is(err, io.EOF) {
+	cfg := Default()
+	if err := dec.Decode(cfg); err != nil && !errors.Is(err, io.EOF) {
 		return nil, fmt.Errorf("error parsing YAML: %w", err)
 	}
 
-	if cfg.SecretDB == "" {
-		cfg.SecretDB = DefaultSecretDB
-	}
-
-	return &cfg, nil
+	return cfg, nil
 }
 
 // Save writes the config to the default path returned by ConfigPath.
@@ -135,7 +136,6 @@ func (c *Config) ValidateForSync() error {
 	return nil
 }
 
-// ResolveSecretDB returns the absolute path to the secret database, expanding ~ if necessary.
 func (c *Config) ResolveSecretDB() (string, error) {
 	if c.SecretDB == "" {
 		return "", errors.New("no path to the secret database is configured")

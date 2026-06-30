@@ -41,6 +41,38 @@ func TestConfigPath(t *testing.T) {
 	}
 }
 
+func TestDefault(t *testing.T) {
+	want := Config{SecretDB: DefaultSecretDB}
+	if got := *Default(); got != want {
+		t.Errorf("Default() = %+v, want %+v", got, want)
+	}
+}
+
+func TestLoadFromFile_SecretDBDefaulting(t *testing.T) {
+	tests := []struct {
+		name string
+		yaml string
+		want string
+	}{
+		{"omitted keeps default", "remote: https://x\n", DefaultSecretDB},
+		{"null keeps default", "secret-db:\n", DefaultSecretDB},
+		{"explicit empty overrides", `secret-db: ""` + "\n", ""},
+		{"explicit value overrides", "secret-db: ~/db.sqlite\n", "~/db.sqlite"},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			cfg, err := LoadFromFile(writeConfig(t, tc.yaml))
+			if err != nil {
+				t.Fatalf("LoadFromFile returned error: %v", err)
+			}
+			if cfg.SecretDB != tc.want {
+				t.Errorf("SecretDB = %q, want %q", cfg.SecretDB, tc.want)
+			}
+		})
+	}
+}
+
 func TestLoadFromFile_Valid(t *testing.T) {
 	tests := []struct {
 		name string
