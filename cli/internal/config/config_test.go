@@ -13,7 +13,7 @@ import (
 func writeConfig(t *testing.T, content string) string {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), "config.yaml")
-	if err := os.WriteFile(path, []byte(content), 0600); err != nil {
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
 		t.Fatalf("writing config fixture: %v", err)
 	}
 	return path
@@ -29,18 +29,6 @@ func setHome(t *testing.T) string {
 	return home
 }
 
-func TestConfigPath(t *testing.T) {
-	home := setHome(t)
-
-	path, err := ConfigPath()
-	if err != nil {
-		t.Fatalf("ConfigPath returned error: %v", err)
-	}
-	if want := filepath.Join(home, ".goph", "config.yaml"); path != want {
-		t.Errorf("ConfigPath() = %q, want %q", path, want)
-	}
-}
-
 func TestDefault(t *testing.T) {
 	want := Config{SecretDB: DefaultSecretDB}
 	if got := *Default(); got != want {
@@ -48,127 +36,15 @@ func TestDefault(t *testing.T) {
 	}
 }
 
-func TestLoadFromFile_SecretDBDefaulting(t *testing.T) {
-	tests := []struct {
-		name string
-		yaml string
-		want string
-	}{
-		{"omitted keeps default", "remote: https://x\n", DefaultSecretDB},
-		{"null keeps default", "secret-db:\n", DefaultSecretDB},
-		{"explicit empty overrides", `secret-db: ""` + "\n", ""},
-		{"explicit value overrides", "secret-db: ~/db.sqlite\n", "~/db.sqlite"},
-	}
+func TestDefaultPath(t *testing.T) {
+	home := setHome(t)
 
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			cfg, err := LoadFromFile(writeConfig(t, tc.yaml))
-			if err != nil {
-				t.Fatalf("LoadFromFile returned error: %v", err)
-			}
-			if cfg.SecretDB != tc.want {
-				t.Errorf("SecretDB = %q, want %q", cfg.SecretDB, tc.want)
-			}
-		})
+	path, err := defaultPath()
+	if err != nil {
+		t.Fatalf("defaultPath returned error: %v", err)
 	}
-}
-
-func TestLoadFromFile_Valid(t *testing.T) {
-	tests := []struct {
-		name string
-		yaml string
-		want Config
-	}{
-		{
-			name: "all fields set",
-			yaml: "remote: https://example.com\nsecret-db: ~/db.sqlite\ndevice-name: laptop\ndefault-folder: work\n",
-			want: Config{
-				Remote:        "https://example.com",
-				SecretDB:      "~/db.sqlite",
-				DeviceName:    "laptop",
-				DefaultFolder: "work",
-			},
-		},
-		{
-			name: "secret-db defaults when omitted",
-			yaml: "remote: https://example.com\ndevice-name: laptop\n",
-			want: Config{Remote: "https://example.com", DeviceName: "laptop", SecretDB: DefaultSecretDB},
-		},
-		{
-			name: "empty file yields defaults",
-			yaml: "",
-			want: Config{SecretDB: DefaultSecretDB},
-		},
-		{
-			name: "comments only yields defaults",
-			yaml: "# nothing but a comment\n",
-			want: Config{SecretDB: DefaultSecretDB},
-		},
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			cfg, err := LoadFromFile(writeConfig(t, tc.yaml))
-			if err != nil {
-				t.Fatalf("LoadFromFile returned error: %v", err)
-			}
-			if *cfg != tc.want {
-				t.Errorf("LoadFromFile = %+v, want %+v", *cfg, tc.want)
-			}
-		})
-	}
-}
-
-func TestLoadFromFile_Errors(t *testing.T) {
-	tests := []struct {
-		name string
-		yaml string
-	}{
-		{"malformed yaml", "this is not yaml: [}"},
-		{"unknown field", "remote: https://example.com\ntypo-field: nope\n"},
-		{"wrong type for remote", "remote: [a, b, c]\n"},
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			if _, err := LoadFromFile(writeConfig(t, tc.yaml)); err == nil {
-				t.Error("expected error, got nil")
-			}
-		})
-	}
-}
-
-// The unknown-field error must name the offending key so the user can fix it.
-func TestLoadFromFile_UnknownFieldIsNamed(t *testing.T) {
-	_, err := LoadFromFile(writeConfig(t, "bogus-key: x\n"))
-	if err == nil {
-		t.Fatal("expected error, got nil")
-	}
-	if !strings.Contains(err.Error(), "bogus-key") {
-		t.Errorf("error %q should name the offending field", err)
-	}
-}
-
-// Callers detect a missing config with errors.Is(err, os.ErrNotExist); the
-// adapter must preserve that wrapping.
-func TestLoadFromFile_NotFound(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "missing.yaml")
-
-	_, err := LoadFromFile(path)
-	if err == nil {
-		t.Fatal("expected error for missing file, got nil")
-	}
-	if !errors.Is(err, os.ErrNotExist) {
-		t.Errorf("error %v does not wrap os.ErrNotExist", err)
-	}
-}
-
-func TestValidateForSync(t *testing.T) {
-	if err := (&Config{Remote: ""}).ValidateForSync(); err == nil {
-		t.Error("expected error when remote is empty")
-	}
-	if err := (&Config{Remote: "https://valid.com"}).ValidateForSync(); err != nil {
-		t.Errorf("unexpected error: %v", err)
+	if want := filepath.Join(home, ".goph", "config.yaml"); path != want {
+		t.Errorf("defaultPath() = %q, want %q", path, want)
 	}
 }
 
@@ -208,12 +84,130 @@ func TestResolveSecretDB(t *testing.T) {
 	}
 }
 
-func TestSaveToFile_CreatesFileAndParentDir(t *testing.T) {
+func TestFileStore_Load_Valid(t *testing.T) {
+	tests := []struct {
+		name string
+		yaml string
+		want Config
+	}{
+		{
+			name: "all fields set",
+			yaml: "remote: https://example.com\nsecret-db: ~/db.sqlite\ndevice-name: laptop\ndefault-folder: work\n",
+			want: Config{
+				Remote:        "https://example.com",
+				SecretDB:      "~/db.sqlite",
+				DeviceName:    "laptop",
+				DefaultFolder: "work",
+			},
+		},
+		{
+			name: "secret-db defaults when omitted",
+			yaml: "remote: https://example.com\ndevice-name: laptop\n",
+			want: Config{Remote: "https://example.com", DeviceName: "laptop", SecretDB: DefaultSecretDB},
+		},
+		{
+			name: "empty file yields defaults",
+			yaml: "",
+			want: Config{SecretDB: DefaultSecretDB},
+		},
+		{
+			name: "comments only yields defaults",
+			yaml: "# nothing but a comment\n",
+			want: Config{SecretDB: DefaultSecretDB},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			cfg, err := NewFileStore(writeConfig(t, tc.yaml)).Load()
+			if err != nil {
+				t.Fatalf("Load returned error: %v", err)
+			}
+			if *cfg != tc.want {
+				t.Errorf("Load = %+v, want %+v", *cfg, tc.want)
+			}
+		})
+	}
+}
+
+// Decoding on top of the defaults means an omitted or null secret-db keeps the
+// default, while an explicit empty string overrides it — so callers can tell
+// "unset" from "deliberately empty".
+func TestFileStore_Load_SecretDBDefaulting(t *testing.T) {
+	tests := []struct {
+		name string
+		yaml string
+		want string
+	}{
+		{"omitted keeps default", "remote: https://x\n", DefaultSecretDB},
+		{"null keeps default", "secret-db:\n", DefaultSecretDB},
+		{"explicit empty overrides", `secret-db: ""` + "\n", ""},
+		{"explicit value overrides", "secret-db: ~/db.sqlite\n", "~/db.sqlite"},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			cfg, err := NewFileStore(writeConfig(t, tc.yaml)).Load()
+			if err != nil {
+				t.Fatalf("Load returned error: %v", err)
+			}
+			if cfg.SecretDB != tc.want {
+				t.Errorf("SecretDB = %q, want %q", cfg.SecretDB, tc.want)
+			}
+		})
+	}
+}
+
+func TestFileStore_Load_Errors(t *testing.T) {
+	tests := []struct {
+		name string
+		yaml string
+	}{
+		{"malformed yaml", "this is not yaml: [}"},
+		{"unknown field", "remote: https://example.com\ntypo-field: nope\n"},
+		{"wrong type for remote", "remote: [a, b, c]\n"},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if _, err := NewFileStore(writeConfig(t, tc.yaml)).Load(); err == nil {
+				t.Error("expected error, got nil")
+			}
+		})
+	}
+}
+
+// The unknown-field error must name the offending key so the user can fix it.
+func TestFileStore_Load_UnknownFieldIsNamed(t *testing.T) {
+	_, err := NewFileStore(writeConfig(t, "bogus-key: x\n")).Load()
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "bogus-key") {
+		t.Errorf("error %q should name the offending field", err)
+	}
+}
+
+// A missing file must surface as ErrConfigNotFound so callers can bootstrap a
+// default config instead of failing.
+func TestFileStore_Load_NotFound(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "missing.yaml")
+
+	_, err := NewFileStore(path).Load()
+	if err == nil {
+		t.Fatal("expected error for missing file, got nil")
+	}
+	if !errors.Is(err, ErrConfigNotFound) {
+		t.Errorf("error %v does not wrap ErrConfigNotFound", err)
+	}
+}
+
+func TestFileStore_Save_CreatesFileAndParentDir(t *testing.T) {
 	path := filepath.Join(t.TempDir(), ".goph", "config.yaml")
 	cfg := &Config{Remote: "https://test.com", SecretDB: "~/my.db"}
 
-	if err := cfg.SaveToFile(path); err != nil {
-		t.Fatalf("SaveToFile returned error: %v", err)
+	if err := NewFileStore(path).Save(cfg); err != nil {
+		t.Fatalf("Save returned error: %v", err)
 	}
 	if _, err := os.Stat(path); err != nil {
 		t.Fatalf("config file not created: %v", err)
@@ -223,10 +217,15 @@ func TestSaveToFile_CreatesFileAndParentDir(t *testing.T) {
 	}
 }
 
-// Save then Load through the default path must reproduce the config exactly,
+// Save then Load through the default store must reproduce the config exactly,
 // and Save must create the .goph directory along the way.
 func TestSaveLoadRoundTrip(t *testing.T) {
 	setHome(t)
+
+	store, err := DefaultStore()
+	if err != nil {
+		t.Fatalf("DefaultStore returned error: %v", err)
+	}
 
 	want := &Config{
 		Remote:        "https://api.example.com",
@@ -235,10 +234,10 @@ func TestSaveLoadRoundTrip(t *testing.T) {
 		DefaultFolder: "personal",
 	}
 
-	if err := want.Save(); err != nil {
+	if err := store.Save(want); err != nil {
 		t.Fatalf("Save returned error: %v", err)
 	}
-	got, err := Load()
+	got, err := store.Load()
 	if err != nil {
 		t.Fatalf("Load returned error: %v", err)
 	}
@@ -247,10 +246,14 @@ func TestSaveLoadRoundTrip(t *testing.T) {
 	}
 }
 
-func TestLoad_NotFound(t *testing.T) {
+func TestDefaultStore_Load_NotFound(t *testing.T) {
 	setHome(t)
 
-	if _, err := Load(); err == nil {
-		t.Error("expected error for missing config, got nil")
+	store, err := DefaultStore()
+	if err != nil {
+		t.Fatalf("DefaultStore returned error: %v", err)
+	}
+	if _, err := store.Load(); !errors.Is(err, ErrConfigNotFound) {
+		t.Errorf("error %v does not wrap ErrConfigNotFound", err)
 	}
 }

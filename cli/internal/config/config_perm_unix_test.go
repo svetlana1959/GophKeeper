@@ -12,12 +12,12 @@ import (
 // must persist the directory as 0700 and the file as 0600 — never group- or
 // world-readable. Windows has no equivalent mode bits; there the cross-platform
 // round-trip tests cover persistence instead.
-func TestSaveToFile_UnixPermissions(t *testing.T) {
+func TestFileStore_Save_UnixPermissions(t *testing.T) {
 	path := filepath.Join(t.TempDir(), ".goph", "config.yaml")
 	cfg := &Config{Remote: "https://test.com", SecretDB: "~/my.db"}
 
-	if err := cfg.SaveToFile(path); err != nil {
-		t.Fatalf("SaveToFile returned error: %v", err)
+	if err := NewFileStore(path).Save(cfg); err != nil {
+		t.Fatalf("Save returned error: %v", err)
 	}
 
 	fileInfo, err := os.Stat(path)
