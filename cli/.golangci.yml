@@ -1,0 +1,13 @@
+# golangci-lint v2 config. Default linters (errcheck, govet, ineffassign,
+# staticcheck, unused) with the standard error-handling exclusions so writing to
+# stdout/buffers and best-effort Close/Rollback in defers aren't flagged.
+version: "2"
+
+linters:
+  settings:
+    errcheck:
+      exclude-functions:
+        - (*database/sql.Tx).Rollback
+  exclusions:
+    presets:
+      - std-error-handling

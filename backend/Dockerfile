@@ -1,8 +1,14 @@
+# --- uv source for builder stage ---
+FROM ghcr.io/astral-sh/uv:0.11.25@sha256:1e3808aa9023d0980e7c15b1fa7c1ac16ff35925780cf5c459858b2d693f01a9  AS uv-source
+
+# --- dbmate source for database migrations ---
+FROM amacneil/dbmate:2.33.0@sha256:cbdf9e3631ff1c70a8a7a0091437bdd63c8525407009c2541273ee19e6eebc9e AS dbmate
+
 # --- Build stage: resolve and install dependencies into a venv ---
-FROM python:3.12-slim AS builder
+FROM python:3.12-slim@sha256:6c4dd321d176d61ea848dc8c73a4f7dbae8f70e0ee48bb411ea2f045b599fa8e AS builder
 
 # uv is the package manager (https://docs.astral.sh/uv/)
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+COPY --from=uv-source /uv /usr/local/bin/uv
 
 ENV UV_COMPILE_BYTECODE=1 \
     UV_LINK_MODE=copy
@@ -18,11 +24,8 @@ COPY src ./src
 COPY README.md ./
 RUN uv sync --no-dev
 
-# --- dbmate source for database migrations ---
-FROM amacneil/dbmate:2.33.0 AS dbmate
-
 # --- Runtime stage: slim image with just the venv and source ---
-FROM python:3.12-slim AS runtime
+FROM python:3.12-slim@sha256:6c4dd321d176d61ea848dc8c73a4f7dbae8f70e0ee48bb411ea2f045b599fa8e AS runtime
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     postgresql-client \

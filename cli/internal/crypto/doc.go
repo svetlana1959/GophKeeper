@@ -1,5 +1,6 @@
-// Package crypto implements the engine behind the domain: age key generation,
-// the symmetric DEK layer, and wrapping/unwrapping DEKs to recipients (#32).
-//
-// Not implemented yet.
+// Package crypto is the age-backed adapter for sealing and opening secrets:
+// the implementation behind secret.Cipher. age already performs envelope
+// encryption — a random file key, a ChaCha20-Poly1305 payload, and that key
+// wrapped per recipient — so this package is a thin shell over filippo.io/age
+// that adapts it to the domain port. Key generation lives here too.
 package crypto

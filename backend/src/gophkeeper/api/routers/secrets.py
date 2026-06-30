@@ -5,6 +5,8 @@ service, shape the response. No business logic here — and no try/except for
 domain errors, which the registered exception handlers turn into 404/409.
 """
 
+from uuid import UUID
+
 from fastapi import APIRouter, Depends, status
 
 from gophkeeper.api.deps import provide
@@ -14,7 +16,6 @@ from gophkeeper.api.schemas.secrets import (
     UpdateSecretRequest,
 )
 from gophkeeper.services.secret_service import SecretService
-from uuid import UUID
 
 router = APIRouter(prefix="/secrets", tags=["secrets"])
 

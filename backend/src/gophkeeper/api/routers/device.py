@@ -1,14 +1,15 @@
 """Devices endpoints"""
 
+from uuid import UUID
+
 from fastapi import APIRouter, Depends, status
 
 from gophkeeper.api.deps import provide
 from gophkeeper.api.schemas.device import (
-    RegisterDeviceRequest,
     DeviceResponse,
+    RegisterDeviceRequest,
 )
 from gophkeeper.services.device_service import DeviceService
-from uuid import UUID
 
 router = APIRouter(prefix="/devices", tags=["devices"])
 

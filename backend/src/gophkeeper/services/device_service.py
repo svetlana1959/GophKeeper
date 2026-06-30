@@ -1,9 +1,11 @@
 """Application service for devices"""
 
-from gophkeeper.domain.device import Device
-from gophkeeper.domain.unit_of_work import UnitOfWork
-from gophkeeper.domain.errors import DeviceAlreadyExists
 from uuid import UUID
+
+from gophkeeper.domain.device import Device
+from gophkeeper.domain.errors import DeviceAlreadyExists
+from gophkeeper.domain.unit_of_work import UnitOfWork
+
 
 class DeviceService:
     def __init__(self, uow: UnitOfWork) -> None:
