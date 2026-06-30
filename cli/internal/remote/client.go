@@ -133,12 +133,14 @@ func (c *Client) WhoAmI(ctx context.Context) (Identity, error) {
 
 // PushItem is one local change to upload. BaseVersion is the server version the
 // client last reconciled (0 for a never-synced secret). Ciphertext may be empty
-// when Deleted is set.
+// when Deleted is set. Recipients are the age public keys the secret is sealed
+// to, so the server can scope who may pull it.
 type PushItem struct {
 	ID          string
 	Ciphertext  []byte
 	BaseVersion int
 	Deleted     bool
+	Recipients  []string
 }
 
 // PushResult is the server's per-item verdict. Status is "applied" or
@@ -167,18 +169,24 @@ func (c *Client) Push(ctx context.Context, items []PushItem) ([]PushResult, erro
 	}
 
 	type wireItem struct {
-		ID          string `json:"id"`
-		Ciphertext  string `json:"ciphertext_b64"`
-		BaseVersion int    `json:"base_version"`
-		Deleted     bool   `json:"deleted"`
+		ID          string   `json:"id"`
+		Ciphertext  string   `json:"ciphertext_b64"`
+		BaseVersion int      `json:"base_version"`
+		Deleted     bool     `json:"deleted"`
+		Recipients  []string `json:"recipients"`
 	}
 	wire := make([]wireItem, len(items))
 	for i, it := range items {
+		recipients := it.Recipients
+		if recipients == nil {
+			recipients = []string{}
+		}
 		wire[i] = wireItem{
 			ID:          it.ID,
 			Ciphertext:  base64.StdEncoding.EncodeToString(it.Ciphertext),
 			BaseVersion: it.BaseVersion,
 			Deleted:     it.Deleted,
+			Recipients:  recipients,
 		}
 	}
 
@@ -234,6 +242,51 @@ func (c *Client) Pull(ctx context.Context, since int64) ([]ChangedSecret, int64,
 		}
 	}
 	return out, resp.Cursor, nil
+}
+
+// ListDevices returns the account's devices. Requires a prior Authenticate.
+func (c *Client) ListDevices(ctx context.Context) ([]Device, error) {
+	if c.token == "" {
+		return nil, ErrNotAuthed
+	}
+	var devices []Device
+	if err := c.do(ctx, http.MethodGet, "/devices", nil, &devices); err != nil {
+		return nil, err
+	}
+	return devices, nil
+}
+
+// Invite is a single-use pairing code for linking a new device.
+type Invite struct {
+	Code      string    `json:"code"`
+	ExpiresAt time.Time `json:"expires_at"`
+}
+
+// CreateInvite mints a pairing code for a new device to join this account.
+// Requires a prior Authenticate.
+func (c *Client) CreateInvite(ctx context.Context) (Invite, error) {
+	if c.token == "" {
+		return Invite{}, ErrNotAuthed
+	}
+	var inv Invite
+	if err := c.do(ctx, http.MethodPost, "/enroll/invite", nil, &inv); err != nil {
+		return Invite{}, err
+	}
+	return inv, nil
+}
+
+// Join links this device into an account using a pairing code. It is
+// unauthenticated — the code is the authorization. ErrConflict means the public
+// key is already registered.
+func (c *Client) Join(ctx context.Context, code, deviceName, publicKey string) (Device, error) {
+	body := map[string]string{
+		"code": code, "device_name": deviceName, "public_key": publicKey,
+	}
+	var dev Device
+	if err := c.do(ctx, http.MethodPost, "/enroll/join", body, &dev); err != nil {
+		return Device{}, err
+	}
+	return dev, nil
 }
 
 // do performs a request, encoding body as JSON (when non-nil), attaching the

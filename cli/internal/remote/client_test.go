@@ -155,6 +155,43 @@ func (f *fakeBackend) handler(t *testing.T) http.Handler {
 		writeJSON(w, http.StatusOK, map[string]any{"secrets": out, "cursor": cursor})
 	})
 
+	mux.HandleFunc("GET /devices", func(w http.ResponseWriter, r *http.Request) {
+		if !f.authed(r) {
+			writeJSON(w, http.StatusUnauthorized, map[string]string{"detail": "unauthorized"})
+			return
+		}
+		writeJSON(w, http.StatusOK, []remote.Device{
+			{ID: "dev-1", AccountID: "acc-1", Name: "laptop", PublicKey: f.publicKey, Status: "active"},
+			{ID: "dev-2", AccountID: "acc-1", Name: "phone", PublicKey: "age1other", Status: "active"},
+		})
+	})
+
+	mux.HandleFunc("POST /enroll/invite", func(w http.ResponseWriter, r *http.Request) {
+		if !f.authed(r) {
+			writeJSON(w, http.StatusUnauthorized, map[string]string{"detail": "unauthorized"})
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]string{
+			"code": "GK-TEST-CODE", "expires_at": "2026-07-01T00:00:00Z",
+		})
+	})
+
+	mux.HandleFunc("POST /enroll/join", func(w http.ResponseWriter, r *http.Request) {
+		var body struct {
+			Code      string `json:"code"`
+			Name      string `json:"device_name"`
+			PublicKey string `json:"public_key"`
+		}
+		_ = json.NewDecoder(r.Body).Decode(&body)
+		if body.Code != "GK-TEST-CODE" {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"detail": "invalid invite"})
+			return
+		}
+		writeJSON(w, http.StatusCreated, remote.Device{
+			ID: "dev-new", AccountID: "acc-1", Name: body.Name, PublicKey: body.PublicKey, Status: "active",
+		})
+	})
+
 	return mux
 }
 
@@ -278,6 +315,72 @@ func TestPushThenPullRoundTrip(t *testing.T) {
 	}
 	if len(more) != 0 {
 		t.Fatalf("expected no new changes, got %d", len(more))
+	}
+}
+
+func TestListDevices(t *testing.T) {
+	kp, _ := crypto.GenerateKeyPair()
+	be := newFakeBackend(kp.Public)
+	srv := httptest.NewServer(be.handler(t))
+	defer srv.Close()
+
+	c := remote.New(srv.URL)
+	if err := c.Authenticate(context.Background(), kp.Public, decryptWith(kp.Private)); err != nil {
+		t.Fatalf("authenticate: %v", err)
+	}
+	devices, err := c.ListDevices(context.Background())
+	if err != nil {
+		t.Fatalf("list devices: %v", err)
+	}
+	if len(devices) != 2 {
+		t.Fatalf("got %d devices, want 2", len(devices))
+	}
+}
+
+func TestCreateInvite(t *testing.T) {
+	kp, _ := crypto.GenerateKeyPair()
+	be := newFakeBackend(kp.Public)
+	srv := httptest.NewServer(be.handler(t))
+	defer srv.Close()
+
+	c := remote.New(srv.URL)
+	if err := c.Authenticate(context.Background(), kp.Public, decryptWith(kp.Private)); err != nil {
+		t.Fatalf("authenticate: %v", err)
+	}
+	inv, err := c.CreateInvite(context.Background())
+	if err != nil {
+		t.Fatalf("create invite: %v", err)
+	}
+	if inv.Code != "GK-TEST-CODE" || inv.ExpiresAt.IsZero() {
+		t.Fatalf("unexpected invite: %+v", inv)
+	}
+}
+
+func TestJoin(t *testing.T) {
+	kp, _ := crypto.GenerateKeyPair()
+	be := newFakeBackend(kp.Public)
+	srv := httptest.NewServer(be.handler(t))
+	defer srv.Close()
+
+	dev, err := remote.New(srv.URL).Join(context.Background(), "GK-TEST-CODE", "phone", kp.Public)
+	if err != nil {
+		t.Fatalf("join: %v", err)
+	}
+	if dev.ID != "dev-new" || dev.PublicKey != kp.Public {
+		t.Fatalf("unexpected device: %+v", dev)
+	}
+}
+
+func TestJoinBadCode(t *testing.T) {
+	kp, _ := crypto.GenerateKeyPair()
+	be := newFakeBackend(kp.Public)
+	srv := httptest.NewServer(be.handler(t))
+	defer srv.Close()
+
+	_, err := remote.New(srv.URL).Join(context.Background(), "wrong", "phone", kp.Public)
+	var apiErr *remote.APIError
+	if !errors.As(err, &apiErr) || apiErr.StatusCode != http.StatusBadRequest {
+		t.Fatalf("want 400 APIError, got %v", err)
 	}
 }
 
