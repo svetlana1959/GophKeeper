@@ -1,9 +1,10 @@
+from uuid import UUID, uuid4
+
 import pytest
 
 from gophkeeper.domain.device import Device
-from gophkeeper.domain.errors import DeviceNotFound, DeviceAlreadyExists
+from gophkeeper.domain.errors import DeviceAlreadyExists, DeviceNotFound
 from gophkeeper.services.device_service import DeviceService
-from uuid import UUID, uuid4
 
 
 class FakeDeviceRepository:

@@ -1,11 +1,12 @@
 """Integration tests for DeviceRepository."""
 
+from uuid import uuid4
+
 import pytest
 
 from gophkeeper.domain.device import Device
 from gophkeeper.domain.errors import DeviceNotFound
 from gophkeeper.infrastructure.unit_of_work import SqlAlchemyUnitOfWork
-from uuid import uuid4
 
 pytestmark = pytest.mark.integration
 
@@ -79,4 +80,3 @@ async def test_list_active_devices(database):
 
     assert len(devices) == 1
     assert devices[0].id == active_id
-

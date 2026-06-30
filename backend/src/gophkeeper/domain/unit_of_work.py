@@ -14,8 +14,8 @@ transaction.
 from types import TracebackType
 from typing import Protocol, Self
 
-from gophkeeper.domain.secret import SecretRepository
 from gophkeeper.domain.device import DeviceRepository
+from gophkeeper.domain.secret import SecretRepository
 
 
 class UnitOfWork(Protocol):

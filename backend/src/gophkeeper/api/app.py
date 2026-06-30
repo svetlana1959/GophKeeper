@@ -14,7 +14,7 @@ from fastapi import FastAPI
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from gophkeeper.api.errors import register_exception_handlers
-from gophkeeper.api.routers import secrets, device
+from gophkeeper.api.routers import device, secrets
 from gophkeeper.infrastructure.adapters.database import SqlAlchemyAdapter
 from gophkeeper.settings.settings import settings
 

@@ -6,9 +6,10 @@ transaction, drive the aggregate, commit. It holds no business rules itself
 *port*, so it is trivially testable with a fake.
 """
 
+from uuid import UUID
+
 from gophkeeper.domain.secret import Secret
 from gophkeeper.domain.unit_of_work import UnitOfWork
-from uuid import UUID
 
 
 class SecretService:
