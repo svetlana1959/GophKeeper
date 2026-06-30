@@ -32,10 +32,15 @@ async def push(
             ciphertext=item.ciphertext,
             base_version=item.base_version,
             deleted=item.deleted,
+            recipients=item.recipients,
         )
         for item in body.items
     ]
-    results = await service.push(account_id=str(principal.account_id), items=items)
+    results = await service.push(
+        account_id=str(principal.account_id),
+        device_id=principal.device_id,
+        items=items,
+    )
     return PushResponse(
         results=[
             PushResultResponse(id=r.id, status=r.status, version=r.version, seq=r.seq)
@@ -50,7 +55,9 @@ async def changes(
     principal: DevicePrincipal = Depends(get_principal),
     service: SyncService = Depends(provide(SyncService)),
 ) -> ChangesResponse:
-    secrets, cursor = await service.changes(account_id=str(principal.account_id), since=since)
+    secrets, cursor = await service.changes(
+        account_id=str(principal.account_id), device_id=principal.device_id, since=since
+    )
     return ChangesResponse(
         secrets=[ChangedSecretResponse.from_domain(s) for s in secrets],
         cursor=cursor,

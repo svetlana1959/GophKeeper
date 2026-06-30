@@ -80,17 +80,37 @@ class SqlAlchemySecretRepository(SecretRepository):
         return [_from_row(row) for row in result.mappings().all()]
 
     async def list_changed_since(
-        self, account_id: str, since_seq: int, *, limit: int
+        self, account_id: str, device_id: UUID, since_seq: int, *, limit: int
     ) -> list[Secret]:
         result = await self._session.execute(
             text(
-                f"SELECT {_READ_LIST} FROM secrets "
-                "WHERE account_id = :account_id AND seq > :since_seq "
-                "ORDER BY seq LIMIT :limit"
+                f"SELECT {_READ_LIST} FROM secrets s "
+                "JOIN secret_recipients sr ON sr.secret_id = s.id "
+                "WHERE s.account_id = :account_id AND sr.device_id = :device_id "
+                "AND s.seq > :since_seq ORDER BY s.seq LIMIT :limit"
             ),
-            {"account_id": account_id, "since_seq": since_seq, "limit": limit},
+            {
+                "account_id": account_id,
+                "device_id": device_id,
+                "since_seq": since_seq,
+                "limit": limit,
+            },
         )
         return [_from_row(row) for row in result.mappings().all()]
+
+    async def set_recipients(self, secret_id: UUID, device_ids: list[UUID]) -> None:
+        await self._session.execute(
+            text("DELETE FROM secret_recipients WHERE secret_id = :secret_id"),
+            {"secret_id": secret_id},
+        )
+        for device_id in device_ids:
+            await self._session.execute(
+                text(
+                    "INSERT INTO secret_recipients (secret_id, device_id) "
+                    "VALUES (:secret_id, :device_id)"
+                ),
+                {"secret_id": secret_id, "device_id": device_id},
+            )
 
     async def save(self, secret: Secret) -> None:
         result = await self._session.execute(

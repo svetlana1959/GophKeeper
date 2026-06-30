@@ -19,6 +19,7 @@ class PushItemRequest(BaseModel):
     ciphertext_b64: str = ""  # empty allowed only for a pure tombstone
     base_version: int = 0
     deleted: bool = False
+    recipients: list[str] = []  # age public keys the secret is sealed to
 
     @field_validator("ciphertext_b64")
     @classmethod

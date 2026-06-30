@@ -119,10 +119,14 @@ class SecretRepository(Protocol):
         ...
 
     async def list_changed_since(
-        self, account_id: str, since_seq: int, *, limit: int
+        self, account_id: str, device_id: UUID, since_seq: int, *, limit: int
     ) -> list[Secret]:
-        """Return an account's secrets (incl. tombstones) with seq > since_seq,
-        ordered by seq — the delta a device pulls to catch up."""
+        """Return secrets (incl. tombstones) the device is a recipient of with
+        seq > since_seq, ordered by seq — the delta that device pulls to catch up."""
+        ...
+
+    async def set_recipients(self, secret_id: UUID, device_ids: list[UUID]) -> None:
+        """Replace a secret's recipient set (which devices may pull it)."""
         ...
 
     async def save(self, secret: Secret) -> None:

@@ -12,7 +12,7 @@ Everything is scoped to one account_id (resolved from the caller's session, not
 the request body), so a device can only ever touch its own account's secrets.
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from uuid import UUID
 
 from gophkeeper.domain.errors import SecretNotFound, VersionConflict
@@ -28,6 +28,7 @@ class PushItem:
     ciphertext: bytes
     base_version: int = 0
     deleted: bool = False
+    recipients: list[str] = field(default_factory=list)  # age public keys
 
 
 @dataclass
@@ -42,7 +43,9 @@ class SyncService:
     def __init__(self, uow: UnitOfWork) -> None:
         self._uow = uow
 
-    async def push(self, *, account_id: str, items: list[PushItem]) -> list[PushResult]:
+    async def push(
+        self, *, account_id: str, device_id: UUID, items: list[PushItem]
+    ) -> list[PushResult]:
         results: list[PushResult] = []
         async with self._uow as uow:
             for item in items:
@@ -59,6 +62,7 @@ class SyncService:
                         deleted=item.deleted,
                     )
                     await uow.secrets.add(secret)
+                    await self._apply_recipients(uow, account_id, device_id, item)
                     results.append(self._applied(secret))
                     continue
 
@@ -78,18 +82,34 @@ class SyncService:
                     continue
 
                 await uow.secrets.save(secret)
+                if not item.deleted:
+                    await self._apply_recipients(uow, account_id, device_id, item)
                 results.append(self._applied(secret))
 
             await uow.commit()
         return results
 
     async def changes(
-        self, *, account_id: str, since: int, limit: int = _DEFAULT_LIMIT
+        self, *, account_id: str, device_id: UUID, since: int, limit: int = _DEFAULT_LIMIT
     ) -> tuple[list[Secret], int]:
         async with self._uow as uow:
-            secrets = await uow.secrets.list_changed_since(account_id, since, limit=limit)
+            secrets = await uow.secrets.list_changed_since(
+                account_id, device_id, since, limit=limit
+            )
         cursor = max((s.seq for s in secrets), default=since)
         return secrets, cursor
+
+    async def _apply_recipients(
+        self, uow: UnitOfWork, account_id: str, device_id: UUID, item: PushItem
+    ) -> None:
+        """Resolve recipient public keys to account devices and set them. The
+        pushing device is always included so the author can always read it."""
+        device_ids = {device_id}
+        for public_key in item.recipients:
+            device = await uow.devices.find_by_public_key(public_key)
+            if device is not None and str(device.account_id) == account_id:
+                device_ids.add(device.id)
+        await uow.secrets.set_recipients(item.id, list(device_ids))
 
     @staticmethod
     def _applied(secret: Secret) -> PushResult:
