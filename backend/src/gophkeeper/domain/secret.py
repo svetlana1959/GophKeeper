@@ -43,6 +43,7 @@ class Secret:
     version: int = 1
     deleted: bool = False
     updated_at: datetime = field(default_factory=_now)
+    seq: int = 0  # server-assigned sync cursor; the repository fills it on write
 
     def __post_init__(self) -> None:
         """Validate right after the dataclass __init__, so no Secret can exist in
@@ -115,6 +116,13 @@ class SecretRepository(Protocol):
         self, account_id: str, *, include_deleted: bool = False
     ) -> list[Secret]:
         """Return all secrets owned by an account."""
+        ...
+
+    async def list_changed_since(
+        self, account_id: str, since_seq: int, *, limit: int
+    ) -> list[Secret]:
+        """Return an account's secrets (incl. tombstones) with seq > since_seq,
+        ordered by seq — the delta a device pulls to catch up."""
         ...
 
     async def save(self, secret: Secret) -> None:
