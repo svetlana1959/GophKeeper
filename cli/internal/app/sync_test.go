@@ -409,6 +409,16 @@ func TestSync_ResharesToAccountDevices(t *testing.T) {
 	if !bytes.Contains(plain, []byte("gh")) {
 		t.Fatalf("decrypted payload missing name: %s", plain)
 	}
+
+	// Once sealed to the full device set, a further sync must not reshare again
+	// (guards against the pull-clobbers-recipients ping-pong).
+	stable, err := sess.Sync(context.Background(), "")
+	if err != nil {
+		t.Fatalf("second Sync: %v", err)
+	}
+	if stable.Reshared != 0 || stable.Pushed != 0 {
+		t.Fatalf("second sync = %+v, want 0 reshared / 0 pushed (stable)", stable)
+	}
 }
 
 func TestSync_PullRecoversNameFromPayload(t *testing.T) {
