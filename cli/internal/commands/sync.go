@@ -30,6 +30,9 @@ func newSyncCmd() *cobra.Command {
 
 				out := cmd.OutOrStdout()
 				fmt.Fprintf(out, "Synced: %d pulled, %d pushed", res.Pulled, res.Pushed)
+				if res.Reshared > 0 {
+					fmt.Fprintf(out, ", %d reshared", res.Reshared)
+				}
 				if res.Conflicts > 0 {
 					fmt.Fprintf(out, ", %d conflicts (re-run sync to reconcile)", res.Conflicts)
 				}

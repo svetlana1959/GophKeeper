@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/svetlana1959/GophKeeper/cli/internal/device"
 	"github.com/svetlana1959/GophKeeper/cli/internal/remote"
 	"github.com/svetlana1959/GophKeeper/cli/internal/secret"
 	"github.com/svetlana1959/GophKeeper/cli/internal/syncstate"
@@ -19,6 +20,7 @@ var ErrNoRemote = errors.New("no remote configured; set 'remote' in config to sy
 type SyncResult struct {
 	Pulled    int
 	Pushed    int
+	Reshared  int
 	Conflicts int
 }
 
@@ -40,6 +42,14 @@ func (s *Session) Sync(ctx context.Context, pin string) (SyncResult, error) {
 		return res, err
 	}
 	res.Pulled = pulled
+
+	// Reshare secrets to any account devices not yet sealed in (e.g. a newly
+	// linked one). Reshared secrets become dirty and push below.
+	reshared, err := s.applyReshare(ctx, client, priv)
+	if err != nil {
+		return res, err
+	}
+	res.Reshared = reshared
 
 	pushed, conflicts, pushSeq, err := s.applyPush(ctx, client, st)
 	if err != nil {
@@ -175,6 +185,95 @@ func (s *Session) metaFromPayload(ciphertext []byte, priv string) (content, bool
 	return c, true
 }
 
+// applyReshare ensures every secret this device can decrypt is sealed to all of
+// the account's active devices. It mirrors the account's device list into the
+// local trusted set (so recipient keys resolve), then re-encrypts any secret
+// whose recipient set differs, marking it dirty to push. This is how a newly
+// linked device gains access to existing secrets.
+func (s *Session) applyReshare(
+	ctx context.Context, client *remote.Client, priv string,
+) (int, error) {
+	devices, err := client.ListDevices(ctx)
+	if err != nil {
+		return 0, fmt.Errorf("app: list devices: %w", err)
+	}
+
+	desired := make([]string, 0, len(devices))
+	for _, d := range devices {
+		if d.Status != "active" {
+			continue
+		}
+		desired = append(desired, d.PublicKey)
+		if err := s.rememberDevice(d); err != nil {
+			return 0, err
+		}
+	}
+
+	secs, err := s.secrets.List(false) // active secrets only; tombstones carry no payload
+	if err != nil {
+		return 0, err
+	}
+
+	reshared := 0
+	for _, sec := range secs {
+		if sameSet(sec.Recipients, desired) {
+			continue
+		}
+		// Only reshare what we can decrypt; skip secrets we are not a recipient of.
+		plain, err := s.cipher.Open(sec.Payload, priv)
+		if err != nil {
+			continue
+		}
+		payload, err := s.cipher.Seal(plain, desired)
+		if err != nil {
+			return reshared, err
+		}
+		sec.Reseal(payload, time.Now().UTC())
+		sec.Recipients = desired
+		if err := s.secrets.Save(sec); err != nil {
+			return reshared, err
+		}
+		if err := s.db.Sync().MarkDirty(sec.ID); err != nil {
+			return reshared, err
+		}
+		reshared++
+	}
+	return reshared, nil
+}
+
+// rememberDevice adds an account device to the local trusted set if its key is
+// not already known, so secret recipients resolve when saving.
+func (s *Session) rememberDevice(d remote.Device) error {
+	_, err := s.db.Devices().FindByPublicKey(d.PublicKey)
+	if err == nil {
+		return nil
+	}
+	if !errors.Is(err, device.ErrNotFound) {
+		return err
+	}
+	return s.db.Devices().Save(&device.Device{
+		ID: d.ID, Name: d.Name, PublicKey: d.PublicKey, Active: true, UpdatedAt: time.Now().UTC(),
+	})
+}
+
+// sameSet reports whether two recipient lists contain the same keys.
+func sameSet(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	counts := make(map[string]int, len(a))
+	for _, x := range a {
+		counts[x]++
+	}
+	for _, x := range b {
+		counts[x]--
+		if counts[x] < 0 {
+			return false
+		}
+	}
+	return true
+}
+
 // applyPush uploads dirty secrets and records the outcome. A conflicting item is
 // left dirty so the next sync pulls the winner and reconciles.
 func (s *Session) applyPush(
@@ -199,6 +298,7 @@ func (s *Session) applyPush(
 			Ciphertext:  sec.Payload,
 			BaseVersion: d.ServerVersion,
 			Deleted:     sec.Deleted,
+			Recipients:  sec.Recipients,
 		})
 	}
 

@@ -18,11 +18,12 @@ import (
 // syncBackend is a minimal stand-in for the server: it runs the age challenge
 // and stores pushed ciphertext so the reconcile loop can be exercised offline.
 type syncBackend struct {
-	publicKey string
-	token     string
-	nonce     []byte
-	secrets   map[string]storedSecret
-	seq       int64
+	publicKey      string
+	extraDevicePub string // a second account device, if set
+	token          string
+	nonce          []byte
+	secrets        map[string]storedSecret
+	seq            int64
 }
 
 type storedSecret struct {
@@ -104,12 +105,17 @@ func (b *syncBackend) handler(t *testing.T) http.Handler {
 			respond(w, http.StatusUnauthorized, map[string]any{"detail": "unauthorized"})
 			return
 		}
-		respond(w, http.StatusOK, []map[string]any{
+		devices := []map[string]any{
 			{"id": "dev-1", "account_id": "acc-1", "device_name": "laptop",
 				"public_key": b.publicKey, "status": "active"},
-			{"id": "dev-2", "account_id": "acc-1", "device_name": "phone",
-				"public_key": "age1other", "status": "active"},
-		})
+		}
+		if b.extraDevicePub != "" {
+			devices = append(devices, map[string]any{
+				"id": "dev-2", "account_id": "acc-1", "device_name": "phone",
+				"public_key": b.extraDevicePub, "status": "active",
+			})
+		}
+		respond(w, http.StatusOK, devices)
 	})
 
 	mux.HandleFunc("POST /enroll/invite", func(w http.ResponseWriter, r *http.Request) {
@@ -300,6 +306,8 @@ func TestListDevices(t *testing.T) {
 		t.Fatalf("Init: %v", err)
 	}
 	be.publicKey = res.PublicKey
+	other, _ := crypto.GenerateKeyPair()
+	be.extraDevicePub = other.Public
 
 	sess, err := app.Open()
 	if err != nil {
@@ -349,6 +357,57 @@ func TestLink(t *testing.T) {
 	// Already linked now.
 	if err := sess.Link(context.Background(), "GK-CODE"); !errors.Is(err, app.ErrAlreadyLinked) {
 		t.Fatalf("second Link err = %v, want ErrAlreadyLinked", err)
+	}
+}
+
+func TestSync_ResharesToAccountDevices(t *testing.T) {
+	setHome(t)
+	be := newSyncBackend()
+	srv := httptest.NewServer(be.handler(t))
+	defer srv.Close()
+
+	res, err := app.Init(app.InitParams{DeviceName: "laptop", Remote: srv.URL})
+	if err != nil {
+		t.Fatalf("Init: %v", err)
+	}
+	be.publicKey = res.PublicKey
+	// A second device in the account (as if freshly linked).
+	other, err := crypto.GenerateKeyPair()
+	if err != nil {
+		t.Fatalf("keypair: %v", err)
+	}
+	be.extraDevicePub = other.Public
+
+	sess, err := app.Open()
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	defer sess.Close()
+
+	mustSet(t, sess, app.SetParams{Name: "gh", Value: []byte("tok")})
+
+	out, err := sess.Sync(context.Background(), "")
+	if err != nil {
+		t.Fatalf("Sync: %v", err)
+	}
+	if out.Reshared < 1 {
+		t.Fatalf("sync = %+v, want at least 1 reshared", out)
+	}
+
+	// The pushed ciphertext must now be decryptable by the OTHER device.
+	if len(be.secrets) != 1 {
+		t.Fatalf("server has %d secrets, want 1", len(be.secrets))
+	}
+	var ct []byte
+	for _, s := range be.secrets {
+		ct = s.ct
+	}
+	plain, err := crypto.Engine{}.Open(ct, other.Private)
+	if err != nil {
+		t.Fatalf("other device cannot decrypt reshared secret: %v", err)
+	}
+	if !bytes.Contains(plain, []byte("gh")) {
+		t.Fatalf("decrypted payload missing name: %s", plain)
 	}
 }
 
