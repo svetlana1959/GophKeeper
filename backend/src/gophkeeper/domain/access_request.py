@@ -1,18 +1,11 @@
-"""The AccessRequest aggregate and its repository port.
+"""The AccessRequest aggregate, its repository port, and the pending read-model.
 
-Multi-device access (issue #69), revised per review: GophKeeper is
-Zero-Knowledge, so the server cannot decide that a new device may read a
-secret — only the device that already holds the decryption key can, by
-re-encrypting the secret's payload for the new device locally and pushing the
-result through the existing ``PUT /secrets/{id}``. The server's role here is
-purely as an asynchronous broker: it relays *that a device is asking* and
-*its public key*, and nothing else. It never inspects, re-encrypts, or
-approves anything on its own.
-
-``AccessRequest`` is that relayed message. Its lifecycle is exactly three
-states — pending, approved, rejected — and approval/rejection are the only
-mutations, mirroring ``Secret.delete()``'s tombstone pattern: a terminal state
-is reached once and stays reached.
+GophKeeper is Zero-Knowledge: only a device that already holds the decryption
+key can let another device in, by re-encrypting the secret locally and pushing
+it through ``PUT /secrets/{id}``. The server only relays *that a device is
+asking*; it never re-encrypts or grants on its own. ``AccessRequest`` is that
+relayed message — a three-state lifecycle (pending -> approved/rejected) where
+the terminal states are reached once and stay reached.
 """
 
 from __future__ import annotations
@@ -54,12 +47,11 @@ class AccessRequest:
             raise DomainError("access request device_id must not be empty")
 
     def approve(self, *, at: datetime | None = None) -> None:
-        """Mark this request approved.
+        """Mark this request approved. Only valid from PENDING.
 
-        Only valid from PENDING — the caller (the service layer) is
-        responsible for having just pushed the re-encrypted secret via
-        ``PUT /secrets/{id}`` first; this method only records that the
-        handshake completed, it does not touch the secret itself.
+        Records that the handshake completed; it does not touch the secret —
+        the caller is responsible for having pushed the re-encrypted payload
+        via ``PUT /secrets/{id}`` first.
         """
         if self.status != AccessRequestStatus.PENDING:
             raise AccessRequestNotPending(self.id, current_status=self.status)
@@ -78,19 +70,24 @@ class AccessRequest:
         return self.status == AccessRequestStatus.PENDING
 
 
-class AccessRequestRepository(Protocol):
-    """Port for persisting AccessRequest aggregates.
-
-    Lives in the domain next to the aggregate it serves, same shape as every
-    other repository port in this codebase.
+@dataclass(frozen=True)
+class PendingAccessRequest:
+    """Read-model: a pending request paired with the requester's current public
+    key, looked up live at read time so the approving device has everything it
+    needs to re-encrypt in one round-trip. The key is never snapshotted onto the
+    request row — a rotated key must not be re-encrypted against.
     """
+
+    request: AccessRequest
+    requester_public_key: str
+
+
+class AccessRequestRepository(Protocol):
+    """Port for persisting AccessRequest aggregates."""
 
     async def add(self, request: AccessRequest) -> None:
         """Insert a new request. Raises ``AccessRequestAlreadyPending`` if the
-        same (secret_id, device_id) pair already has a PENDING row — mirrors
-        the partial unique index in the migration, checked here too so the
-        domain raises its own vocabulary error instead of surfacing a raw
-        constraint violation.
+        same (secret_id, device_id) pair already has a PENDING row.
         """
         ...
 

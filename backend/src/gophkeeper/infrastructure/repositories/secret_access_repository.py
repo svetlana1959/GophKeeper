@@ -1,8 +1,7 @@
 """SQLAlchemy implementation of the SecretAccessRepository port.
 
-Translates between the ``SecretAccess`` domain object and the ``secret_access``
-table. We use SQLAlchemy Core text queries (not the ORM): the domain model stays
-a plain dataclass with no mapper, and the mapping is explicit and visible right here.
+Reads and writes the ``secret_access`` table with Core ``text()`` queries, same
+shape as every other repository in this package.
 """
 
 from uuid import UUID
@@ -38,14 +37,6 @@ class SqlAlchemySecretAccessRepository(SecretAccessRepository):
             _to_params(secret_id, device_id),
         )
 
-    async def revoke(self, secret_id: UUID, device_id: UUID) -> None:
-        await self._session.execute(
-            text(
-                "DELETE FROM secret_access WHERE secret_id = :secret_id AND device_id = :device_id"
-            ),
-            _to_params(secret_id, device_id),
-        )
-
     async def has_access(self, secret_id: UUID, device_id: UUID) -> bool:
         result = await self._session.execute(
             text(
@@ -60,12 +51,5 @@ class SqlAlchemySecretAccessRepository(SecretAccessRepository):
         result = await self._session.execute(
             text("SELECT secret_id FROM secret_access WHERE device_id = :device_id"),
             {"device_id": device_id},
-        )
-        return [row[0] for row in result.all()]
-
-    async def list_device_ids_for_secret(self, secret_id: UUID) -> list[UUID]:
-        result = await self._session.execute(
-            text("SELECT device_id FROM secret_access WHERE secret_id = :secret_id"),
-            {"secret_id": secret_id},
         )
         return [row[0] for row in result.all()]

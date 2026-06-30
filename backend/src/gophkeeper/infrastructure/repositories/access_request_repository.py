@@ -49,23 +49,13 @@ class SqlAlchemyAccessRequestRepository(AccessRequestRepository):
         self._session = session
 
     async def add(self, request: AccessRequest) -> None:
-        # The upfront SELECT below closes the common, non-racing case with a
-        # clean domain error. It is NOT sufficient on its own: two concurrent
-        # requests for the same (secret_id, device_id) can both pass the
-        # SELECT before either INSERTs, a classic check-then-act race. The
-        # partial unique index in the migration is what actually prevents two
-        # PENDING rows from existing — the loser of the race hits it on
-        # INSERT and gets a raw IntegrityError, which we catch here and
-        # re-raise as the same domain error the SELECT path raises, so the
-        # caller sees one consistent error either way.
-        #
-        # Importantly we do NOT call session.rollback() ourselves here: that
-        # would discard the whole Unit-of-Work transaction, not just this
-        # insert. We let the exception propagate instead — the caller's
-        # `async with self._uow as uow:` block in the service layer exits
-        # via SqlAlchemyUnitOfWork.__aexit__, which already rolls back
-        # automatically on any exception. This mirrors exactly how
-        # VersionConflict is handled elsewhere in this codebase.
+        # The upfront SELECT gives the common case a clean domain error, but it
+        # can't win the check-then-act race: two concurrent inserts for the same
+        # pair both pass it. The partial unique index is the real guard — the
+        # loser hits it and we translate the IntegrityError into the same domain
+        # error. We deliberately do NOT rollback here; letting the exception
+        # propagate lets the UoW's __aexit__ roll back the whole transaction,
+        # exactly as VersionConflict is handled elsewhere.
         existing = await self._session.execute(
             text(
                 "SELECT 1 FROM access_requests "

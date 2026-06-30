@@ -99,17 +99,17 @@ class AccessRequestNotPending(DomainError):
         self.current_status = current_status
 
 
-class NotSecretOwner(DomainError):
-    """Raised when a device that does not itself have access to a secret tries
-    to act on requests for that secret (list/approve/reject).
+class NotTrustedWithSecret(DomainError):
+    """Raised when a device without access to a secret tries to administer its
+    request queue (list/approve/reject).
 
-    Only a device that can already decrypt a secret is in a position to
-    re-encrypt it for someone else — a device with no access has no standing
-    to manage who else gets it, mirroring the same rule the old direct-share
-    flow enforced, just applied to the request queue instead.
+    There is no single owner: any active device that already has access may
+    vouch for another, since only a device that can decrypt the secret can
+    re-encrypt it for someone else. Bounding *who* may vouch is deferred until a
+    real auth boundary replaces the ``X-Device-Id`` header.
     """
 
     def __init__(self, device_id: UUID, secret_id: UUID) -> None:
-        super().__init__(f"device {device_id} does not own secret {secret_id}")
+        super().__init__(f"device {device_id} is not trusted with secret {secret_id}")
         self.device_id = device_id
         self.secret_id = secret_id

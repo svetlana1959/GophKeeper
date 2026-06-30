@@ -1,156 +1,27 @@
-"""Unit tests for AccessRequestService — the handshake broker (issue #69 revision).
-
-Covers the devops review's exact required flow:
-
-- test_device_b_can_request_access                     -> POST .../requests
-- test_duplicate_pending_request_rejected               -> one PENDING per pair
-- test_only_owner_can_list_pending_requests             -> GET .../requests guarded
-- test_owner_can_approve_and_grant_is_created            -> approve() is the only grant path
-- test_non_owner_cannot_approve                          -> POST .../approve guarded
-- test_approve_does_not_touch_secret_ciphertext          -> server stays Zero-Knowledge
-- test_reject_does_not_create_a_grant                    -> POST .../reject
-- test_cannot_approve_already_settled_request            -> terminal state is terminal
-"""
+"""Unit tests for AccessRequestService — the handshake broker (issue #69)."""
 
 from uuid import UUID, uuid4
 
 import pytest
 
-from gophkeeper.domain.access_request import AccessRequest, AccessRequestStatus
+from gophkeeper.domain.access_request import AccessRequestStatus
 from gophkeeper.domain.device import Device
 from gophkeeper.domain.errors import (
+    AccessDenied,
     AccessRequestAlreadyPending,
+    AccessRequestNotFound,
     AccessRequestNotPending,
     DeviceNotFound,
-    NotSecretOwner,
+    NotTrustedWithSecret,
     SecretNotFound,
 )
 from gophkeeper.domain.secret import Secret
 from gophkeeper.services.access_request_service import AccessRequestService
-
-
-class FakeDeviceRepository:
-    def __init__(self):
-        self.devices: dict[UUID, Device] = {}
-
-    async def add(self, device: Device) -> None:
-        self.devices[device.id] = device
-
-    async def get(self, device_id: UUID) -> Device:
-        if device_id not in self.devices:
-            raise DeviceNotFound(device_id)
-        return self.devices[device_id]
-
-    async def exists(self, device_id: UUID) -> bool:
-        return device_id in self.devices
-
-    async def list_active(self) -> list[Device]:
-        return [d for d in self.devices.values() if d.is_active]
-
-    async def save(self, device: Device) -> None:
-        self.devices[device.id] = device
-
-
-class FakeSecretRepository:
-    def __init__(self):
-        self.secrets: dict[UUID, Secret] = {}
-
-    async def add(self, secret: Secret) -> None:
-        self.secrets[secret.id] = secret
-
-    async def get(self, secret_id: UUID) -> Secret:
-        if secret_id not in self.secrets:
-            raise SecretNotFound(secret_id)
-        return self.secrets[secret_id]
-
-    async def list_for_account(self, account_id: str, *, include_deleted: bool = False):
-        return [s for s in self.secrets.values() if s.account_id == account_id]
-
-    async def save(self, secret: Secret) -> None:
-        self.secrets[secret.id] = secret
-
-
-class FakeSecretAccessRepository:
-    def __init__(self):
-        self.grants: set[tuple[UUID, UUID]] = set()
-        self.grant_calls: list[tuple[UUID, UUID]] = []
-
-    async def grant(self, secret_id: UUID, device_id: UUID) -> None:
-        self.grants.add((secret_id, device_id))
-        self.grant_calls.append((secret_id, device_id))
-
-    async def revoke(self, secret_id: UUID, device_id: UUID) -> None:
-        self.grants.discard((secret_id, device_id))
-
-    async def has_access(self, secret_id: UUID, device_id: UUID) -> bool:
-        return (secret_id, device_id) in self.grants
-
-    async def list_secret_ids_for_device(self, device_id: UUID) -> list[UUID]:
-        return [sid for sid, did in self.grants if did == device_id]
-
-    async def list_device_ids_for_secret(self, secret_id: UUID) -> list[UUID]:
-        return [did for sid, did in self.grants if sid == secret_id]
-
-
-class FakeAccessRequestRepository:
-    def __init__(self):
-        self.requests: dict[UUID, AccessRequest] = {}
-
-    async def add(self, request: AccessRequest) -> None:
-        for existing in self.requests.values():
-            if (
-                existing.secret_id == request.secret_id
-                and existing.device_id == request.device_id
-                and existing.status == AccessRequestStatus.PENDING
-            ):
-                raise AccessRequestAlreadyPending(request.secret_id, request.device_id)
-        self.requests[request.id] = request
-
-    async def get(self, request_id: UUID) -> AccessRequest:
-        if request_id not in self.requests:
-            from gophkeeper.domain.errors import AccessRequestNotFound
-
-            raise AccessRequestNotFound(request_id)
-        return self.requests[request_id]
-
-    async def list_pending_for_secret(self, secret_id: UUID) -> list[AccessRequest]:
-        return [
-            r
-            for r in self.requests.values()
-            if r.secret_id == secret_id and r.status == AccessRequestStatus.PENDING
-        ]
-
-    async def save(self, request: AccessRequest) -> None:
-        self.requests[request.id] = request
-
-
-class FakeUnitOfWork:
-    def __init__(self):
-        self.devices = FakeDeviceRepository()
-        self.secrets = FakeSecretRepository()
-        self.access = FakeSecretAccessRepository()
-        self.access_requests = FakeAccessRequestRepository()
-        self.committed = False
-
-    async def __aenter__(self):
-        return self
-
-    async def __aexit__(self, *_):
-        pass
-
-    async def commit(self):
-        self.committed = True
-
-    async def rollback(self):
-        pass
-
-
-def _device() -> Device:
-    return Device(id=uuid4(), device_name="d", public_key="pk", is_active=True)
+from tests.fakes import FakeUnitOfWork, make_device
 
 
 async def _setup_owned_secret(uow: FakeUnitOfWork) -> tuple[Device, UUID]:
-    owner = _device()
+    owner = make_device()
     await uow.devices.add(owner)
     secret_id = uuid4()
     await uow.secrets.add(Secret(id=secret_id, account_id="acc", ciphertext=b"v1"))
@@ -161,7 +32,7 @@ async def _setup_owned_secret(uow: FakeUnitOfWork) -> tuple[Device, UUID]:
 async def test_device_b_can_request_access():
     uow = FakeUnitOfWork()
     owner, secret_id = await _setup_owned_secret(uow)
-    requester = _device()
+    requester = make_device()
     await uow.devices.add(requester)
     service = AccessRequestService(uow)
 
@@ -170,12 +41,44 @@ async def test_device_b_can_request_access():
     assert request.status == AccessRequestStatus.PENDING
     assert request.device_id == requester.id
     assert request.secret_id == secret_id
+    assert uow.committed is True
+
+
+async def test_request_by_deactivated_device_denied():
+    """The docstring promises 'exist and be active' — a revoked device cannot queue."""
+    uow = FakeUnitOfWork()
+    owner, secret_id = await _setup_owned_secret(uow)
+    requester = make_device(is_active=False)
+    await uow.devices.add(requester)
+    service = AccessRequestService(uow)
+
+    with pytest.raises(AccessDenied):
+        await service.request(secret_id, device_id=requester.id)
+
+
+async def test_request_by_unknown_device_raises():
+    uow = FakeUnitOfWork()
+    owner, secret_id = await _setup_owned_secret(uow)
+    service = AccessRequestService(uow)
+
+    with pytest.raises(DeviceNotFound):
+        await service.request(secret_id, device_id=uuid4())
+
+
+async def test_request_for_unknown_secret_raises():
+    uow = FakeUnitOfWork()
+    requester = make_device()
+    await uow.devices.add(requester)
+    service = AccessRequestService(uow)
+
+    with pytest.raises(SecretNotFound):
+        await service.request(uuid4(), device_id=requester.id)
 
 
 async def test_duplicate_pending_request_rejected():
     uow = FakeUnitOfWork()
     owner, secret_id = await _setup_owned_secret(uow)
-    requester = _device()
+    requester = make_device()
     await uow.devices.add(requester)
     service = AccessRequestService(uow)
 
@@ -185,69 +88,94 @@ async def test_duplicate_pending_request_rejected():
         await service.request(secret_id, device_id=requester.id)
 
 
-async def test_only_owner_can_list_pending_requests():
+async def test_only_trusted_device_can_list_pending():
     uow = FakeUnitOfWork()
     owner, secret_id = await _setup_owned_secret(uow)
-    requester = _device()
-    stranger = _device()
+    requester = make_device()
+    stranger = make_device()
     await uow.devices.add(requester)
     await uow.devices.add(stranger)
     service = AccessRequestService(uow)
 
     await service.request(secret_id, device_id=requester.id)
 
-    with pytest.raises(NotSecretOwner):
-        await service.list_pending(secret_id, owner_device_id=stranger.id)
+    with pytest.raises(NotTrustedWithSecret):
+        await service.list_pending(secret_id, acting_device_id=stranger.id)
 
-    with pytest.raises(NotSecretOwner):
-        await service.list_pending(secret_id, owner_device_id=requester.id)
+    with pytest.raises(NotTrustedWithSecret):
+        await service.list_pending(secret_id, acting_device_id=requester.id)
 
-    pending = await service.list_pending(secret_id, owner_device_id=owner.id)
+    pending = await service.list_pending(secret_id, acting_device_id=owner.id)
     assert len(pending) == 1
-    assert pending[0].device_id == requester.id
+    assert pending[0].request.device_id == requester.id
+
+
+async def test_list_pending_carries_requester_public_key():
+    """The owner gets the requester's public key in one call, so it can
+    re-encrypt without a separate device lookup."""
+    uow = FakeUnitOfWork()
+    owner, secret_id = await _setup_owned_secret(uow)
+    requester = make_device(public_key="REQUESTER-PUBKEY")
+    await uow.devices.add(requester)
+    service = AccessRequestService(uow)
+
+    await service.request(secret_id, device_id=requester.id)
+
+    pending = await service.list_pending(secret_id, acting_device_id=owner.id)
+    assert pending[0].requester_public_key == "REQUESTER-PUBKEY"
 
 
 async def test_owner_can_approve_and_grant_is_created():
     uow = FakeUnitOfWork()
     owner, secret_id = await _setup_owned_secret(uow)
-    requester = _device()
+    requester = make_device()
     await uow.devices.add(requester)
     service = AccessRequestService(uow)
 
     request = await service.request(secret_id, device_id=requester.id)
     assert not await uow.access.has_access(secret_id, requester.id)
 
-    approved = await service.approve(request.id, owner_device_id=owner.id)
+    approved = await service.approve(request.id, acting_device_id=owner.id)
 
     assert approved.status == AccessRequestStatus.APPROVED
-    assert await uow.access.has_access(secret_id, requester.id)
-    # the grant must be created exactly once, by approve(), and nowhere else
-    assert uow.access.grant_calls.count((secret_id, requester.id)) == 1
+    assert (secret_id, requester.id) in uow.access.grants
+    assert uow.committed is True
 
 
-async def test_non_owner_cannot_approve():
+async def test_non_trusted_device_cannot_approve():
     uow = FakeUnitOfWork()
     owner, secret_id = await _setup_owned_secret(uow)
-    requester = _device()
+    requester = make_device()
     await uow.devices.add(requester)
     service = AccessRequestService(uow)
 
     request = await service.request(secret_id, device_id=requester.id)
 
     # the requester cannot approve its own request
-    with pytest.raises(NotSecretOwner):
-        await service.approve(request.id, owner_device_id=requester.id)
+    with pytest.raises(NotTrustedWithSecret):
+        await service.approve(request.id, acting_device_id=requester.id)
 
-    # access must still not exist — the failed approval attempt changed nothing
     assert not await uow.access.has_access(secret_id, requester.id)
 
 
-async def test_approve_does_not_touch_secret_ciphertext():
-    """Zero-Knowledge guarantee: approving a request must not read or modify
-    the secret's ciphertext or version — the server never re-encrypts."""
+async def test_non_trusted_device_cannot_reject():
     uow = FakeUnitOfWork()
     owner, secret_id = await _setup_owned_secret(uow)
-    requester = _device()
+    requester = make_device()
+    await uow.devices.add(requester)
+    service = AccessRequestService(uow)
+
+    request = await service.request(secret_id, device_id=requester.id)
+
+    with pytest.raises(NotTrustedWithSecret):
+        await service.reject(request.id, acting_device_id=requester.id)
+
+
+async def test_approve_does_not_touch_secret_ciphertext():
+    """Zero-Knowledge: approving must not read or modify the ciphertext/version."""
+    uow = FakeUnitOfWork()
+    owner, secret_id = await _setup_owned_secret(uow)
+    requester = make_device()
     await uow.devices.add(requester)
     service = AccessRequestService(uow)
 
@@ -256,7 +184,7 @@ async def test_approve_does_not_touch_secret_ciphertext():
     version_before = secret_before.version
 
     request = await service.request(secret_id, device_id=requester.id)
-    await service.approve(request.id, owner_device_id=owner.id)
+    await service.approve(request.id, acting_device_id=owner.id)
 
     secret_after = await uow.secrets.get(secret_id)
     assert secret_after.ciphertext == ciphertext_before
@@ -266,31 +194,69 @@ async def test_approve_does_not_touch_secret_ciphertext():
 async def test_reject_does_not_create_a_grant():
     uow = FakeUnitOfWork()
     owner, secret_id = await _setup_owned_secret(uow)
-    requester = _device()
+    requester = make_device()
     await uow.devices.add(requester)
     service = AccessRequestService(uow)
 
     request = await service.request(secret_id, device_id=requester.id)
-    rejected = await service.reject(request.id, owner_device_id=owner.id)
+    rejected = await service.reject(request.id, acting_device_id=owner.id)
 
     assert rejected.status == AccessRequestStatus.REJECTED
     assert not await uow.access.has_access(secret_id, requester.id)
-    # the owner's own setup grant is expected; the requester must never appear
     assert (secret_id, requester.id) not in uow.access.grant_calls
+    assert uow.committed is True
 
 
-async def test_cannot_approve_already_settled_request():
+async def test_cannot_re_settle_an_approved_request():
     uow = FakeUnitOfWork()
     owner, secret_id = await _setup_owned_secret(uow)
-    requester = _device()
+    requester = make_device()
     await uow.devices.add(requester)
     service = AccessRequestService(uow)
 
     request = await service.request(secret_id, device_id=requester.id)
-    await service.approve(request.id, owner_device_id=owner.id)
+    await service.approve(request.id, acting_device_id=owner.id)
 
     with pytest.raises(AccessRequestNotPending):
-        await service.approve(request.id, owner_device_id=owner.id)
+        await service.approve(request.id, acting_device_id=owner.id)
+    with pytest.raises(AccessRequestNotPending):
+        await service.reject(request.id, acting_device_id=owner.id)
+
+    # the re-approve attempt must not have written a second grant
+    assert uow.access.grant_calls.count((secret_id, requester.id)) == 1
+
+
+async def test_cannot_re_settle_a_rejected_request():
+    uow = FakeUnitOfWork()
+    owner, secret_id = await _setup_owned_secret(uow)
+    requester = make_device()
+    await uow.devices.add(requester)
+    service = AccessRequestService(uow)
+
+    request = await service.request(secret_id, device_id=requester.id)
+    await service.reject(request.id, acting_device_id=owner.id)
 
     with pytest.raises(AccessRequestNotPending):
-        await service.reject(request.id, owner_device_id=owner.id)
+        await service.approve(request.id, acting_device_id=owner.id)
+    with pytest.raises(AccessRequestNotPending):
+        await service.reject(request.id, acting_device_id=owner.id)
+
+    assert not await uow.access.has_access(secret_id, requester.id)
+
+
+async def test_approve_unknown_request_raises():
+    uow = FakeUnitOfWork()
+    await _setup_owned_secret(uow)
+    service = AccessRequestService(uow)
+
+    with pytest.raises(AccessRequestNotFound):
+        await service.approve(uuid4(), acting_device_id=uuid4())
+
+
+async def test_reject_unknown_request_raises():
+    uow = FakeUnitOfWork()
+    await _setup_owned_secret(uow)
+    service = AccessRequestService(uow)
+
+    with pytest.raises(AccessRequestNotFound):
+        await service.reject(uuid4(), acting_device_id=uuid4())

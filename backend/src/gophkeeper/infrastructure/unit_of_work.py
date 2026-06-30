@@ -25,9 +25,7 @@ class SqlAlchemyUnitOfWork(UnitOfWork):
     async def __aenter__(self) -> Self:
         self._session = self._database.session()
 
-        """
-        New repositories are added here
-        """
+        # New repositories are bound to the session here.
         self.secrets = SqlAlchemySecretRepository(self._session)
         self.devices = SqlAlchemyDeviceRepository(self._session)
         self.access = SqlAlchemySecretAccessRepository(self._session)

@@ -1,25 +1,16 @@
 """Application service for secrets — the use-case layer.
 
-EXAMPLE service. It orchestrates the domain and the Unit of Work: open the
-transaction, drive the aggregate, commit. It holds no business rules itself
-(those live on ``Secret``) and knows nothing about HTTP. It depends on the UoW
-*port*, so it is trivially testable with a fake.
+Orchestrates the domain and the Unit of Work: open the transaction, drive the
+aggregate, commit. It holds no business rules (those live on ``Secret``) and
+knows nothing about HTTP, depending only on the UoW *port* so it is testable
+with a fake.
 
-Multi-device access (issue #69): there is no account/auth layer yet, so trust
-is modeled directly between devices and secrets via ``uow.access``. A device
-must be both *active* (not deactivated/revoked) and *granted* access to a
-secret before it can read or write it. The device that originally stores a
-secret is granted access automatically.
-
-REVISION per review: this used to also expose ``share()``/``revoke()``,
-letting any device with access grant another device access directly with no
-re-encryption step. That is wrong for a Zero-Knowledge system — see
-``services/access_request_service.py`` for the replacement, an asynchronous
-handshake broker where the server only relays requests and public keys, and a
-grant is created only after the owning device has re-encrypted the secret
-locally and pushed it through ``update()`` below (unchanged). ``update()``
-itself needed no changes for this: it was already the endpoint the owner
-re-pushes the re-encrypted payload through.
+Multi-device access (issue #69): there is no account/auth layer yet, so trust is
+modeled directly between devices and secrets via ``uow.access``. A device must be
+both active and granted access before it can read or write a secret; the device
+that stores a secret is granted access automatically. Sharing with a new device
+goes through ``services/access_request_service.py`` — ``update()`` here is the
+(unchanged) endpoint the owner re-pushes the re-encrypted payload through.
 """
 
 from uuid import UUID

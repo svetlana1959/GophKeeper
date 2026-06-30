@@ -28,13 +28,8 @@ def _now() -> datetime:
     return datetime.now(UTC)
 
 
-"""
-We could use Pydantic, and it won't be wrong, though we have rule about domain
-importing only base libs.
-Also not using Pydantic make it impossible to use domain model as DTO in the API
-"""
-
-
+# Plain dataclass, not Pydantic: the domain rule is to import only the stdlib,
+# and keeping it framework-free stops the domain model leaking into the API as a DTO.
 @dataclass
 class Secret:
     id: UUID
@@ -137,18 +132,10 @@ class SecretAccessRepository(Protocol):
         """Give a device access to a secret. Idempotent — granting twice is a no-op."""
         ...
 
-    async def revoke(self, secret_id: UUID, device_id: UUID) -> None:
-        """Take away a device's access to a secret. Idempotent."""
-        ...
-
     async def has_access(self, secret_id: UUID, device_id: UUID) -> bool:
         """Whether this device currently has a grant for this secret."""
         ...
 
     async def list_secret_ids_for_device(self, device_id: UUID) -> list[UUID]:
         """All secret ids this device is trusted to access (for sync)."""
-        ...
-
-    async def list_device_ids_for_secret(self, secret_id: UUID) -> list[UUID]:
-        """All devices currently trusted with this secret."""
         ...

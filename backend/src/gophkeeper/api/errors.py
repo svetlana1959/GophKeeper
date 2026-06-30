@@ -3,7 +3,7 @@
 The domain raises vocabulary errors (``SecretNotFound``, ``VersionConflict``,
 ``DeviceNotFound``, ``DeviceAlreadyExists``, ``AccessDenied``,
 ``AccessRequestNotFound``, ``AccessRequestAlreadyPending``,
-``AccessRequestNotPending``, ``NotSecretOwner``); only this layer knows they
+``AccessRequestNotPending``, ``NotTrustedWithSecret``); only this layer knows they
 become 403, 404, and 409. Register once at app creation.
 """
 
@@ -17,7 +17,7 @@ from gophkeeper.domain.errors import (
     AccessRequestNotPending,
     DeviceAlreadyExists,
     DeviceNotFound,
-    NotSecretOwner,
+    NotTrustedWithSecret,
     SecretNotFound,
     VersionConflict,
 )
@@ -26,7 +26,7 @@ _NotFoundError = SecretNotFound | DeviceNotFound | AccessRequestNotFound
 _ConflictError = (
     VersionConflict | DeviceAlreadyExists | AccessRequestAlreadyPending | AccessRequestNotPending
 )
-_ForbiddenError = AccessDenied | NotSecretOwner
+_ForbiddenError = AccessDenied | NotTrustedWithSecret
 
 
 async def _not_found_handler(request: Request, exc: _NotFoundError) -> JSONResponse:
@@ -57,4 +57,4 @@ def register_exception_handlers(app: FastAPI) -> None:
     app.add_exception_handler(AccessRequestAlreadyPending, _conflict_handler)  # type: ignore[arg-type]
     app.add_exception_handler(AccessRequestNotPending, _conflict_handler)  # type: ignore[arg-type]
     app.add_exception_handler(AccessDenied, _forbidden_handler)  # type: ignore[arg-type]
-    app.add_exception_handler(NotSecretOwner, _forbidden_handler)  # type: ignore[arg-type]
+    app.add_exception_handler(NotTrustedWithSecret, _forbidden_handler)  # type: ignore[arg-type]
