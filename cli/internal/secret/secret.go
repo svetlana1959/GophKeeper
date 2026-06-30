@@ -44,7 +44,7 @@ func (s *Secret) Delete(at time.Time) {
 func (s *Secret) IsActive() bool { return !s.Deleted }
 
 // Repository persists Secret aggregates. It is the port; the SQLite
-// implementation is the adapter in internal/vault (#33).
+// implementation is the adapter in internal/vault.
 type Repository interface {
 	Get(id string) (*Secret, error)
 	FindByName(name string) (*Secret, error)

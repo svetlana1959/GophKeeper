@@ -1,4 +1,4 @@
-// Package config owns the non-secret client configuration (#23): the Config
+// Package config owns the non-secret client configuration: the Config
 // model and its rules, the Store port, and the YAML+filesystem adapter
 // (FileStore) that implements it. The file lives at $HOME/.goph/config.yaml
 // (or %USERPROFILE%\.goph\config.yaml on Windows) and holds non-secret
