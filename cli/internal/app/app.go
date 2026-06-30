@@ -29,10 +29,13 @@ var (
 	ErrFieldNotFound      = errors.New("field not found in secret")
 )
 
-// content is the JSON shape encrypted into a secret's payload. Value is a []byte
-// so encoding/json base64-encodes it, preserving binary secrets exactly; folder
-// lives in a column (metadata), not here.
+// content is the JSON shape encrypted into a secret's payload. Name and folder
+// live here (not just in local columns) so another device can fully reconstruct
+// a pulled secret by decrypting it. Value is a []byte so encoding/json
+// base64-encodes it, preserving binary secrets exactly.
 type content struct {
+	Name        string `json:"name"`
+	Folder      string `json:"folder,omitempty"`
 	Value       []byte `json:"value"`
 	Description string `json:"description,omitempty"`
 }
@@ -207,11 +210,6 @@ type SetParams struct {
 // Set creates a new secret sealed to this device, or updates the existing one
 // with that name (re-sealing to its current recipients and bumping the version).
 func (s *Session) Set(p SetParams) error {
-	plain, err := json.Marshal(content{Value: p.Value, Description: p.Description})
-	if err != nil {
-		return fmt.Errorf("app: encode secret: %w", err)
-	}
-
 	// Start from the existing secret, or a fresh one sealed to this device.
 	sec, err := s.secrets.FindByName(p.Name)
 	switch {
@@ -228,6 +226,13 @@ func (s *Session) Set(p SetParams) error {
 		sec.FolderID = p.Folder
 	}
 	sec.Deleted = false // writing a value resurrects a tombstoned name
+
+	plain, err := json.Marshal(content{
+		Name: p.Name, Folder: sec.FolderID, Value: p.Value, Description: p.Description,
+	})
+	if err != nil {
+		return fmt.Errorf("app: encode secret: %w", err)
+	}
 
 	ct, err := s.cipher.Seal(plain, sec.Recipients)
 	if err != nil {

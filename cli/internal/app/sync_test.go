@@ -225,3 +225,45 @@ func TestSync_PullsRemoteSecret(t *testing.T) {
 		t.Fatalf("pulled secret not in vault: %+v", items)
 	}
 }
+
+func TestSync_PullRecoversNameFromPayload(t *testing.T) {
+	setHome(t)
+	be := newSyncBackend()
+	srv := httptest.NewServer(be.handler(t))
+	defer srv.Close()
+
+	res, err := app.Init(app.InitParams{DeviceName: "laptop", Remote: srv.URL})
+	if err != nil {
+		t.Fatalf("Init: %v", err)
+	}
+	be.publicKey = res.PublicKey
+
+	// A secret sealed to this device, carrying its name inside the payload, as if
+	// it had been created and reshared from another device.
+	payload := []byte(`{"name":"github","value":"dG9r"}`) // value = base64("tok")
+	sealed, err := crypto.Engine{}.Seal(payload, []string{res.PublicKey})
+	if err != nil {
+		t.Fatalf("seal: %v", err)
+	}
+	be.seq++
+	be.secrets["sec-xyz"] = storedSecret{version: 1, seq: be.seq, ct: sealed}
+
+	sess, err := app.Open()
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	defer sess.Close()
+
+	if _, err := sess.Sync(context.Background(), ""); err != nil {
+		t.Fatalf("Sync: %v", err)
+	}
+
+	// The name is recovered from the payload, and the value decrypts.
+	got, err := sess.Get("github", "", "")
+	if err != nil {
+		t.Fatalf("Get by recovered name: %v", err)
+	}
+	if string(got) != "tok" {
+		t.Fatalf("Get = %q, want tok", got)
+	}
+}

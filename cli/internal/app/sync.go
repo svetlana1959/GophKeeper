@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
@@ -52,7 +53,7 @@ func (s *Session) Sync(ctx context.Context, pin string) (SyncResult, error) {
 	}
 
 	// Pull before push, so local edits are pushed against the latest server state.
-	pulled, pullSeq, err := s.applyPull(ctx, client, st, state.Cursor)
+	pulled, pullSeq, err := s.applyPull(ctx, client, st, state.Cursor, priv)
 	if err != nil {
 		return res, err
 	}
@@ -98,9 +99,10 @@ func (s *Session) ensureRegistered(
 }
 
 // applyPull fetches the server delta and applies it locally, returning how many
-// secrets were applied and the highest seq seen.
+// secrets were applied and the highest seq seen. priv decrypts payloads to
+// recover the secret's name/folder (and confirms this device is a recipient).
 func (s *Session) applyPull(
-	ctx context.Context, client *remote.Client, st syncstate.Repository, since int64,
+	ctx context.Context, client *remote.Client, st syncstate.Repository, since int64, priv string,
 ) (applied int, maxSeq int64, err error) {
 	changes, _, err := client.Pull(ctx, since)
 	if err != nil {
@@ -114,13 +116,10 @@ func (s *Session) applyPull(
 		}
 
 		local, gerr := s.secrets.Get(cs.ID)
-		switch {
-		case errors.Is(gerr, secret.ErrNotFound):
-			// A secret created on another device. Names are local-only and not
-			// synced yet, so use the id as a placeholder until names move into
-			// the encrypted payload (a later milestone).
-			local = &secret.Secret{ID: cs.ID, Name: cs.ID}
-		case gerr != nil:
+		isNew := errors.Is(gerr, secret.ErrNotFound)
+		if isNew {
+			local = &secret.Secret{ID: cs.ID, Name: cs.ID} // placeholder name; refined below
+		} else if gerr != nil {
 			return applied, maxSeq, gerr
 		}
 
@@ -128,6 +127,15 @@ func (s *Session) applyPull(
 		local.Version = cs.Version
 		local.Deleted = cs.Deleted
 		local.UpdatedAt = time.Now().UTC()
+
+		// If we can decrypt it, recover the real name/folder from the payload and
+		// record that this device is a recipient (so a later edit can re-seal).
+		if meta, ok := s.metaFromPayload(cs.Ciphertext, priv); ok {
+			local.Name = meta.Name
+			local.FolderID = meta.Folder
+			local.Recipients = []string{s.localPub}
+		}
+
 		if err := s.secrets.Save(local); err != nil {
 			return applied, maxSeq, err
 		}
@@ -137,6 +145,21 @@ func (s *Session) applyPull(
 		applied++
 	}
 	return applied, maxSeq, nil
+}
+
+// metaFromPayload decrypts a payload to recover a secret's name and folder. It
+// returns ok=false when this device is not a recipient or the payload predates
+// names-in-payload.
+func (s *Session) metaFromPayload(ciphertext []byte, priv string) (content, bool) {
+	plain, err := s.cipher.Open(ciphertext, priv)
+	if err != nil {
+		return content{}, false
+	}
+	var c content
+	if json.Unmarshal(plain, &c) != nil || c.Name == "" {
+		return content{}, false
+	}
+	return c, true
 }
 
 // applyPush uploads dirty secrets and records the outcome. A conflicting item is
