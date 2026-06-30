@@ -22,10 +22,10 @@ Week 4
 | ------------------------ | -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------ |
 | **Svetlana Maltseva**    | Team Lead, Product Manager | Project planning, backlog management, sprint coordination, stakeholder communication, requirements analysis, sprint documentation, sprint retrospective preparation                                                                      | Issues: #100, #104 |
 | **Elina Akhmetzyanova**  | Design, Documentation      | Designed the application dark theme, refined UI interaction flows, updated sprint documentation and templates                                                                                                                            | Issues: #101, #102 |
-| **Arseny Lashkevich**    | DevOps Engineer            | Implemented CI/CD pipelines for frontend and backend, automated testing, coverage reporting, Docker image publishing to GHCR, VM deployment improvements, secured GitHub Actions workflows                                               | PRs: 94, 82        |
-| **Aleksander Goncharov** | CLI Engineer               | Implemented the cryptographic core, added encrypted local database support, fixed review comments, improved local storage implementation                                             |                    |
-| **Emil Nabiullin**       | Frontend Developer         | Implemented the landing page, responsive layout, authentication pages (Login and Registration), Dashboard layout, and integrated approved UI designs into the frontend                                                                   |                    |
-| **Malik Nurullin**       | Backend Developer          | Implemented multi-device access and synchronization, added access request workflow and synchronization API, wrote unit and integration tests, increased backend test coverage above 80%, improved backend stability and passed CI checks |                    |
+| **Arseny Lashkevich**    | DevOps Engineer            | Implemented CI/CD pipelines for frontend and backend, automated testing, coverage reporting, Docker image publishing to GHCR, VM deployment improvements, secured GitHub Actions workflows                                               | PRs: #94, #82        |
+| **Aleksander Goncharov** | CLI Engineer               | Implemented the cryptographic core, added encrypted local database support, fixed review comments, improved local storage implementation                                             |     Issues: #32, #33, #23, #38, #37, #39, #74, #36, #22               |
+| **Emil Nabiullin**       | Frontend Developer         | Implemented the landing page, responsive layout, authentication pages (Login and Registration), Dashboard layout, and integrated approved UI designs into the frontend                                                                   |       #75             |
+| **Malik Nurullin**       | Backend Developer          | Implemented multi-device access and synchronization, added access request workflow and synchronization API, wrote unit and integration tests, increased backend test coverage above 80%, improved backend stability and passed CI checks |      PRs: #121, #119, #112            |
 
 ---
 
@@ -88,6 +88,11 @@ Integration tests verify repository behavior and database interaction using the 
 
 ---
 
+### API
+
+<img width="1280" height="806" alt="image" src="https://github.com/user-attachments/assets/81219591-3c2a-4b2a-aa38-7d963eb26283" />
+
+
 ## End-to-End Testing
 
 End-to-end testing is currently focused on the core user workflows and will be expanded as frontend-backend integration progresses.
@@ -113,8 +118,9 @@ Planned user flows include:
 
 | Test Type | Total | Passed | Failed |
 |------------|------:|------:|------:|
-| Unit Tests | 9 | 9 | 0 |
-| Integration Tests | 5 | 5 | 0 |
+| Unit Tests | 74 | 74 | 0 |
+| Integration Tests | 14 | 14 | 0 |
+
 
 ---
 ## Evidence
@@ -127,6 +133,29 @@ Planned user flows include:
 - CLI CI runs formatting checks, `go vet`, linting, tests, and coverage summary.
 
 ### Test Screenshots
+
+<img width="825" height="890" alt="image" src="https://github.com/user-attachments/assets/20b3a550-be58-45a0-9c4e-de17ed1e8a1e" />
+
+## Design Dark Theme
+
+### Account Statistics Dark
+<img width="1440" height="1024" alt="Account Statistics Dark" src="https://github.com/user-attachments/assets/6256c158-fd25-4c43-97ac-597e37f2339c" />
+
+### Dashboard Dark
+<img width="1440" height="1024" alt="Dashboard Dark" src="https://github.com/user-attachments/assets/4f8d43fe-f99e-4927-b266-a5ddd5edac7c" />
+
+
+### Login Dark
+<img width="1440" height="1024" alt="Login Dark" src="https://github.com/user-attachments/assets/ee2905e9-25cc-40f1-9276-2a478403893b" />
+
+### Secrets List Dark
+<img width="1440" height="1024" alt="Secrets List Dark" src="https://github.com/user-attachments/assets/6e62310c-f1f0-4257-8ff8-d6779830574d" />
+
+### Trusted Devices Dark
+<img width="1440" height="1024" alt="Trusted Devices Dark" src="https://github.com/user-attachments/assets/08e1185f-cad2-43f1-857c-366965c41b94" />
+
+### Registration Dark
+<img width="1440" height="1024" alt="Registration Dark" src="https://github.com/user-attachments/assets/85e1d7f8-cdc3-4ed6-a7d0-4d4f8a99751e" />
 
 
 
@@ -387,12 +416,16 @@ Workflow - https://github.com/svetlana1959/GophKeeper/tree/main/.github/workflow
 - Issue #22 - Implement CLI init command - https://github.com/orgs/svetlana1959/projects/4/views/1?pane=issue&itemId=197205031&issue=svetlana1959%7CGophKeeper%7C22
 - Issue #109 - Implement Full Web Application Frontend - https://github.com/orgs/svetlana1959/projects/4/views/1?pane=issue&itemId=204189656&issue=svetlana1959%7CGophKeeper%7C109
 - Issue #110 - Configure Continuous Integration (CI) - https://github.com/orgs/svetlana1959/projects/4/views/1?pane=issue&itemId=204195437&issue=svetlana1959%7CGophKeeper%7C110
-- Issue #111 - Configure Continuous Deployment and Deploy Application - https://github.com/orgs/svetlana1959/projects/4/views/1?pane=issue&itemId=204196082&issue=svetlana1959%7CGophKeeper%7C111
+- Issue #111 - Configure Continuous Deployment and Deploy Application - https://github.com/orgs/svetlana1959/projects/4/views/1?pane=issue&itemId=204196082&issue=svetlana1959%7CGophKeeper%7C111 
+- Issue #75 - [feat]: Frontend landing preview - https://github.com/svetlana1959/GophKeeper/issues/75
   
 ## Pull Requests
 
-- PR #
-- 
+- PR #121 - test: add backend unit tests - https://github.com/svetlana1959/GophKeeper/pull/121
+- PR #119 - Feature/synchronization - https://github.com/svetlana1959/GophKeeper/pull/119
+- PR #112 - Feature/69 multi device access - https://github.com/svetlana1959/GophKeeper/pull/112
+- PR #94 - [CI]: frontend CI - https://github.com/svetlana1959/GophKeeper/pull/94
+- PR #82 - [CI] Backend CI - https://github.com/svetlana1959/GophKeeper/pull/82
 ---
 
 # Updated Backlog
@@ -400,10 +433,14 @@ Project backlog and sprint planning are managed using GitHub Projects.
 Link: https://github.com/orgs/svetlana1959/projects/4/views/1 and https://github.com/orgs/svetlana1959/projects/6/views/1
 
 ## Completed
-### Issue: #102, #100, #101, 
+### Issue: #102, #100, #101, #104, #110, #111, #106, #121, #32, #33, #23, #38, #37, #39, #74, #36, #22, #75
+
+
+## In Review
+### Issue: #112, #119
 
 ## In Progress
-### Issue: #109,
+### Issue: #103, #109
 
 ## Planned for Sprint 5
 
@@ -416,3 +453,43 @@ Link: https://github.com/orgs/svetlana1959/projects/4/views/1 and https://github
 * Deploy the improved application to the VM and validate changes
 
 
+### (1) View Devices
+As a secret owner
+I want to see which devices have access to my secrets
+So that I can control who can access my data
+
+Acceptance criteria:
+
+- Given devices have access to the account, when the user opens device management, then the user can see a list of devices.
+- Given the device list is displayed, when the user views it, then only devices with access are displayed.
+- Given there are no trusted devices except the current one, when the list is opened, then the system displays the available trusted device information.
+- Given a device was revoked, when the device list is refreshed, then the revoked device is no longer shown as trusted.
+
+
+### (2) Dashboard
+As an authenticated user
+I want to view information about my secrets and requests
+So that I can monitor the security of my account
+
+Acceptance criteria
+
+- Given the user is authenticated, when the dashboard is opened, then the user can see their secrets and requests.
+- Given information is available, when the dashboard loads, then the information is displayed correctly.
+- Given data changes, when the dashboard is refreshed or reopened, then data is updated after changes.
+- Given there are no requests, when the dashboard is opened, then the system displays an empty requests state.
+- Given the user is not authenticated, when the dashboard is requested, then access is denied
+
+
+
+### (3) Revoke Device Access
+As a secret owner
+I want to revoke access for a trusted device
+So that lost or unused devices cannot access my secrets
+
+Acceptance criteria:
+
+- Given a device is trusted, when the user removes it, then the user can remove the device from trusted devices.
+- Given the device is removed from trusted devices, when it tries to access data, then the device loses access to data.
+- Given access is revoked, when the system updates device information, then the changes are reflected in the system.
+- Given the user cancels revocation, when the confirmation step is closed, then the device remains trusted.
+- Given a revoked device tries to synchronize, when the request is processed, then synchronization is denied.
