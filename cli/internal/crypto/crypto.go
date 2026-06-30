@@ -33,6 +33,17 @@ func GenerateKeyPair() (KeyPair, error) {
 	return KeyPair{Public: id.Recipient().String(), Private: id.String()}, nil
 }
 
+// ImportKeyPair derives the public key from an existing age private key, for
+// adopting an identity generated elsewhere. It returns ErrInvalidKey if the key
+// does not parse.
+func ImportKeyPair(privateKey string) (KeyPair, error) {
+	id, err := age.ParseX25519Identity(privateKey)
+	if err != nil {
+		return KeyPair{}, fmt.Errorf("%w: %v", ErrInvalidKey, err)
+	}
+	return KeyPair{Public: id.Recipient().String(), Private: id.String()}, nil
+}
+
 // Engine implements secret.Cipher over age. It is stateless; the zero value is
 // ready to use.
 type Engine struct{}
