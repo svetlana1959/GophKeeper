@@ -2,15 +2,17 @@
 
 from datetime import datetime
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class CreateInviteResponse(BaseModel):
-    code: str  # plaintext pairing code, shown once
-    expires_at: datetime
+    code: str = Field(
+        description="Plaintext pairing code, returned once; share with the new device."
+    )
+    expires_at: datetime = Field(description="When the code stops being valid.")
 
 
 class JoinRequest(BaseModel):
-    code: str
-    device_name: str
-    public_key: str
+    code: str = Field(description="The pairing code from /enroll/invite.")
+    device_name: str = Field(description="Human-readable name for the joining device.")
+    public_key: str = Field(description="The joining device's age public key (age1…).")

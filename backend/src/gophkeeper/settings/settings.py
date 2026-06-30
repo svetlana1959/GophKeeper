@@ -30,7 +30,9 @@ class DatabaseSettings(BaseModel):
     @property
     def url(self) -> str:
         """Async SQLAlchemy URL (asyncpg driver)."""
-        return f"postgresql+asyncpg://{self.user}:{self.password}@{self.host}:{self.port}/{self.name}"
+        return (
+            f"postgresql+asyncpg://{self.user}:{self.password}@{self.host}:{self.port}/{self.name}"
+        )
 
 
 class APISettings(BaseModel):

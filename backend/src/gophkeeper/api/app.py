@@ -19,6 +19,36 @@ from gophkeeper.infrastructure.adapters.database import SqlAlchemyAdapter
 from gophkeeper.settings.settings import settings
 
 
+_TAGS_METADATA = [
+    {
+        "name": "auth",
+        "description": (
+            "Device authentication. A device proves it holds its private key via an "
+            "**age challenge/response** (no key ever leaves the client) and receives a "
+            "short-lived bearer session token used by the other endpoints."
+        ),
+    },
+    {
+        "name": "sync",
+        "description": (
+            "Zero-knowledge synchronization. Push opaque ciphertext under optimistic "
+            "concurrency and pull the per-device delta since a cursor. The server never "
+            "decrypts; it only relays and orders."
+        ),
+    },
+    {
+        "name": "enroll",
+        "description": "Link new devices into an account with single-use, expiring invite codes.",
+    },
+    {"name": "devices", "description": "Account device registry."},
+    {
+        "name": "secrets",
+        "description": "Legacy direct secret access — superseded by `/sync`.",
+    },
+    {"name": "health", "description": "Liveness."},
+]
+
+
 def create_app() -> FastAPI:
     logging.basicConfig(level=settings.run_settings.logging_level)
 
@@ -41,6 +71,7 @@ def create_app() -> FastAPI:
         title=f"{settings.api.application_name} API",
         description=settings.api.description,
         lifespan=lifespan,
+        openapi_tags=_TAGS_METADATA,
     )
     app.state.database = database
 
@@ -48,8 +79,9 @@ def create_app() -> FastAPI:
 
     register_exception_handlers(app)
 
-    @app.get("/health", tags=["health"])
+    @app.get("/health", tags=["health"], summary="Liveness probe")
     async def health() -> dict[str, str]:
+        """Return ``{"status": "ok"}`` once the app is serving."""
         return {"status": "ok"}
 
     app.include_router(auth.router)

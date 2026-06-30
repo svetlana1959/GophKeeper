@@ -20,12 +20,28 @@ from gophkeeper.services.sync_service import PushItem, SyncService
 router = APIRouter(prefix="/sync", tags=["sync"])
 
 
-@router.post("/push", response_model=PushResponse)
+_UNAUTHORIZED = {401: {"description": "Missing, invalid, or expired bearer token."}}
+
+
+@router.post(
+    "/push",
+    response_model=PushResponse,
+    summary="Push local changes",
+    responses=_UNAUTHORIZED,
+)
 async def push(
     body: PushRequest,
     principal: DevicePrincipal = Depends(get_principal),
     service: SyncService = Depends(provide(SyncService)),
 ) -> PushResponse:
+    """Upload a batch of changes for the caller's account.
+
+    Each item is created, updated against its `base_version`, or tombstoned.
+    Optimistic concurrency is per item: a stale write comes back with
+    `status: "conflict"` and the winning `version` (so the client can pull and
+    reconcile) while the rest of the batch still applies. `recipients` sets which
+    devices may pull the secret.
+    """
     items = [
         PushItem(
             id=item.id,
@@ -49,12 +65,25 @@ async def push(
     )
 
 
-@router.get("/changes", response_model=ChangesResponse)
+@router.get(
+    "/changes",
+    response_model=ChangesResponse,
+    summary="Pull changes since a cursor",
+    responses=_UNAUTHORIZED,
+)
 async def changes(
-    since: int = Query(default=0, ge=0),
+    since: int = Query(
+        default=0, ge=0, description="Highest seq already applied; 0 for a full pull"
+    ),
     principal: DevicePrincipal = Depends(get_principal),
     service: SyncService = Depends(provide(SyncService)),
 ) -> ChangesResponse:
+    """Return the secrets this device may read with `seq > since`.
+
+    Results are ordered by `seq` and include tombstones (deleted secrets) so the
+    deletion propagates. The response `cursor` is the new high-water mark to pass
+    as `since` next time.
+    """
     secrets, cursor = await service.changes(
         account_id=str(principal.account_id), device_id=principal.device_id, since=since
     )

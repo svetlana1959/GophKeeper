@@ -52,9 +52,7 @@ class SqlAlchemySecretRepository(SecretRepository):
 
     async def add(self, secret: Secret) -> None:
         result = await self._session.execute(
-            text(
-                f"INSERT INTO secrets ({_INSERT_LIST}) VALUES ({_INSERT_VALUES}) RETURNING seq"
-            ),
+            text(f"INSERT INTO secrets ({_INSERT_LIST}) VALUES ({_INSERT_VALUES}) RETURNING seq"),
             _to_params(secret),
         )
         secret.seq = result.scalar_one()

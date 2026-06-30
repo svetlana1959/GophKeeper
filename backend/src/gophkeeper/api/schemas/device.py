@@ -3,14 +3,14 @@
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from gophkeeper.domain.device import Device
 
 
 class RegisterDeviceRequest(BaseModel):
-    device_name: str
-    public_key: str
+    device_name: str = Field(description="Human-readable name for this device.")
+    public_key: str = Field(description="The device's age public key (age1…).")
 
 
 class DeviceResponse(BaseModel):
@@ -18,8 +18,8 @@ class DeviceResponse(BaseModel):
     account_id: UUID
     device_name: str
     public_key: str
-    status: str
-    last_seen_at: datetime | None
+    status: str = Field(description="Trust lifecycle: pending | active | revoked.")
+    last_seen_at: datetime | None = Field(description="Last authenticated call, if any.")
     updated_at: datetime
 
     @classmethod
