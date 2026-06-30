@@ -14,6 +14,7 @@ import (
 type Secret struct {
 	ID         string
 	Name       string   // local-only lookup key; never sent to the server
+	FolderID   string   // optional folder/group for categorization; "" if none
 	Payload    []byte   // self-contained age ciphertext (nonce + recipient stanzas embedded)
 	Recipients []string // age public keys this secret is sealed to; age cannot derive them from Payload
 	Version    int
