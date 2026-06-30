@@ -16,17 +16,21 @@ class RegisterDeviceRequest(BaseModel):
 
 class DeviceResponse(BaseModel):
     id: UUID
+    account_id: UUID
     device_name: str
     public_key: str
-    is_active: bool
+    status: str
+    last_seen_at: datetime | None
     updated_at: datetime
 
     @classmethod
     def from_domain(cls, device: Device) -> "DeviceResponse":
         return cls(
             id=device.id,
+            account_id=device.account_id,
             device_name=device.device_name,
             public_key=device.public_key,
-            is_active=device.is_active,
+            status=device.status,
+            last_seen_at=device.last_seen_at,
             updated_at=device.updated_at,
         )

@@ -11,6 +11,7 @@ from typing import Self
 from gophkeeper.domain.unit_of_work import UnitOfWork
 from gophkeeper.infrastructure.adapters.database import DatabaseAdapter
 from gophkeeper.infrastructure.repositories import (
+    SqlAlchemyAccountRepository,
     SqlAlchemyDeviceRepository,
     SqlAlchemySecretRepository,
 )
@@ -26,6 +27,7 @@ class SqlAlchemyUnitOfWork(UnitOfWork):
         """
         New repositories are added here
         """
+        self.accounts = SqlAlchemyAccountRepository(self._session)
         self.secrets = SqlAlchemySecretRepository(self._session)
         self.devices = SqlAlchemyDeviceRepository(self._session)
         return self

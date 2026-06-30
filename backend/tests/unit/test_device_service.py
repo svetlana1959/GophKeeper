@@ -2,14 +2,26 @@ from uuid import UUID, uuid4
 
 import pytest
 
+from gophkeeper.domain.account import Account
 from gophkeeper.domain.device import Device
 from gophkeeper.domain.errors import DeviceAlreadyExists, DeviceNotFound
 from gophkeeper.services.device_service import DeviceService
 
 
+class FakeAccountRepository:
+    def __init__(self):
+        self.accounts: dict[UUID, Account] = {}
+
+    async def add(self, account: Account) -> None:
+        self.accounts[account.id] = account
+
+    async def get(self, account_id: UUID) -> Account:
+        return self.accounts[account_id]
+
+
 class FakeDeviceRepository:
     def __init__(self):
-        self.devices: dict[str, Device] = {}
+        self.devices: dict[UUID, Device] = {}
 
     async def add(self, device: Device) -> None:
         self.devices[device.id] = device
@@ -19,11 +31,14 @@ class FakeDeviceRepository:
             raise DeviceNotFound(device_id)
         return self.devices[device_id]
 
+    async def find_by_public_key(self, public_key: str) -> Device | None:
+        return next((d for d in self.devices.values() if d.public_key == public_key), None)
+
     async def exists(self, device_id: UUID) -> bool:
         return device_id in self.devices
 
-    async def list_active(self) -> list[Device]:
-        return [d for d in self.devices.values() if d.is_active]
+    async def list_for_account(self, account_id: UUID) -> list[Device]:
+        return [d for d in self.devices.values() if d.account_id == account_id]
 
     async def save(self, device: Device) -> None:
         self.devices[device.id] = device
@@ -31,6 +46,7 @@ class FakeDeviceRepository:
 
 class FakeUnitOfWork:
     def __init__(self):
+        self.accounts = FakeAccountRepository()
         self.devices = FakeDeviceRepository()
         self.committed = False
 
@@ -47,7 +63,7 @@ class FakeUnitOfWork:
         pass
 
 
-async def test_register_creates_new_device():
+async def test_register_creates_account_and_active_device():
     uow = FakeUnitOfWork()
     service = DeviceService(uow)
     device_id = uuid4()
@@ -62,6 +78,7 @@ async def test_register_creates_new_device():
     assert device.device_name == "MacBook"
     assert device.public_key == "pubkey"
     assert device.is_active is True
+    assert device.account_id in uow.accounts.accounts
     assert uow.committed is True
 
 
@@ -71,11 +88,10 @@ async def test_register_duplicate_raises_device_already_exists():
 
     existing = Device(
         id=device_id,
+        account_id=uuid4(),
         device_name="MacBook",
         public_key="pubkey",
-        is_active=True,
     )
-
     await uow.devices.add(existing)
 
     service = DeviceService(uow)
@@ -94,11 +110,10 @@ async def test_fetch_returns_device():
 
     device = Device(
         id=device_id,
+        account_id=uuid4(),
         device_name="MacBook",
         public_key="pubkey",
-        is_active=True,
     )
-
     await uow.devices.add(device)
 
     service = DeviceService(uow)

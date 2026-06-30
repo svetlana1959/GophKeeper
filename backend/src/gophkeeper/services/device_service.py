@@ -1,8 +1,9 @@
-"""Application service for devices"""
+"""Application service for devices."""
 
-from uuid import UUID
+from uuid import UUID, uuid4
 
-from gophkeeper.domain.device import Device
+from gophkeeper.domain.account import Account
+from gophkeeper.domain.device import ACTIVE, Device
 from gophkeeper.domain.errors import DeviceAlreadyExists
 from gophkeeper.domain.unit_of_work import UnitOfWork
 
@@ -18,17 +19,26 @@ class DeviceService:
         device_name: str,
         public_key: str,
     ) -> Device:
+        """Bootstrap a new account from its first device.
+
+        Each registration creates a fresh account owning this one active device.
+        Linking further devices into an existing account is the enrollment
+        handshake (a later milestone).
+        """
         async with self._uow as uow:
             if await uow.devices.exists(device_id):
                 raise DeviceAlreadyExists(device_id)
 
+            account = Account(id=uuid4())
+            await uow.accounts.add(account)
+
             device = Device(
                 id=device_id,
+                account_id=account.id,
                 device_name=device_name,
                 public_key=public_key,
-                is_active=True,
+                status=ACTIVE,
             )
-
             await uow.devices.add(device)
             await uow.commit()
             return device

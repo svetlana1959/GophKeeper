@@ -11,6 +11,12 @@ class DomainError(Exception):
     """Base class for all domain rule violations."""
 
 
+class AccountNotFound(DomainError):
+    def __init__(self, account_id: UUID) -> None:
+        super().__init__(f"account {account_id} not found")
+        self.account_id = account_id
+
+
 class SecretNotFound(DomainError):
     def __init__(self, secret_id: UUID) -> None:
         super().__init__(f"secret {secret_id} not found")
