@@ -34,7 +34,7 @@ def provide[Service](
     generic provider wires all of them — a new service needs no new function
     here. Use it directly in a router:
 
-        service: SecretService = Depends(provide(SecretService))
+        service: SyncService = Depends(provide(SyncService))
     """
 
     def _provider(uow: UnitOfWork = Depends(get_uow)) -> Service:
