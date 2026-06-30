@@ -1,0 +1,102 @@
+name: CI CLI
+on:
+  push:
+    branches:
+      - main
+      - dev
+    # paths:
+    #   - .github/workflows/ci-cli.yaml
+    #   - cli/**
+  pull_request:
+    branches:
+      - main
+      - dev
+    # paths:
+    #   - .github/workflows/ci-cli.yaml
+    #   - cli/**
+  workflow_dispatch:
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  lint:
+    name: Run lint
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Set up Go
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version-file: cli/go.mod
+          cache-dependency-path: cli/go.sum
+
+      - name: Check formatting
+        working-directory: cli
+        run: |
+          out="$(gofmt -l .)"
+          if [ -n "$out" ]; then
+            echo "These files need gofmt:"; echo "$out"; exit 1
+          fi
+
+      - name: go vet
+        working-directory: cli
+        run: go vet ./...
+
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@4afd733a84b1f43292c63897423277bb7f4313a9 # v8
+        with:
+          version: v2.12.2
+          working-directory: cli
+
+  test:
+    name: Run tests
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Set up Go
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version-file: cli/go.mod
+          cache-dependency-path: cli/go.sum
+
+      - name: Run tests
+        working-directory: cli
+        run: go test -race -covermode=atomic -coverprofile=coverage.out ./...
+
+      - name: Add coverage to summary
+        working-directory: cli
+        run: |
+          echo "## CLI coverage" >> "$GITHUB_STEP_SUMMARY"
+          go tool cover -func=coverage.out | tail -n1 >> "$GITHUB_STEP_SUMMARY"
+
+  build:
+    name: Cross-compile
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Set up Go
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version-file: cli/go.mod
+          cache-dependency-path: cli/go.sum
+
+      # Builds every release target (CGO_ENABLED=0) so a cross-compile break is
+      # caught on PRs, not at tag time.
+      - name: GoReleaser build (snapshot)
+        uses: goreleaser/goreleaser-action@e435ccd777264be153ace6237001ef4d979d3a7a # v6
+        with:
+          version: "~> v2"
+          args: build --snapshot --clean
+          workdir: cli
