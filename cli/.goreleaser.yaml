@@ -1,0 +1,54 @@
+# GoReleaser config for the goph CLI. Run from the cli/ directory.
+# Validate locally with: goreleaser release --snapshot --clean --skip=publish
+version: 2
+
+project_name: goph
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - id: goph
+    main: .
+    binary: goph
+    env:
+      # Pure-Go SQLite (modernc) means we cross-compile every target with no C
+      # toolchain — that's the whole reason quick-install works everywhere.
+      - CGO_ENABLED=0
+    goos: [linux, darwin, windows]
+    goarch: [amd64, arm64]
+    ldflags:
+      - -s -w -X github.com/svetlana1959/GophKeeper/cli/internal/commands.version={{ .Version }}
+
+archives:
+  - id: default
+    formats: [tar.gz]
+    # zip on Windows, the conventional archive format there.
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+    name_template: >-
+      {{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}
+
+checksum:
+  name_template: "checksums.txt"
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^ci:"
+
+# Linux packages (.deb / .rpm / .apk / Arch). No signing secrets required.
+nfpms:
+  - id: packages
+    package_name: goph
+    vendor: GophKeeper
+    homepage: "https://github.com/svetlana1959/GophKeeper"
+    maintainer: "GophKeeper <aleksei.v.lukin@gmail.com>"
+    description: "GophKeeper — zero-knowledge, distributed secret manager (CLI)"
+    license: "AGPL-3.0"
+    formats: [deb, rpm, apk, archlinux]
