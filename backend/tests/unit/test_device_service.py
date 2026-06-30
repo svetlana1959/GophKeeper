@@ -66,15 +66,13 @@ class FakeUnitOfWork:
 async def test_register_creates_account_and_active_device():
     uow = FakeUnitOfWork()
     service = DeviceService(uow)
-    device_id = uuid4()
 
     device = await service.register(
-        device_id=device_id,
         device_name="MacBook",
         public_key="pubkey",
     )
 
-    assert device.id == device_id
+    assert device.id is not None
     assert device.device_name == "MacBook"
     assert device.public_key == "pubkey"
     assert device.is_active is True
@@ -82,12 +80,11 @@ async def test_register_creates_account_and_active_device():
     assert uow.committed is True
 
 
-async def test_register_duplicate_raises_device_already_exists():
+async def test_register_duplicate_public_key_raises_device_already_exists():
     uow = FakeUnitOfWork()
-    device_id = uuid4()
 
     existing = Device(
-        id=device_id,
+        id=uuid4(),
         account_id=uuid4(),
         device_name="MacBook",
         public_key="pubkey",
@@ -98,10 +95,12 @@ async def test_register_duplicate_raises_device_already_exists():
 
     with pytest.raises(DeviceAlreadyExists):
         await service.register(
-            device_id=device_id,
             device_name="Another Name",
-            public_key="another-key",
+            public_key="pubkey",
         )
+
+    # The duplicate is rejected before any account is created.
+    assert uow.accounts.accounts == {}
 
 
 async def test_fetch_returns_device():

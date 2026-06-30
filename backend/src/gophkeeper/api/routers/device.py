@@ -20,7 +20,6 @@ async def register_device(
     service: DeviceService = Depends(provide(DeviceService)),
 ) -> DeviceResponse:
     device = await service.register(
-        device_id=body.id,
         device_name=body.device_name,
         public_key=body.public_key,
     )

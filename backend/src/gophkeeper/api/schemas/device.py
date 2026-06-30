@@ -9,7 +9,6 @@ from gophkeeper.domain.device import Device
 
 
 class RegisterDeviceRequest(BaseModel):
-    id: UUID
     device_name: str
     public_key: str
 

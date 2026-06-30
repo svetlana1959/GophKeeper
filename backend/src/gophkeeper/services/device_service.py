@@ -15,25 +15,26 @@ class DeviceService:
     async def register(
         self,
         *,
-        device_id: UUID,
         device_name: str,
         public_key: str,
     ) -> Device:
         """Bootstrap a new account from its first device.
 
-        Each registration creates a fresh account owning this one active device.
-        Linking further devices into an existing account is the enrollment
-        handshake (a later milestone).
+        A device is identified by its public key, so the id is minted here rather
+        than trusted from the client. Each registration creates a fresh account
+        owning this one active device; linking further devices into an existing
+        account is the enrollment handshake (a later milestone).
         """
         async with self._uow as uow:
-            if await uow.devices.exists(device_id):
-                raise DeviceAlreadyExists(device_id)
+            existing = await uow.devices.find_by_public_key(public_key)
+            if existing is not None:
+                raise DeviceAlreadyExists(existing.id)
 
             account = Account(id=uuid4())
             await uow.accounts.add(account)
 
             device = Device(
-                id=device_id,
+                id=uuid4(),
                 account_id=account.id,
                 device_name=device_name,
                 public_key=public_key,
