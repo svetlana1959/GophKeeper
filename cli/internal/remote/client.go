@@ -131,6 +131,111 @@ func (c *Client) WhoAmI(ctx context.Context) (Identity, error) {
 	return id, nil
 }
 
+// PushItem is one local change to upload. BaseVersion is the server version the
+// client last reconciled (0 for a never-synced secret). Ciphertext may be empty
+// when Deleted is set.
+type PushItem struct {
+	ID          string
+	Ciphertext  []byte
+	BaseVersion int
+	Deleted     bool
+}
+
+// PushResult is the server's per-item verdict. Status is "applied" or
+// "conflict"; on conflict Version is the winning server version to reconcile to.
+type PushResult struct {
+	ID      string
+	Status  string
+	Version int
+	Seq     int64
+}
+
+// ChangedSecret is one secret in a pull delta (tombstones included).
+type ChangedSecret struct {
+	ID         string
+	Version    int
+	Deleted    bool
+	Seq        int64
+	Ciphertext []byte
+}
+
+// Push uploads a batch of changes and returns the per-item results. Requires a
+// prior Authenticate.
+func (c *Client) Push(ctx context.Context, items []PushItem) ([]PushResult, error) {
+	if c.token == "" {
+		return nil, ErrNotAuthed
+	}
+
+	type wireItem struct {
+		ID          string `json:"id"`
+		Ciphertext  string `json:"ciphertext_b64"`
+		BaseVersion int    `json:"base_version"`
+		Deleted     bool   `json:"deleted"`
+	}
+	wire := make([]wireItem, len(items))
+	for i, it := range items {
+		wire[i] = wireItem{
+			ID:          it.ID,
+			Ciphertext:  base64.StdEncoding.EncodeToString(it.Ciphertext),
+			BaseVersion: it.BaseVersion,
+			Deleted:     it.Deleted,
+		}
+	}
+
+	var resp struct {
+		Results []struct {
+			ID      string `json:"id"`
+			Status  string `json:"status"`
+			Version int    `json:"version"`
+			Seq     int64  `json:"seq"`
+		} `json:"results"`
+	}
+	if err := c.do(ctx, http.MethodPost, "/sync/push", map[string]any{"items": wire}, &resp); err != nil {
+		return nil, err
+	}
+
+	out := make([]PushResult, len(resp.Results))
+	for i, r := range resp.Results {
+		out[i] = PushResult{ID: r.ID, Status: r.Status, Version: r.Version, Seq: r.Seq}
+	}
+	return out, nil
+}
+
+// Pull fetches the account's changes with seq greater than since, returning them
+// in seq order along with the new cursor. Requires a prior Authenticate.
+func (c *Client) Pull(ctx context.Context, since int64) ([]ChangedSecret, int64, error) {
+	if c.token == "" {
+		return nil, 0, ErrNotAuthed
+	}
+
+	var resp struct {
+		Secrets []struct {
+			ID         string `json:"id"`
+			Version    int    `json:"version"`
+			Deleted    bool   `json:"deleted"`
+			Seq        int64  `json:"seq"`
+			Ciphertext string `json:"ciphertext_b64"`
+		} `json:"secrets"`
+		Cursor int64 `json:"cursor"`
+	}
+	path := fmt.Sprintf("/sync/changes?since=%d", since)
+	if err := c.do(ctx, http.MethodGet, path, nil, &resp); err != nil {
+		return nil, 0, err
+	}
+
+	out := make([]ChangedSecret, len(resp.Secrets))
+	for i, s := range resp.Secrets {
+		ciphertext, err := base64.StdEncoding.DecodeString(s.Ciphertext)
+		if err != nil {
+			return nil, 0, fmt.Errorf("remote: decode secret %s: %w", s.ID, err)
+		}
+		out[i] = ChangedSecret{
+			ID: s.ID, Version: s.Version, Deleted: s.Deleted, Seq: s.Seq, Ciphertext: ciphertext,
+		}
+	}
+	return out, resp.Cursor, nil
+}
+
 // do performs a request, encoding body as JSON (when non-nil), attaching the
 // bearer token (when set), and decoding a 2xx response into out (when non-nil).
 func (c *Client) do(ctx context.Context, method, path string, body, out any) error {

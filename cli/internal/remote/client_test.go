@@ -9,6 +9,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"testing"
 
 	"github.com/svetlana1959/GophKeeper/cli/internal/crypto"
@@ -20,14 +21,21 @@ import (
 // end to end without the Python backend.
 type fakeBackend struct {
 	publicKey     string
-	registerConf  bool   // make /devices answer 409
-	unknownDevice bool   // make /auth/challenge answer 401
+	registerConf  bool // make /devices answer 409
+	unknownDevice bool // make /auth/challenge answer 401
 	nonceByToken  map[string][]byte
 	issuedToken   string
+	secrets       map[string]remote.ChangedSecret
+	seq           int64
 }
 
 func newFakeBackend(publicKey string) *fakeBackend {
-	return &fakeBackend{publicKey: publicKey, nonceByToken: map[string][]byte{}, issuedToken: "session-xyz"}
+	return &fakeBackend{
+		publicKey:    publicKey,
+		nonceByToken: map[string][]byte{},
+		issuedToken:  "session-xyz",
+		secrets:      map[string]remote.ChangedSecret{},
+	}
 }
 
 func (f *fakeBackend) handler(t *testing.T) http.Handler {
@@ -89,7 +97,69 @@ func (f *fakeBackend) handler(t *testing.T) http.Handler {
 		writeJSON(w, http.StatusOK, remote.Identity{DeviceID: "dev-1", AccountID: "acc-1"})
 	})
 
+	mux.HandleFunc("POST /sync/push", func(w http.ResponseWriter, r *http.Request) {
+		if !f.authed(r) {
+			writeJSON(w, http.StatusUnauthorized, map[string]string{"detail": "unauthorized"})
+			return
+		}
+		var body struct {
+			Items []struct {
+				ID          string `json:"id"`
+				Ciphertext  string `json:"ciphertext_b64"`
+				BaseVersion int    `json:"base_version"`
+				Deleted     bool   `json:"deleted"`
+			} `json:"items"`
+		}
+		_ = json.NewDecoder(r.Body).Decode(&body)
+
+		var results []map[string]any
+		for _, it := range body.Items {
+			f.seq++
+			ct, _ := base64.StdEncoding.DecodeString(it.Ciphertext)
+			existing, ok := f.secrets[it.ID]
+			version := 1
+			if ok {
+				version = existing.Version + 1
+			}
+			f.secrets[it.ID] = remote.ChangedSecret{
+				ID: it.ID, Version: version, Deleted: it.Deleted, Seq: f.seq, Ciphertext: ct,
+			}
+			results = append(results, map[string]any{
+				"id": it.ID, "status": "applied", "version": version, "seq": f.seq,
+			})
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"results": results})
+	})
+
+	mux.HandleFunc("GET /sync/changes", func(w http.ResponseWriter, r *http.Request) {
+		if !f.authed(r) {
+			writeJSON(w, http.StatusUnauthorized, map[string]string{"detail": "unauthorized"})
+			return
+		}
+		since, _ := strconv.ParseInt(r.URL.Query().Get("since"), 10, 64)
+		var out []map[string]any
+		cursor := since
+		for _, s := range f.secrets {
+			if s.Seq <= since {
+				continue
+			}
+			out = append(out, map[string]any{
+				"id": s.ID, "version": s.Version, "deleted": s.Deleted, "seq": s.Seq,
+				"updated_at":     "2026-06-30T00:00:00Z",
+				"ciphertext_b64": base64.StdEncoding.EncodeToString(s.Ciphertext),
+			})
+			if s.Seq > cursor {
+				cursor = s.Seq
+			}
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"secrets": out, "cursor": cursor})
+	})
+
 	return mux
+}
+
+func (f *fakeBackend) authed(r *http.Request) bool {
+	return r.Header.Get("Authorization") == "Bearer "+f.issuedToken
 }
 
 func writeJSON(w http.ResponseWriter, status int, v any) {
@@ -155,6 +225,59 @@ func TestAuthenticateAndWhoAmI(t *testing.T) {
 	}
 	if id.DeviceID != "dev-1" || id.AccountID != "acc-1" {
 		t.Fatalf("unexpected identity: %+v", id)
+	}
+}
+
+func TestPushRequiresAuth(t *testing.T) {
+	if _, err := remote.New("http://unused").Push(context.Background(), nil); !errors.Is(err, remote.ErrNotAuthed) {
+		t.Fatalf("want ErrNotAuthed, got %v", err)
+	}
+}
+
+func TestPushThenPullRoundTrip(t *testing.T) {
+	kp, _ := crypto.GenerateKeyPair()
+	be := newFakeBackend(kp.Public)
+	srv := httptest.NewServer(be.handler(t))
+	defer srv.Close()
+
+	c := remote.New(srv.URL)
+	if err := c.Authenticate(context.Background(), kp.Public, decryptWith(kp.Private)); err != nil {
+		t.Fatalf("authenticate: %v", err)
+	}
+
+	results, err := c.Push(context.Background(), []remote.PushItem{
+		{ID: "s1", Ciphertext: []byte("ct-a")},
+		{ID: "s2", Ciphertext: []byte("ct-b")},
+	})
+	if err != nil {
+		t.Fatalf("push: %v", err)
+	}
+	if len(results) != 2 || results[0].Status != "applied" {
+		t.Fatalf("unexpected push results: %+v", results)
+	}
+
+	secrets, cursor, err := c.Pull(context.Background(), 0)
+	if err != nil {
+		t.Fatalf("pull: %v", err)
+	}
+	if len(secrets) != 2 || cursor == 0 {
+		t.Fatalf("unexpected pull: secrets=%d cursor=%d", len(secrets), cursor)
+	}
+	got := map[string][]byte{}
+	for _, s := range secrets {
+		got[s.ID] = s.Ciphertext
+	}
+	if string(got["s1"]) != "ct-a" || string(got["s2"]) != "ct-b" {
+		t.Fatalf("ciphertext round-trip mismatch: %v", got)
+	}
+
+	// A second pull from the cursor sees nothing new.
+	more, _, err := c.Pull(context.Background(), cursor)
+	if err != nil {
+		t.Fatalf("pull 2: %v", err)
+	}
+	if len(more) != 0 {
+		t.Fatalf("expected no new changes, got %d", len(more))
 	}
 }
 
