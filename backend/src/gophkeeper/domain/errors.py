@@ -11,6 +11,11 @@ class DomainError(Exception):
     """Base class for all domain rule violations."""
 
 
+class AuthenticationError(DomainError):
+    """The caller failed to prove identity: unknown device, bad/expired token,
+    or a failed challenge. Maps to 401."""
+
+
 class AccountNotFound(DomainError):
     def __init__(self, account_id: UUID) -> None:
         super().__init__(f"account {account_id} not found")

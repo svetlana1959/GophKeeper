@@ -7,11 +7,14 @@ that UoW. No global singletons: dependencies read from the app instance.
 
 from collections.abc import Callable
 
-from fastapi import Depends, Request
+from fastapi import Depends, Header, Request
 
+from gophkeeper.domain.errors import AuthenticationError
 from gophkeeper.domain.unit_of_work import UnitOfWork
 from gophkeeper.infrastructure.adapters.database import DatabaseAdapter
 from gophkeeper.infrastructure.unit_of_work import SqlAlchemyUnitOfWork
+from gophkeeper.security.principal import DevicePrincipal
+from gophkeeper.services.auth_service import AuthService
 
 
 def get_database(request: Request) -> DatabaseAdapter:
@@ -38,3 +41,18 @@ def provide[Service](
         return service(uow)
 
     return _provider
+
+
+def get_principal(
+    authorization: str | None = Header(default=None),
+    service: AuthService = Depends(provide(AuthService)),
+) -> DevicePrincipal:
+    """Resolve the bearer session token on a request to its device principal.
+
+    Use as a dependency on any protected endpoint:
+
+        principal: DevicePrincipal = Depends(get_principal)
+    """
+    if not authorization or not authorization.lower().startswith("bearer "):
+        raise AuthenticationError("missing bearer token")
+    return service.principal(authorization.split(" ", 1)[1].strip())
