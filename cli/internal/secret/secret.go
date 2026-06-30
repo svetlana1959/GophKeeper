@@ -14,6 +14,7 @@ import (
 type Secret struct {
 	ID         string
 	Name       string   // local-only lookup key; never sent to the server
+	FolderID   string   // optional folder/group for categorization; "" if none
 	Payload    []byte   // self-contained age ciphertext (nonce + recipient stanzas embedded)
 	Recipients []string // age public keys this secret is sealed to; age cannot derive them from Payload
 	Version    int
@@ -43,7 +44,7 @@ func (s *Secret) Delete(at time.Time) {
 func (s *Secret) IsActive() bool { return !s.Deleted }
 
 // Repository persists Secret aggregates. It is the port; the SQLite
-// implementation is the adapter in internal/vault (#33).
+// implementation is the adapter in internal/vault.
 type Repository interface {
 	Get(id string) (*Secret, error)
 	FindByName(name string) (*Secret, error)
