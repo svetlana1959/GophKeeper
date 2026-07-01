@@ -72,18 +72,22 @@ class SyncService:
                     results.append(PushResult(item.id, "conflict", 0, 0))
                     continue
 
-                try:
-                    if item.deleted:
-                        secret.delete()
-                    else:
-                        secret.update(item.ciphertext, base_version=item.base_version)
-                except VersionConflict:
-                    results.append(PushResult(item.id, "conflict", secret.version, secret.seq))
+                if item.deleted:
+                    secret.delete()
+                    await uow.secrets.save(secret)  # tombstone: last write wins
+                    results.append(self._applied(secret))
                     continue
 
-                await uow.secrets.save(secret)
-                if not item.deleted:
-                    await self._apply_recipients(uow, account_id, device_id, item)
+                try:
+                    secret.update(item.ciphertext, base_version=item.base_version)
+                    # expected_version is the pre-update version, so the DB write
+                    # is an atomic compare-and-set (see SecretRepository.save).
+                    await uow.secrets.save(secret, expected_version=item.base_version)
+                except VersionConflict as exc:
+                    results.append(PushResult(item.id, "conflict", exc.actual, 0))
+                    continue
+
+                await self._apply_recipients(uow, account_id, device_id, item)
                 results.append(self._applied(secret))
 
             await uow.commit()

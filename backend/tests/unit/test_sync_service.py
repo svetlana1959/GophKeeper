@@ -1,7 +1,8 @@
+import dataclasses
 from uuid import UUID, uuid4
 
 from gophkeeper.domain.device import Device
-from gophkeeper.domain.errors import SecretNotFound
+from gophkeeper.domain.errors import SecretNotFound, VersionConflict
 from gophkeeper.domain.secret import Secret
 from gophkeeper.services.sync_service import PushItem, SyncService
 
@@ -23,13 +24,20 @@ class FakeSecretRepository:
     async def get(self, secret_id: UUID) -> Secret:
         if secret_id not in self.secrets:
             raise SecretNotFound(secret_id)
-        return self.secrets[secret_id]
+        # Return a working copy so the stored "row" only changes on save() —
+        # this is what lets compare-and-set see the committed version.
+        return dataclasses.replace(self.secrets[secret_id])
 
     async def add(self, secret: Secret) -> None:
         secret.seq = self._next_seq()
         self.secrets[secret.id] = secret
 
-    async def save(self, secret: Secret) -> None:
+    async def save(self, secret: Secret, *, expected_version: int | None = None) -> None:
+        if expected_version is not None:
+            stored = self.secrets.get(secret.id)
+            actual = stored.version if stored else 0
+            if actual != expected_version:
+                raise VersionConflict(secret.id, expected=expected_version, actual=actual)
         secret.seq = self._next_seq()
         self.secrets[secret.id] = secret
 

@@ -129,6 +129,12 @@ class SecretRepository(Protocol):
         """Replace a secret's recipient set (which devices may pull it)."""
         ...
 
-    async def save(self, secret: Secret) -> None:
-        """Persist changes to an existing secret (update)."""
+    async def save(self, secret: Secret, *, expected_version: int | None = None) -> None:
+        """Persist changes to an existing secret.
+
+        When ``expected_version`` is given, the write is a compare-and-set: it
+        only lands if the stored row still has that version, otherwise it raises
+        ``VersionConflict``. This makes optimistic concurrency atomic at the row
+        level rather than relying on a read-then-write in the service. ``None``
+        writes unconditionally (used for tombstones)."""
         ...

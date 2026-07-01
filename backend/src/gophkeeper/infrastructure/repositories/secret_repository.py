@@ -12,7 +12,7 @@ from uuid import UUID
 from sqlalchemy import RowMapping, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from gophkeeper.domain.errors import SecretNotFound
+from gophkeeper.domain.errors import SecretNotFound, VersionConflict
 from gophkeeper.domain.secret import Secret, SecretRepository
 
 # seq is excluded from writes: the DB assigns it (default nextval on insert,
@@ -110,15 +110,33 @@ class SqlAlchemySecretRepository(SecretRepository):
                 {"secret_id": secret_id, "device_id": device_id},
             )
 
-    async def save(self, secret: Secret) -> None:
+    async def save(self, secret: Secret, *, expected_version: int | None = None) -> None:
+        set_clause = (
+            "ciphertext = :ciphertext, version = :version, "
+            "deleted = :deleted, updated_at = :updated_at, "
+            "seq = nextval('secret_seq') "
+        )
+        if expected_version is None:
+            # Unconditional write (tombstone): the row is known to exist.
+            result = await self._session.execute(
+                text(f"UPDATE secrets SET {set_clause} WHERE id = :id RETURNING seq"),
+                _to_params(secret),
+            )
+            secret.seq = result.scalar_one()
+            return
+
+        # Compare-and-set: the UPDATE only matches if the stored version is still
+        # the one the client edited. Concurrent pushes can no longer both read
+        # v1, both pass an in-app check, and both blindly write v2.
         result = await self._session.execute(
             text(
-                "UPDATE secrets SET "
-                "ciphertext = :ciphertext, version = :version, "
-                "deleted = :deleted, updated_at = :updated_at, "
-                "seq = nextval('secret_seq') "
-                "WHERE id = :id RETURNING seq"
+                f"UPDATE secrets SET {set_clause} "
+                "WHERE id = :id AND version = :expected_version RETURNING seq"
             ),
-            _to_params(secret),
+            {**_to_params(secret), "expected_version": expected_version},
         )
-        secret.seq = result.scalar_one()
+        seq = result.scalar_one_or_none()
+        if seq is None:
+            current = await self.get(secret.id)
+            raise VersionConflict(secret.id, expected=expected_version, actual=current.version)
+        secret.seq = seq
