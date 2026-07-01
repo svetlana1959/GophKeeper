@@ -279,14 +279,12 @@ func (s *Session) applyReshare(
 		if sameSet(sec.Recipients, desired) {
 			continue
 		}
-		// Only reshare what we can decrypt; skip secrets we are not a recipient of.
-		plain, err := s.cipher.Open(sec.Payload, priv)
+		// Reshare rotates the key to the new recipient set (the tested path that
+		// guarantees a removed recipient loses access). It fails for a secret we
+		// can't decrypt — i.e. one we're not a recipient of — which we simply skip.
+		payload, err := s.cipher.Reshare(sec.Payload, priv, desired)
 		if err != nil {
 			continue
-		}
-		payload, err := s.cipher.Seal(plain, desired)
-		if err != nil {
-			return reshared, err
 		}
 		sec.Reseal(payload, time.Now().UTC())
 		sec.Recipients = desired
