@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/google/uuid"
+
 	"github.com/svetlana1959/GophKeeper/cli/internal/device"
 	"github.com/svetlana1959/GophKeeper/cli/internal/remote"
 	"github.com/svetlana1959/GophKeeper/cli/internal/secret"
@@ -37,11 +39,12 @@ func (s *Session) Sync(ctx context.Context, pin string) (SyncResult, error) {
 	}
 
 	// Pull before push, so local edits are pushed against the latest server state.
-	pulled, pullCursor, err := s.applyPull(ctx, client, st, state.Cursor, priv)
+	pulled, pullConflicts, pullCursor, err := s.applyPull(ctx, client, st, state.Cursor, priv)
 	if err != nil {
 		return res, err
 	}
 	res.Pulled = pulled
+	res.Conflicts = pullConflicts
 
 	// Reshare secrets to any account devices not yet sealed in (e.g. a newly
 	// linked one). Reshared secrets become dirty and push below.
@@ -51,11 +54,12 @@ func (s *Session) Sync(ctx context.Context, pin string) (SyncResult, error) {
 	}
 	res.Reshared = reshared
 
-	pushed, conflicts, err := s.applyPush(ctx, client, st)
+	pushed, pushConflicts, err := s.applyPush(ctx, client, st)
 	if err != nil {
 		return res, err
 	}
-	res.Pushed, res.Conflicts = pushed, conflicts
+	res.Pushed = pushed
+	res.Conflicts += pushConflicts
 
 	// The cursor tracks only what we pulled and applied — never our own pushes.
 	// Folding a push seq in here would advance the cursor past a concurrent
@@ -126,15 +130,25 @@ func (s *Session) ensureRegistered(
 }
 
 // applyPull fetches the server delta and applies it locally, returning how many
-// secrets were applied and the server's authoritative cursor (the high-water to
+// secrets were applied, how many concurrent-edit conflicts were forked into
+// conflict copies, and the server's authoritative cursor (the high-water to
 // persist). priv decrypts payloads to recover the secret's name/folder (and
 // confirms this device is a recipient).
 func (s *Session) applyPull(
 	ctx context.Context, client *remote.Client, st syncstate.Repository, since int64, priv string,
-) (applied int, cursor int64, err error) {
+) (applied, conflicts int, cursor int64, err error) {
 	changes, cursor, err := client.Pull(ctx, since)
 	if err != nil {
-		return 0, since, fmt.Errorf("app: pull: %w", err)
+		return 0, 0, since, fmt.Errorf("app: pull: %w", err)
+	}
+
+	dirty, err := st.ListDirty()
+	if err != nil {
+		return 0, 0, cursor, err
+	}
+	dirtyBase := make(map[string]int, len(dirty))
+	for _, d := range dirty {
+		dirtyBase[d.SecretID] = d.ServerVersion // the server version our edit is based on
 	}
 
 	for _, cs := range changes {
@@ -143,10 +157,23 @@ func (s *Session) applyPull(
 		if isNew {
 			local = &secret.Secret{ID: cs.ID, Name: cs.ID} // placeholder name; refined below
 		} else if gerr != nil {
-			return applied, cursor, gerr
+			return applied, conflicts, cursor, gerr
+		} else if base, isDirty := dirtyBase[cs.ID]; isDirty {
+			// We hold an unpushed local edit. If the server hasn't moved past the
+			// version we based it on, keep our edit as-is (push will land it) and
+			// don't clobber. If the server did move on, this is a genuine
+			// concurrent edit: preserve our version as a conflict copy rather than
+			// silently overwriting it, then take the server's winner below.
+			if cs.Version == base {
+				continue
+			}
+			if err := s.forkConflictCopy(st, local); err != nil {
+				return applied, conflicts, cursor, err
+			}
+			conflicts++
 		} else if local.Version == cs.Version && local.Deleted == cs.Deleted {
-			// Already at this version — nothing to apply. This is the common case
-			// when a device re-pulls its own just-pushed secrets (the cursor
+			// Clean and already at this version — nothing to apply. The common
+			// case when a device re-pulls its own just-pushed secrets (the cursor
 			// deliberately doesn't advance past our own writes).
 			continue
 		}
@@ -170,14 +197,37 @@ func (s *Session) applyPull(
 		}
 
 		if err := s.secrets.Save(local); err != nil {
-			return applied, cursor, err
+			return applied, conflicts, cursor, err
 		}
 		if err := st.MarkSynced(cs.ID, cs.Version); err != nil {
-			return applied, cursor, err
+			return applied, conflicts, cursor, err
 		}
 		applied++
 	}
-	return applied, cursor, nil
+	return applied, conflicts, cursor, nil
+}
+
+// forkConflictCopy preserves an unpushed local edit as a new, independent secret
+// before the server's winning version overwrites the original. The copy keeps
+// the local ciphertext (already sealed to the local recipients) under a
+// name-suffixed, collision-free id, and is marked dirty so it pushes as a fresh
+// create on this same run. This is the design's conflict-copy rule: a genuine
+// concurrent edit is never silently lost.
+func (s *Session) forkConflictCopy(st syncstate.Repository, local *secret.Secret) error {
+	copyID := uuid.NewString()
+	dup := &secret.Secret{
+		ID:         copyID,
+		Name:       fmt.Sprintf("%s (conflict %s)", local.Name, copyID[:8]),
+		FolderID:   local.FolderID,
+		Payload:    local.Payload,
+		Recipients: local.Recipients,
+		Version:    1,
+		UpdatedAt:  time.Now().UTC(),
+	}
+	if err := s.secrets.Save(dup); err != nil {
+		return err
+	}
+	return st.MarkDirty(dup.ID)
 }
 
 // metaFromPayload decrypts a payload to recover a secret's name and folder. It

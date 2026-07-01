@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/svetlana1959/GophKeeper/cli/internal/app"
@@ -221,6 +222,68 @@ func TestSync_RegistersAndPushes(t *testing.T) {
 	}
 	if out.Pushed != 1 {
 		t.Fatalf("after edit = %+v, want 1 pushed", out)
+	}
+}
+
+func TestSync_ConcurrentEditForksConflictCopy(t *testing.T) {
+	setHome(t)
+	be := newSyncBackend()
+	srv := httptest.NewServer(be.handler(t))
+	defer srv.Close()
+
+	res, err := app.Init(app.InitParams{DeviceName: "laptop", Remote: srv.URL})
+	if err != nil {
+		t.Fatalf("Init: %v", err)
+	}
+	be.publicKey = res.PublicKey
+
+	sess, err := app.Open()
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	defer sess.Close()
+
+	// Create and sync "a" (server version 1).
+	mustSet(t, sess, app.SetParams{Name: "a", Value: []byte("local-v1")})
+	if _, err := sess.Sync(context.Background(), ""); err != nil {
+		t.Fatalf("sync 1: %v", err)
+	}
+
+	// Another device advances "a" on the server past the version we based on.
+	var id string
+	for sid := range be.secrets {
+		id = sid
+	}
+	prev := be.secrets[id]
+	be.seq++
+	be.secrets[id] = storedSecret{version: prev.version + 1, seq: be.seq, ct: []byte("server-wins")}
+
+	// Meanwhile we edit "a" locally without pushing — a genuine concurrent edit.
+	mustSet(t, sess, app.SetParams{Name: "a", Value: []byte("local-v2")})
+
+	out, err := sess.Sync(context.Background(), "")
+	if err != nil {
+		t.Fatalf("sync 2: %v", err)
+	}
+	if out.Conflicts != 1 {
+		t.Fatalf("sync 2 = %+v, want 1 conflict", out)
+	}
+
+	// The local edit is preserved as a conflict copy rather than silently lost.
+	secs, err := sess.List("", false)
+	if err != nil {
+		t.Fatalf("List: %v", err)
+	}
+	var names []string
+	conflictFound := false
+	for _, s := range secs {
+		names = append(names, s.Name)
+		if strings.HasPrefix(s.Name, "a (conflict ") {
+			conflictFound = true
+		}
+	}
+	if !conflictFound {
+		t.Fatalf("no conflict copy created; got %v", names)
 	}
 }
 
