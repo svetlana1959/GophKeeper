@@ -15,7 +15,6 @@ import hashlib
 import secrets as randbytes
 from uuid import UUID
 
-from gophkeeper.domain.device import REVOKED
 from gophkeeper.domain.errors import AuthenticationError, DeviceNotFound
 from gophkeeper.domain.unit_of_work import UnitOfWork
 from gophkeeper.security import age, tokens
@@ -39,7 +38,7 @@ class AuthService:
         """Return (age-encrypted nonce, challenge token) for a known device."""
         async with self._uow as uow:
             device = await uow.devices.find_by_public_key(public_key)
-        if device is None or device.status == REVOKED:
+        if device is None or not device.may_authenticate():
             raise AuthenticationError("unknown device")
 
         nonce = randbytes.token_bytes(_NONCE_BYTES)
@@ -72,8 +71,8 @@ class AuthService:
                 device = await uow.devices.get(device_id)
             except DeviceNotFound as exc:
                 raise AuthenticationError("unknown device") from exc
-            if device.status == REVOKED:
-                raise AuthenticationError("device revoked")
+            if not device.may_authenticate():
+                raise AuthenticationError("device is not active")
             device.touch()
             await uow.devices.save(device)
             await uow.commit()
@@ -86,13 +85,24 @@ class AuthService:
         )
         return session, ttl
 
-    def principal(self, token: str) -> DevicePrincipal:
-        """Resolve a bearer session token to its authenticated device."""
+    async def principal(self, token: str) -> DevicePrincipal:
+        """Resolve a bearer session token to its authenticated device.
+
+        Re-checks the device's lifecycle on every request (one indexed read):
+        a valid signature is not enough, the device must still be allowed to
+        authenticate. This is what makes revocation take effect immediately
+        rather than lingering until the stateless token's TTL expires.
+        """
         payload = self._decode(token, expected=_SESSION_TYP)
-        return DevicePrincipal(
-            device_id=UUID(payload["did"]),
-            account_id=UUID(payload["aid"]),
-        )
+        device_id = UUID(payload["did"])
+        async with self._uow as uow:
+            try:
+                device = await uow.devices.get(device_id)
+            except DeviceNotFound as exc:
+                raise AuthenticationError("unknown device") from exc
+        if not device.may_authenticate():
+            raise AuthenticationError("device is not active")
+        return DevicePrincipal(device_id=device.id, account_id=device.account_id)
 
     def _decode(self, token: str, *, expected: str) -> dict:
         try:

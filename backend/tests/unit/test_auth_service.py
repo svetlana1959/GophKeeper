@@ -95,7 +95,7 @@ async def test_challenge_verify_issues_usable_session():
     assert expires_in > 0
     assert device.last_seen_at is not None  # verify recorded the login
 
-    principal = service.principal(access_token)
+    principal = await service.principal(access_token)
     assert principal.device_id == device.id
     assert principal.account_id == device.account_id
 
@@ -124,6 +124,23 @@ async def test_verify_wrong_nonce_rejected():
         await service.verify(challenge_token=challenge_token, nonce=b"wrong-nonce")
 
 
+async def test_principal_rejects_token_after_device_revoked():
+    # A still-valid (unexpired) session token must stop working the moment the
+    # device is revoked — the session path re-checks lifecycle every request.
+    uow = FakeUnitOfWork()
+    device, identity = _device(uow)
+    service = AuthService(uow)
+
+    ciphertext, challenge_token = await service.challenge(public_key=device.public_key)
+    nonce = decrypt(ciphertext, [identity])
+    access_token, _ = await service.verify(challenge_token=challenge_token, nonce=nonce)
+    assert (await service.principal(access_token)).device_id == device.id
+
+    device.revoke()
+    with pytest.raises(AuthenticationError):
+        await service.principal(access_token)
+
+
 async def test_session_token_rejected_as_challenge_and_vice_versa():
     uow = FakeUnitOfWork()
     device, identity = _device(uow)
@@ -138,4 +155,4 @@ async def test_session_token_rejected_as_challenge_and_vice_versa():
         await service.verify(challenge_token=access_token, nonce=nonce)
     # ...and a challenge token is not a session bearer.
     with pytest.raises(AuthenticationError):
-        service.principal(challenge_token)
+        await service.principal(challenge_token)

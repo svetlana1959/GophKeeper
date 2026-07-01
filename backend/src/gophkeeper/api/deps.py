@@ -43,7 +43,7 @@ def provide[Service](
     return _provider
 
 
-def get_principal(
+async def get_principal(
     authorization: str | None = Header(default=None),
     service: AuthService = Depends(provide(AuthService)),
 ) -> DevicePrincipal:
@@ -55,4 +55,4 @@ def get_principal(
     """
     if not authorization or not authorization.lower().startswith("bearer "):
         raise AuthenticationError("missing bearer token")
-    return service.principal(authorization.split(" ", 1)[1].strip())
+    return await service.principal(authorization.split(" ", 1)[1].strip())
