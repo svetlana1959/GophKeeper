@@ -209,6 +209,18 @@ trust the code's transfer channel.
 The server only relays and stores; it never re-encrypts and cannot insert itself
 as a recipient.
 
+> **As implemented in M1–M3 (differences from the target flow above):**
+> - The pairing code is an opaque single-use secret but does **not** yet embed
+>   the server URL/routing. The joining device must already have the remote
+>   configured (`goph init --remote <url>`); otherwise `goph link` errors with
+>   that guidance. Embedding routing in the code is deferred.
+> - `goph link` admits the device as **`active` immediately** on a valid code —
+>   the `pending` → reshare-gated → `active` handshake (and the `--confirm`
+>   fingerprint step) lands in M4. The `pending` state and `Device.activate()`
+>   exist and are guarded, but are not yet exercised.
+> - Reshare currently derives its recipient set from the server's device list
+>   (see the trust-boundary limitation in §9).
+
 ### 5.5 Retiring a device you still hold — self-revoke
 `goph device revoke` run *on that device* marks it revoked using its own device
 key. A remaining key-holder reshares to rotate keys. No recovery key needed.
@@ -311,3 +323,38 @@ Each is a vertically-sliced (backend + CLI) PR into `dev`, testable end-to-end.
 
 PR #112 stays open until M1–M3 land the replacement, then it is closed as
 superseded.
+
+## 9. Known limitations & deferred hardening (M1–M3)
+
+These are conscious gaps, surfaced in review, to close in later milestones. They
+are recorded here so they are decisions, not surprises.
+
+- **Reshare trusts the server's device list (M4).** `applyReshare` seals secrets
+  to the public keys returned by `GET /devices`. A malicious server could report
+  a rogue device and the honest client would seal plaintext to it — weakening
+  the zero-knowledge guarantee that §6 relies on. The mitigation is a
+  client-owned trusted-device allow-list (populated only from confirmed
+  invite/link provenance or an explicit fingerprint confirmation) that reshare
+  seals to instead. Deferred to M4 with the recovery/authority work; until then,
+  trust in the server for *recipient membership* (not for plaintext) is assumed.
+- **Recovery key is not yet a reshare recipient (M4).** `account.recovery_pubkey`
+  is never minted (stays null), and reshare's recipient set is devices only. When
+  the recovery key lands, reshare **must** include it, or the first reshare after
+  setup would rotate the account beyond the recovery key's reach.
+- **Revocation is not enforceable end-to-end yet (M4).** The auth path now
+  re-checks `Device.may_authenticate()` per request (so a revoked device is
+  denied immediately once revoke exists), but there is no revoke endpoint/flow to
+  set that state yet.
+- **`seq` cursor assumes roughly in-order commit (scale).** The pull cursor is a
+  single high-water over a global sequence. Under highly concurrent pushes, a
+  lower `seq` can become visible after a client advanced past it (sequence values
+  are allocated before commit). Acceptable at current scale; a commit-ordered
+  append log or an `xmin`-gated watermark is the fix if it bites.
+- **`secrets.account_id` is `TEXT`, not a `UUID` FK.** Everywhere else account id
+  is a `UUID` with a foreign key; the pre-existing `secrets` table uses `TEXT`
+  with no FK, forcing `str(...)` coercions at the sync seam. Migrating the column
+  and adding the FK is deferred (it touches the older table).
+- **Enrollment vocabulary is not unified.** The act of adding a device is spoken
+  as *enroll* (context), *join* (backend method/endpoint), and *link* (CLI/user).
+  "Invite" is consistent for the code itself. Reconciling on one verb (likely
+  *link*) before the activity log hard-codes `device.linked` is a follow-up.
