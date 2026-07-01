@@ -378,6 +378,11 @@ func TestListDevices(t *testing.T) {
 	}
 	defer sess.Close()
 
+	// ListDevices is read-only and won't bootstrap an account; sync first to bind.
+	if _, err := sess.Sync(context.Background(), ""); err != nil {
+		t.Fatalf("Sync: %v", err)
+	}
+
 	devices, err := sess.ListDevices(context.Background(), "")
 	if err != nil {
 		t.Fatalf("ListDevices: %v", err)
@@ -393,6 +398,27 @@ func TestListDevices(t *testing.T) {
 	}
 	if thisCount != 1 {
 		t.Fatalf("expected exactly one local device, got %d", thisCount)
+	}
+}
+
+func TestListDevices_UnlinkedDeviceDoesNotRegister(t *testing.T) {
+	setHome(t)
+	be := newSyncBackend()
+	srv := httptest.NewServer(be.handler(t))
+	defer srv.Close()
+
+	if _, err := app.Init(app.InitParams{DeviceName: "laptop", Remote: srv.URL}); err != nil {
+		t.Fatalf("Init: %v", err)
+	}
+	sess, err := app.Open()
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	defer sess.Close()
+
+	// Never synced: a read must not silently create an account server-side.
+	if _, err := sess.ListDevices(context.Background(), ""); !errors.Is(err, app.ErrNotLinked) {
+		t.Fatalf("ListDevices err = %v, want ErrNotLinked", err)
 	}
 }
 

@@ -14,6 +14,12 @@ import (
 // account.
 var ErrAlreadyLinked = errors.New("this device is already linked to an account")
 
+// ErrNotLinked is returned by read-only account operations on a device that has
+// never synced or linked, so they don't silently bootstrap a fresh account.
+var ErrNotLinked = errors.New(
+	"this device isn't linked to an account yet; run 'goph sync' or 'goph link <code>' first",
+)
+
 // Invite is a pairing code for linking a new device, shown once.
 type Invite struct {
 	Code      string
@@ -41,8 +47,15 @@ func (s *Session) CreateInvite(ctx context.Context, pin string) (Invite, error) 
 	return Invite{Code: inv.Code, ExpiresAt: inv.ExpiresAt}, nil
 }
 
-// ListDevices returns the account's devices, flagging the local one.
+// ListDevices returns the account's devices, flagging the local one. It never
+// creates an account: a device that has not linked/synced yet gets ErrNotLinked
+// rather than silently registering just to satisfy a read.
 func (s *Session) ListDevices(ctx context.Context, pin string) ([]DeviceInfo, error) {
+	if _, err := s.db.Sync().GetState(); errors.Is(err, syncstate.ErrNoState) {
+		return nil, ErrNotLinked
+	} else if err != nil {
+		return nil, err
+	}
 	client, _, _, _, err := s.connect(ctx, pin)
 	if err != nil {
 		return nil, err
@@ -68,7 +81,9 @@ func (s *Session) ListDevices(ctx context.Context, pin string) ([]DeviceInfo, er
 // sync; run `goph sync` afterwards to pull them.
 func (s *Session) Link(ctx context.Context, code string) error {
 	if s.cfg.Remote == "" {
-		return ErrNoRemote
+		// The pairing code does not yet carry the server URL (see design §5.4),
+		// so the remote must already be configured on this device.
+		return fmt.Errorf("%w: run 'goph init --remote <url>' on this device first", ErrNoRemote)
 	}
 	st := s.db.Sync()
 	if _, err := st.GetState(); err == nil {
