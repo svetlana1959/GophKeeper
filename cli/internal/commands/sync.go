@@ -15,12 +15,9 @@ func newSyncCmd() *cobra.Command {
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return withSession(func(sess *app.Session) error {
-				var pin string
-				var err error
-				if sess.NeedsPIN() {
-					if pin, err = promptHidden(cmd, "PIN: "); err != nil {
-						return err
-					}
+				pin, err := pinIfNeeded(cmd, sess)
+				if err != nil {
+					return err
 				}
 
 				res, err := sess.Sync(cmd.Context(), pin)
