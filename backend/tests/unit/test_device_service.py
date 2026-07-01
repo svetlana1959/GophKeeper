@@ -107,6 +107,25 @@ async def test_fetch_returns_device():
     uow = FakeUnitOfWork()
     device_id = uuid4()
 
+    account_id = uuid4()
+    device = Device(
+        id=device_id,
+        account_id=account_id,
+        device_name="MacBook",
+        public_key="pubkey",
+    )
+    await uow.devices.add(device)
+
+    service = DeviceService(uow)
+
+    fetched = await service.fetch(device_id, account_id=account_id)
+
+    assert fetched.id == device_id
+
+
+async def test_fetch_device_from_other_account_is_not_found():
+    uow = FakeUnitOfWork()
+    device_id = uuid4()
     device = Device(
         id=device_id,
         account_id=uuid4(),
@@ -117,9 +136,8 @@ async def test_fetch_returns_device():
 
     service = DeviceService(uow)
 
-    fetched = await service.fetch(device_id)
-
-    assert fetched.id == device_id
+    with pytest.raises(DeviceNotFound):
+        await service.fetch(device_id, account_id=uuid4())
 
 
 async def test_fetch_missing_device_raises():
@@ -127,4 +145,4 @@ async def test_fetch_missing_device_raises():
     service = DeviceService(uow)
 
     with pytest.raises(DeviceNotFound):
-        await service.fetch(uuid4())
+        await service.fetch(uuid4(), account_id=uuid4())

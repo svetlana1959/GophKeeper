@@ -57,12 +57,19 @@ async def list_devices(
     "/{device_id}",
     response_model=DeviceResponse,
     summary="Fetch a device by id",
-    responses={404: {"description": "No device with that id."}},
+    responses={
+        401: {"description": "Missing, invalid, or expired bearer token."},
+        404: {"description": "No such device in the caller's account."},
+    },
 )
 async def fetch_device(
     device_id: UUID,
+    principal: DevicePrincipal = Depends(get_principal),
     service: DeviceService = Depends(provide(DeviceService)),
 ) -> DeviceResponse:
-    """Return a single device by its id."""
-    device = await service.fetch(device_id)
+    """Return a single device by its id, within the caller's account.
+
+    A device belonging to another account is reported as 404, not disclosed.
+    """
+    device = await service.fetch(device_id, account_id=principal.account_id)
     return DeviceResponse.from_domain(device)

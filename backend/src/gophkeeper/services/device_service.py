@@ -4,7 +4,7 @@ from uuid import UUID, uuid4
 
 from gophkeeper.domain.account import Account
 from gophkeeper.domain.device import ACTIVE, Device
-from gophkeeper.domain.errors import DeviceAlreadyExists
+from gophkeeper.domain.errors import DeviceAlreadyExists, DeviceNotFound
 from gophkeeper.domain.unit_of_work import UnitOfWork
 
 
@@ -44,9 +44,17 @@ class DeviceService:
             await uow.commit()
             return device
 
-    async def fetch(self, device_id: UUID) -> Device:
+    async def fetch(self, device_id: UUID, *, account_id: UUID) -> Device:
+        """Return a device, scoped to the caller's account.
+
+        A device from another account is reported as not found rather than
+        disclosed, so the id cannot be used to enumerate other accounts' rows.
+        """
         async with self._uow as uow:
-            return await uow.devices.get(device_id)
+            device = await uow.devices.get(device_id)
+        if device.account_id != account_id:
+            raise DeviceNotFound(device_id)
+        return device
 
     async def list_for_account(self, account_id: UUID) -> list[Device]:
         async with self._uow as uow:
