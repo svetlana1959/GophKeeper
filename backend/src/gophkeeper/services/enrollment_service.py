@@ -17,6 +17,10 @@ from gophkeeper.domain.invite import Invite
 from gophkeeper.domain.unit_of_work import UnitOfWork
 from gophkeeper.settings.settings import settings
 
+# 24 bytes of token_urlsafe is ~192 bits of entropy, so the code is
+# unguessable and a plain (unsalted) SHA-256 lookup is safe: there is nothing to
+# brute-force and the DB does an indexed equality match, not an in-app compare,
+# so there's no timing surface. Do not shorten this without revisiting the hash.
 _CODE_BYTES = 24
 
 

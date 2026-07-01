@@ -5,8 +5,10 @@ authenticate; an account scopes what they can sync. ``recovery_pubkey`` is the
 public half of the offline recovery key (set at first sync, used later to gate
 emergency revocation and recovery) — it is ``None`` until that key is minted.
 
-Follows the same shape as Secret: a behavior-carrying model plus the port it
-needs, both pure standard library.
+Follows the same shape as Secret: a model plus the port it needs, both pure
+standard library. Account is a plain data holder today — the account-level
+invariants it will own (a minted recovery key, the trusted-device allow-list
+that gates emergency revocation) arrive with M4.
 """
 
 from __future__ import annotations
