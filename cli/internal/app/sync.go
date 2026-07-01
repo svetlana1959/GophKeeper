@@ -37,7 +37,7 @@ func (s *Session) Sync(ctx context.Context, pin string) (SyncResult, error) {
 	}
 
 	// Pull before push, so local edits are pushed against the latest server state.
-	pulled, pullSeq, err := s.applyPull(ctx, client, st, state.Cursor, priv)
+	pulled, pullCursor, err := s.applyPull(ctx, client, st, state.Cursor, priv)
 	if err != nil {
 		return res, err
 	}
@@ -51,15 +51,19 @@ func (s *Session) Sync(ctx context.Context, pin string) (SyncResult, error) {
 	}
 	res.Reshared = reshared
 
-	pushed, conflicts, pushSeq, err := s.applyPush(ctx, client, st)
+	pushed, conflicts, err := s.applyPush(ctx, client, st)
 	if err != nil {
 		return res, err
 	}
 	res.Pushed, res.Conflicts = pushed, conflicts
 
-	cursor := max(state.Cursor, max(pullSeq, pushSeq))
-	if cursor != state.Cursor {
-		state.Cursor = cursor
+	// The cursor tracks only what we pulled and applied — never our own pushes.
+	// Folding a push seq in here would advance the cursor past a concurrent
+	// change committed by another device between our pull and our push, and that
+	// change would then never be returned by a future `since=cursor` pull. Our
+	// own pushed secrets are harmlessly re-pulled next time (apply is idempotent).
+	if pullCursor > state.Cursor {
+		state.Cursor = pullCursor
 		if err := st.SaveState(state); err != nil {
 			return res, err
 		}
@@ -122,28 +126,29 @@ func (s *Session) ensureRegistered(
 }
 
 // applyPull fetches the server delta and applies it locally, returning how many
-// secrets were applied and the highest seq seen. priv decrypts payloads to
-// recover the secret's name/folder (and confirms this device is a recipient).
+// secrets were applied and the server's authoritative cursor (the high-water to
+// persist). priv decrypts payloads to recover the secret's name/folder (and
+// confirms this device is a recipient).
 func (s *Session) applyPull(
 	ctx context.Context, client *remote.Client, st syncstate.Repository, since int64, priv string,
-) (applied int, maxSeq int64, err error) {
-	changes, _, err := client.Pull(ctx, since)
+) (applied int, cursor int64, err error) {
+	changes, cursor, err := client.Pull(ctx, since)
 	if err != nil {
 		return 0, since, fmt.Errorf("app: pull: %w", err)
 	}
 
-	maxSeq = since
 	for _, cs := range changes {
-		if cs.Seq > maxSeq {
-			maxSeq = cs.Seq
-		}
-
 		local, gerr := s.secrets.Get(cs.ID)
 		isNew := errors.Is(gerr, secret.ErrNotFound)
 		if isNew {
 			local = &secret.Secret{ID: cs.ID, Name: cs.ID} // placeholder name; refined below
 		} else if gerr != nil {
-			return applied, maxSeq, gerr
+			return applied, cursor, gerr
+		} else if local.Version == cs.Version && local.Deleted == cs.Deleted {
+			// Already at this version — nothing to apply. This is the common case
+			// when a device re-pulls its own just-pushed secrets (the cursor
+			// deliberately doesn't advance past our own writes).
+			continue
 		}
 
 		local.Payload = cs.Ciphertext
@@ -165,14 +170,14 @@ func (s *Session) applyPull(
 		}
 
 		if err := s.secrets.Save(local); err != nil {
-			return applied, maxSeq, err
+			return applied, cursor, err
 		}
 		if err := st.MarkSynced(cs.ID, cs.Version); err != nil {
-			return applied, maxSeq, err
+			return applied, cursor, err
 		}
 		applied++
 	}
-	return applied, maxSeq, nil
+	return applied, cursor, nil
 }
 
 // metaFromPayload decrypts a payload to recover a secret's name and folder. It
@@ -283,20 +288,20 @@ func sameSet(a, b []string) bool {
 // left dirty so the next sync pulls the winner and reconciles.
 func (s *Session) applyPush(
 	ctx context.Context, client *remote.Client, st syncstate.Repository,
-) (pushed, conflicts int, maxSeq int64, err error) {
+) (pushed, conflicts int, err error) {
 	dirty, err := st.ListDirty()
 	if err != nil {
-		return 0, 0, 0, err
+		return 0, 0, err
 	}
 	if len(dirty) == 0 {
-		return 0, 0, 0, nil
+		return 0, 0, nil
 	}
 
 	items := make([]remote.PushItem, 0, len(dirty))
 	for _, d := range dirty {
 		sec, gerr := s.secrets.Get(d.SecretID)
 		if gerr != nil {
-			return pushed, conflicts, maxSeq, gerr
+			return pushed, conflicts, gerr
 		}
 		items = append(items, remote.PushItem{
 			ID:          sec.ID,
@@ -309,21 +314,18 @@ func (s *Session) applyPush(
 
 	results, err := client.Push(ctx, items)
 	if err != nil {
-		return pushed, conflicts, maxSeq, fmt.Errorf("app: push: %w", err)
+		return pushed, conflicts, fmt.Errorf("app: push: %w", err)
 	}
 
 	for _, r := range results {
-		if r.Seq > maxSeq {
-			maxSeq = r.Seq
-		}
 		if r.Status == "applied" {
 			if err := st.MarkSynced(r.ID, r.Version); err != nil {
-				return pushed, conflicts, maxSeq, err
+				return pushed, conflicts, err
 			}
 			pushed++
 			continue
 		}
 		conflicts++
 	}
-	return pushed, conflicts, maxSeq, nil
+	return pushed, conflicts, nil
 }
