@@ -52,8 +52,15 @@ class SqlAlchemyInviteRepository(InviteRepository):
         row = result.mappings().first()
         return _from_row(row) if row is not None else None
 
-    async def save(self, invite: Invite) -> None:
-        await self._session.execute(
-            text("UPDATE invites SET consumed_at = :consumed_at WHERE id = :id"),
+    async def consume(self, invite: Invite) -> bool:
+        # WHERE consumed_at IS NULL makes this a compare-and-set: two concurrent
+        # joins racing on the same code serialize on the row, and only the first
+        # UPDATE affects a row. rowcount == 0 means we lost the race.
+        result = await self._session.execute(
+            text(
+                "UPDATE invites SET consumed_at = :consumed_at "
+                "WHERE id = :id AND consumed_at IS NULL"
+            ),
             {"consumed_at": invite.consumed_at, "id": invite.id},
         )
+        return result.rowcount > 0

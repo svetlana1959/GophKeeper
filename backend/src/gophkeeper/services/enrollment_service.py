@@ -63,6 +63,9 @@ class EnrollmentService:
             )
             await uow.devices.add(device)
             invite.consume()
-            await uow.invites.save(invite)
+            if not await uow.invites.consume(invite):
+                # Another concurrent join consumed the code first; the device add
+                # above rolls back with the transaction.
+                raise InvalidInvite("invalid or expired invite code")
             await uow.commit()
             return device

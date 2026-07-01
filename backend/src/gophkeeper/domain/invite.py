@@ -12,6 +12,8 @@ from datetime import UTC, datetime
 from typing import Protocol
 from uuid import UUID
 
+from gophkeeper.domain.errors import InvalidInvite
+
 
 def _now() -> datetime:
     return datetime.now(UTC)
@@ -31,7 +33,14 @@ class Invite:
         return self.consumed_at is None and self.expires_at > now
 
     def consume(self, *, at: datetime | None = None) -> None:
-        self.consumed_at = at or _now()
+        """Mark the invite used. Guarded: a consumed or expired invite cannot be
+        consumed again, so the single-use rule lives on the aggregate rather
+        than in service call-ordering. The repository enforces the same rule at
+        the row level (conditional UPDATE) to close the concurrent-join race."""
+        at = at or _now()
+        if not self.is_valid(at=at):
+            raise InvalidInvite("invalid or expired invite code")
+        self.consumed_at = at
 
 
 class InviteRepository(Protocol):
@@ -39,4 +48,7 @@ class InviteRepository(Protocol):
 
     async def find_by_code_hash(self, code_hash: str) -> Invite | None: ...
 
-    async def save(self, invite: Invite) -> None: ...
+    async def consume(self, invite: Invite) -> bool:
+        """Persist consumption only if the row is still unconsumed. Returns True
+        if this call won the race, False if another join consumed it first."""
+        ...

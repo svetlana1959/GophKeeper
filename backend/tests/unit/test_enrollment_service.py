@@ -19,8 +19,9 @@ class FakeInviteRepository:
     async def find_by_code_hash(self, code_hash: str) -> Invite | None:
         return self.invites.get(code_hash)
 
-    async def save(self, invite: Invite) -> None:
+    async def consume(self, invite: Invite) -> bool:
         self.invites[invite.code_hash] = invite
+        return True
 
 
 class FakeDeviceRepository:
