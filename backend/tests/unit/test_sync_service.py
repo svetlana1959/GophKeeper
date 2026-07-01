@@ -203,6 +203,42 @@ async def test_push_to_foreign_secret_is_conflict():
     assert secrets == []
 
 
+async def test_update_with_empty_recipients_preserves_sharing():
+    uow = FakeUnitOfWork()
+    dev_a = Device(id=uuid4(), account_id=_ACCOUNT_ID, device_name="a", public_key="age1a")
+    dev_b = Device(id=uuid4(), account_id=_ACCOUNT_ID, device_name="b", public_key="age1b")
+    uow.devices.add_sync(dev_a)
+    uow.devices.add_sync(dev_b)
+    service = SyncService(uow)
+    sid = uuid4()
+
+    # A shares a secret with B, then edits it without re-sending recipients.
+    await service.push(
+        account_id=_ACCOUNT,
+        device_id=dev_a.id,
+        items=[PushItem(id=sid, ciphertext=b"v1", recipients=["age1a", "age1b"])],
+    )
+    await service.push(
+        account_id=_ACCOUNT,
+        device_id=dev_a.id,
+        items=[PushItem(id=sid, ciphertext=b"v2", base_version=1)],  # no recipients
+    )
+
+    b_secrets, _ = await service.changes(account_id=_ACCOUNT, device_id=dev_b.id, since=0)
+    assert {s.id for s in b_secrets} == {sid}  # B still sees it; edit didn't revoke B
+
+
+async def test_delete_of_unknown_secret_is_noop_not_error():
+    uow = FakeUnitOfWork()
+    service = SyncService(uow)
+    results = await service.push(
+        account_id=_ACCOUNT,
+        device_id=_DEVICE,
+        items=[PushItem(id=uuid4(), ciphertext=b"", deleted=True)],
+    )
+    assert results[0].status == "applied"
+
+
 async def test_pull_is_scoped_to_recipients():
     uow = FakeUnitOfWork()
     dev_a = Device(id=uuid4(), account_id=_ACCOUNT_ID, device_name="a", public_key="age1a")

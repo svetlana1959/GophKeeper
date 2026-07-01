@@ -55,13 +55,21 @@ class SyncService:
                     secret = None
 
                 if secret is None:
+                    if item.deleted:
+                        # Deleting a secret the server never had (offline
+                        # create-then-delete, or a retry) is a no-op — building a
+                        # Secret(ciphertext=b"", deleted=True) would fail the
+                        # aggregate's non-empty-ciphertext invariant and 500 the
+                        # whole batch.
+                        results.append(PushResult(item.id, "applied", 0, 0))
+                        continue
                     secret = Secret(
                         id=item.id,
                         account_id=account_id,
                         ciphertext=item.ciphertext,
-                        deleted=item.deleted,
                     )
                     await uow.secrets.add(secret)
+                    # A create always sets the recipient set (pusher included).
                     await self._apply_recipients(uow, account_id, device_id, item)
                     results.append(self._applied(secret))
                     continue
@@ -87,7 +95,12 @@ class SyncService:
                     results.append(PushResult(item.id, "conflict", exc.actual, 0))
                     continue
 
-                await self._apply_recipients(uow, account_id, device_id, item)
+                # On update, an empty recipient list means "leave sharing as-is".
+                # Only an explicit, non-empty set (a reshare) rewrites it — so a
+                # plain edit that omits recipients can't silently revoke every
+                # other device down to just the pusher.
+                if item.recipients:
+                    await self._apply_recipients(uow, account_id, device_id, item)
                 results.append(self._applied(secret))
 
             await uow.commit()
@@ -111,8 +124,12 @@ class SyncService:
         device_ids = {device_id}
         for public_key in item.recipients:
             device = await uow.devices.find_by_public_key(public_key)
-            if device is not None and str(device.account_id) == account_id:
-                device_ids.add(device.id)
+            if device is None or str(device.account_id) != account_id:
+                continue
+            if not device.is_active:
+                # Don't reinstate a revoked device into the authorization mirror.
+                continue
+            device_ids.add(device.id)
         await uow.secrets.set_recipients(item.id, list(device_ids))
 
     @staticmethod

@@ -88,6 +88,7 @@ class Secret:
         self.deleted = True
         self.version += 1
         self.updated_at = at or _now()
+        self._validate()  # keep the "validate after every mutation" rule intact
 
     @property
     def is_active(self) -> bool:
