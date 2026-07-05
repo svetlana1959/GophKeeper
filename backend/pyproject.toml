@@ -52,6 +52,7 @@ extend-immutable-calls = [
 ]
 
 [tool.pytest.ini_options]
+cache_dir = "tmp/pytest_cache"
 asyncio_mode = "auto"
 addopts = "--cov=src --cov-report=term-missing --cov-report=markdown"
 testpaths = ["tests"]

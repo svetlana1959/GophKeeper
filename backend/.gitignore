@@ -3,8 +3,11 @@ __pycache__/
 *.pyc
 .ruff_cache/
 .pytest_cache/
+.pytest_cache_fixed/
 postgres-data/
 .env
 .coverage
 coverage*.md
 coverage*.xml
+
+tmp/
