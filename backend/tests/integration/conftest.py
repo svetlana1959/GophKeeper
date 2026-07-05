@@ -15,6 +15,16 @@ from sqlalchemy import text
 from gophkeeper.infrastructure.adapters.database import SqlAlchemyAdapter
 
 TEST_DATABASE_URL = os.environ.get("TEST_DATABASE_URL")
+APP_TABLES = (
+    "access_requests",
+    "secret_access",
+    "secrets",
+    "devices",
+    "accounts",
+    "devices",
+    "invites",
+    "secret_recipients",
+)
 
 
 @pytest.fixture
@@ -25,11 +35,14 @@ async def database():
     adapter = SqlAlchemyAdapter(TEST_DATABASE_URL, "gophkeeper-tests")
     await adapter.connect()
 
-    # Start each test from a clean table.
-    async with adapter.session() as session:
-        await session.execute(text("DELETE FROM secrets"))
-        await session.execute(text("DELETE FROM devices"))
-        await session.commit()
-
     yield adapter
     await adapter.disconnect()
+
+
+@pytest.fixture(autouse=True)
+async def clean_database(database):
+    tables = ", ".join(APP_TABLES)
+    # Restart identities and cascade through FK-dependent rows between tests.
+    async with database.session() as session:
+        await session.execute(text(f"TRUNCATE TABLE {tables} RESTART IDENTITY CASCADE"))
+        await session.commit()
