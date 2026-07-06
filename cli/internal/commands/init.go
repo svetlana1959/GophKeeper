@@ -14,7 +14,6 @@ import (
 func newInitCmd() *cobra.Command {
 	var (
 		deviceName string
-		remote     string
 		keyFile    string
 		usePIN     bool
 		force      bool
@@ -47,7 +46,6 @@ func newInitCmd() *cobra.Command {
 
 			res, err := app.Init(app.InitParams{
 				DeviceName: deviceName,
-				Remote:     remote,
 				PIN:        pin,
 				PrivateKey: privateKey,
 				Force:      force,
@@ -66,7 +64,6 @@ func newInitCmd() *cobra.Command {
 	}
 
 	cmd.Flags().StringVar(&deviceName, "device-name", "", "device name (default: hostname)")
-	cmd.Flags().StringVar(&remote, "remote", "", "backend URL (optional; can be set later)")
 	cmd.Flags().StringVar(&keyFile, "key-file", "", "import an existing age private key from a file")
 	cmd.Flags().BoolVar(&usePIN, "pin", false, "protect the private key at rest with a PIN")
 	cmd.Flags().BoolVar(&force, "force", false, "overwrite an existing setup")

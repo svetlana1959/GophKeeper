@@ -40,7 +40,6 @@ type content struct {
 // InitParams are the inputs the init command gathers.
 type InitParams struct {
 	DeviceName string
-	Remote     string // optional
 	PIN        string // empty = store the private key as plaintext (0600)
 	PrivateKey string // empty = generate; otherwise import this age secret key
 	Force      bool
@@ -62,7 +61,7 @@ func Init(p InitParams) (InitResult, error) {
 	}
 
 	cfg := config.Default()
-	cfg.Remote = p.Remote
+	cfg.Remote = []config.RemoteConfig{}
 	cfg.DeviceName = p.DeviceName
 
 	dbPath, err := cfg.ResolveSecretDB()

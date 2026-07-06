@@ -8,11 +8,17 @@ import (
 	"strings"
 )
 
+type RemoteConfig struct {
+	Name    string `yaml:"name"`
+	URL     string `yaml:"url"`
+	Default bool   `yaml:"default"`
+}
+
 type Config struct {
-	Remote        string `yaml:"remote"`         // backend URL used for push/pull
-	SecretDB      string `yaml:"secret-db"`      // path to the local SQLite secret store
-	DeviceName    string `yaml:"device-name"`    // human-readable device identity
-	DefaultFolder string `yaml:"default-folder"` // folder new secrets land in by default
+	Remote        []RemoteConfig `yaml:"remotes"`        // backend URL used for push/pull
+	SecretDB      string         `yaml:"secret-db"`      // path to the local SQLite secret store
+	DeviceName    string         `yaml:"device-name"`    // human-readable device identity
+	DefaultFolder string         `yaml:"default-folder"` // folder new secrets land in by default
 }
 
 const DefaultSecretDB = "~/.goph/secrets.db"
