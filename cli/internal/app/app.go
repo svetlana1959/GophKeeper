@@ -15,6 +15,7 @@ import (
 	"github.com/svetlana1959/GophKeeper/cli/internal/config"
 	"github.com/svetlana1959/GophKeeper/cli/internal/crypto"
 	"github.com/svetlana1959/GophKeeper/cli/internal/device"
+	"github.com/svetlana1959/GophKeeper/cli/internal/remote"
 	"github.com/svetlana1959/GophKeeper/cli/internal/secret"
 	"github.com/svetlana1959/GophKeeper/cli/internal/vault"
 )
@@ -345,4 +346,14 @@ func selectField(plain []byte, field string) ([]byte, error) {
 	default:
 		return nil, fmt.Errorf("%w: %q", ErrFieldNotFound, field)
 	}
+}
+
+func (s *Session) Login(remoteName string, remoteUrl string) error {
+	normalizedUrl, err := remote.NormalizeUrl(remoteUrl)
+	if err != nil {
+		return err
+	}
+	println(normalizedUrl)
+
+	return nil
 }

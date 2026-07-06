@@ -33,6 +33,7 @@ client-side encryption based on age.`,
 		newGetCmd(),
 		newDeleteCmd(),
 		newListCmd(),
+		newLoginCmd(),
 	)
 	return root
 }
