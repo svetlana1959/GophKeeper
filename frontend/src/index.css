@@ -12,6 +12,12 @@ html {
 }
 
 body {
-  background: #000000;
+  background: #08090B;
   font-family: Inter;
+  margin: 0;
+}
+
+a {
+  color: #008645;
+  text-decoration: none;
 }
