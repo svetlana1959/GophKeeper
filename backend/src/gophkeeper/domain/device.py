@@ -87,6 +87,8 @@ class Device:
 
     def revoke(self) -> None:
         """Remove the device. Terminal and idempotent."""
+        if self.status == REVOKED:
+            return
         self.status = REVOKED
         self.updated_at = _now()
 

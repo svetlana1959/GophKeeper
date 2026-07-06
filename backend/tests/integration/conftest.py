@@ -16,14 +16,11 @@ from gophkeeper.infrastructure.adapters.database import SqlAlchemyAdapter
 
 TEST_DATABASE_URL = os.environ.get("TEST_DATABASE_URL")
 APP_TABLES = (
-    "access_requests",
-    "secret_access",
+    "secret_recipients",
+    "invites",
     "secrets",
     "devices",
     "accounts",
-    "devices",
-    "invites",
-    "secret_recipients",
 )
 
 

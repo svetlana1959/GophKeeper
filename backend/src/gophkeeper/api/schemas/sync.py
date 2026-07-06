@@ -7,6 +7,7 @@ a device can only sync its own account. Ciphertext travels base64-encoded.
 import base64
 import binascii
 from datetime import datetime
+from enum import StrEnum
 from uuid import UUID
 
 from pydantic import BaseModel, Field, field_validator, model_validator
@@ -53,9 +54,14 @@ class PushRequest(BaseModel):
     items: list[PushItemRequest]
 
 
+class PushResultStatus(StrEnum):
+    APPLIED = "applied"
+    CONFLICT = "conflict"
+
+
 class PushResultResponse(BaseModel):
     id: UUID
-    status: str = Field(description='"applied" or "conflict".')
+    status: PushResultStatus = Field(description="Per-item push outcome.")
     version: int = Field(description="Resulting (or current, on conflict) server version.")
     seq: int = Field(description="Resulting sync sequence (0 on conflict).")
 

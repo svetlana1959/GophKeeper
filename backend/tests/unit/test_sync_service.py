@@ -1,7 +1,7 @@
 import dataclasses
 from uuid import UUID, uuid4
 
-from gophkeeper.domain.device import Device
+from gophkeeper.domain.device import REVOKED, Device
 from gophkeeper.domain.errors import SecretNotFound, VersionConflict
 from gophkeeper.domain.secret import Secret
 from gophkeeper.services.sync_service import PushItem, SyncService
@@ -264,3 +264,37 @@ async def test_pull_is_scoped_to_recipients():
 
     assert {s.id for s in a_secrets} == {shared, private_to_a}
     assert {s.id for s in b_secrets} == {shared}  # B never sees A's private secret
+
+
+async def test_reshare_excludes_revoked_recipient():
+    active = Device(
+        id=uuid4(),
+        account_id=_ACCOUNT_ID,
+        device_name="active",
+        public_key="age1active",
+    )
+    revoked = Device(
+        id=uuid4(),
+        account_id=_ACCOUNT_ID,
+        device_name="revoked",
+        public_key="age1revoked",
+        status=REVOKED,
+    )
+    uow = FakeUnitOfWork()
+    uow.devices.add_sync(active)
+    uow.devices.add_sync(revoked)
+    secret_id = uuid4()
+
+    await SyncService(uow).push(
+        account_id=_ACCOUNT,
+        device_id=active.id,
+        items=[
+            PushItem(
+                id=secret_id,
+                ciphertext=b"ciphertext",
+                recipients=[active.public_key, revoked.public_key],
+            )
+        ],
+    )
+
+    assert uow.secrets.recipients[secret_id] == {active.id}
