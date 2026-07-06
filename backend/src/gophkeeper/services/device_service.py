@@ -59,3 +59,15 @@ class DeviceService:
     async def list_for_account(self, account_id: UUID) -> list[Device]:
         async with self._uow as uow:
             return await uow.devices.list_for_account(account_id)
+
+    async def revoke_self(self, device_id: UUID, *, account_id: UUID) -> Device:
+        """Revoke the authenticated device and persist the terminal state."""
+        async with self._uow as uow:
+            device = await uow.devices.get(device_id)
+            if device.account_id != account_id:
+                raise DeviceNotFound(device_id)
+
+            device.revoke()
+            await uow.devices.save(device)
+            await uow.commit()
+            return device

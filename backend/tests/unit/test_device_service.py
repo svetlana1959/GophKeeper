@@ -3,7 +3,7 @@ from uuid import UUID, uuid4
 import pytest
 
 from gophkeeper.domain.account import Account
-from gophkeeper.domain.device import Device
+from gophkeeper.domain.device import REVOKED, Device
 from gophkeeper.domain.errors import DeviceAlreadyExists, DeviceNotFound
 from gophkeeper.services.device_service import DeviceService
 
@@ -22,6 +22,7 @@ class FakeAccountRepository:
 class FakeDeviceRepository:
     def __init__(self):
         self.devices: dict[UUID, Device] = {}
+        self.saved: list[UUID] = []
 
     async def add(self, device: Device) -> None:
         self.devices[device.id] = device
@@ -42,6 +43,7 @@ class FakeDeviceRepository:
 
     async def save(self, device: Device) -> None:
         self.devices[device.id] = device
+        self.saved.append(device.id)
 
 
 class FakeUnitOfWork:
@@ -146,3 +148,70 @@ async def test_fetch_missing_device_raises():
 
     with pytest.raises(DeviceNotFound):
         await service.fetch(uuid4(), account_id=uuid4())
+
+
+async def test_revoke_self_persists_revoked_status():
+    uow = FakeUnitOfWork()
+    device = Device(
+        id=uuid4(),
+        account_id=uuid4(),
+        device_name="MacBook",
+        public_key="pubkey",
+    )
+    await uow.devices.add(device)
+
+    revoked = await DeviceService(uow).revoke_self(
+        device.id,
+        account_id=device.account_id,
+    )
+
+    assert revoked.status == REVOKED
+    assert uow.devices.devices[device.id].status == REVOKED
+    assert uow.devices.saved == [device.id]
+    assert uow.committed is True
+
+
+async def test_revoke_self_is_idempotent():
+    uow = FakeUnitOfWork()
+    device = Device(
+        id=uuid4(),
+        account_id=uuid4(),
+        device_name="MacBook",
+        public_key="pubkey",
+    )
+    await uow.devices.add(device)
+    service = DeviceService(uow)
+
+    await service.revoke_self(device.id, account_id=device.account_id)
+    revoked = await service.revoke_self(device.id, account_id=device.account_id)
+
+    assert revoked.status == REVOKED
+    assert uow.devices.saved == [device.id, device.id]
+
+
+async def test_revoke_self_missing_device_raises():
+    uow = FakeUnitOfWork()
+
+    with pytest.raises(DeviceNotFound):
+        await DeviceService(uow).revoke_self(uuid4(), account_id=uuid4())
+
+    assert uow.devices.saved == []
+    assert uow.committed is False
+
+
+async def test_revoke_self_device_from_other_account_is_not_found():
+    uow = FakeUnitOfWork()
+    device = Device(
+        id=uuid4(),
+        account_id=uuid4(),
+        device_name="MacBook",
+        public_key="pubkey",
+    )
+    await uow.devices.add(device)
+
+    with pytest.raises(DeviceNotFound):
+        await DeviceService(uow).revoke_self(device.id, account_id=uuid4())
+
+    assert device.status != REVOKED
+    assert uow.devices.saved == []
+    assert uow.committed is False

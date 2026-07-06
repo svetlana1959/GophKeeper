@@ -10,6 +10,7 @@ from gophkeeper.domain.account import Account
 from gophkeeper.domain.device import ACTIVE, REVOKED, Device
 from gophkeeper.domain.errors import AuthenticationError, DeviceNotFound
 from gophkeeper.services.auth_service import AuthService
+from gophkeeper.services.device_service import DeviceService
 
 
 class FakeAccountRepository:
@@ -89,9 +90,7 @@ async def test_challenge_verify_issues_usable_session():
 
     # The device decrypts the challenge with its private key.
     nonce = decrypt(ciphertext, [identity])
-    access_token, expires_in = await service.verify(
-        challenge_token=challenge_token, nonce=nonce
-    )
+    access_token, expires_in = await service.verify(challenge_token=challenge_token, nonce=nonce)
     assert expires_in > 0
     assert device.last_seen_at is not None  # verify recorded the login
 
@@ -124,7 +123,7 @@ async def test_verify_wrong_nonce_rejected():
         await service.verify(challenge_token=challenge_token, nonce=b"wrong-nonce")
 
 
-async def test_principal_rejects_token_after_device_revoked():
+async def test_principal_rejects_token_after_device_revoked_by_service():
     # A still-valid (unexpired) session token must stop working the moment the
     # device is revoked — the session path re-checks lifecycle every request.
     uow = FakeUnitOfWork()
@@ -136,7 +135,7 @@ async def test_principal_rejects_token_after_device_revoked():
     access_token, _ = await service.verify(challenge_token=challenge_token, nonce=nonce)
     assert (await service.principal(access_token)).device_id == device.id
 
-    device.revoke()
+    await DeviceService(uow).revoke_self(device.id, account_id=device.account_id)
     with pytest.raises(AuthenticationError):
         await service.principal(access_token)
 

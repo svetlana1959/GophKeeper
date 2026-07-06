@@ -53,6 +53,27 @@ async def list_devices(
     return [DeviceResponse.from_domain(d) for d in devices]
 
 
+@router.post(
+    "/self/revoke",
+    response_model=DeviceResponse,
+    summary="Revoke the current device",
+    responses={
+        401: {"description": "Missing, invalid, expired, or revoked bearer token."},
+        404: {"description": "The authenticated device no longer exists."},
+    },
+)
+async def revoke_self(
+    principal: DevicePrincipal = Depends(get_principal),
+    service: DeviceService = Depends(provide(DeviceService)),
+) -> DeviceResponse:
+    """Revoke the caller's own device; another device cannot be targeted."""
+    device = await service.revoke_self(
+        principal.device_id,
+        account_id=principal.account_id,
+    )
+    return DeviceResponse.from_domain(device)
+
+
 @router.get(
     "/{device_id}",
     response_model=DeviceResponse,
