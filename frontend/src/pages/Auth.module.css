@@ -1,0 +1,138 @@
+.page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #0e1512;
+  color: #f4f5f5;
+  font-family: Inter, system-ui, sans-serif;
+  padding: 24px;
+}
+
+.card {
+  width: 100%;
+  max-width: 400px;
+  background: #16201b;
+  border: 1px solid #23302a;
+  border-radius: 16px;
+  padding: 32px;
+}
+
+.brand {
+  font-size: 22px;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+.brand .accent {
+  color: #23bd21;
+}
+
+.title {
+  font-size: 20px;
+  font-weight: 600;
+  margin: 20px 0 4px;
+}
+.subtitle {
+  color: #9aa5a0;
+  font-size: 14px;
+  margin-bottom: 24px;
+}
+
+.label {
+  display: block;
+  font-size: 13px;
+  color: #c7cfcb;
+  margin: 14px 0 6px;
+}
+
+.input {
+  width: 100%;
+  box-sizing: border-box;
+  background: #0e1512;
+  border: 1px solid #2c3a33;
+  border-radius: 8px;
+  padding: 11px 12px;
+  color: #f4f5f5;
+  font-size: 14px;
+}
+.input:focus {
+  outline: none;
+  border-color: #23bd21;
+}
+
+.button {
+  width: 100%;
+  margin-top: 24px;
+  background: #008645;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 12px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.button:hover {
+  background: #23bd21;
+}
+.button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.error {
+  margin-top: 16px;
+  color: #ff8080;
+  font-size: 13px;
+}
+
+.footer {
+  margin-top: 20px;
+  font-size: 14px;
+  color: #9aa5a0;
+  text-align: center;
+}
+.footer a {
+  color: #23bd21;
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.meta {
+  font-size: 13px;
+  color: #9aa5a0;
+  word-break: break-all;
+}
+
+.code {
+  margin-top: 16px;
+  background: #0e1512;
+  border: 1px solid #2c3a33;
+  border-radius: 8px;
+  padding: 14px;
+  font-family: ui-monospace, monospace;
+  font-size: 14px;
+  color: #f4f5f5;
+  word-break: break-all;
+}
+.hint {
+  font-size: 12px;
+  color: #9aa5a0;
+  margin-top: 8px;
+}
+
+.linkButton {
+  background: none;
+  border: none;
+  color: #23bd21;
+  cursor: pointer;
+  font-size: 13px;
+  padding: 0;
+}
