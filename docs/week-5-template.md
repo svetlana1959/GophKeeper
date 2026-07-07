@@ -1,4 +1,4 @@
-# Sprint 5 Report
+Report
 
 ## Project Information
 
@@ -91,42 +91,63 @@ The backend API is documented using automatically generated Swagger/OpenAPI do
 The mobile versions of the main application screens were designed to improve usability on smartphones.
 
 #### Dash Mob Dark
+<img width="385" height="933" alt="Dash Mob Dark 1" src="https://github.com/user-attachments/assets/45f2d23d-926c-4bae-90cb-26c1a4ae022b" />
+<img width="390" height="648" alt="Dash Mob Dark 2" src="https://github.com/user-attachments/assets/9aeadbda-c4c8-459e-96e3-829ccf0a4c9c" />
 
 #### LogIn Mob
+<img width="394" height="701" alt="LogIn Mob" src="https://github.com/user-attachments/assets/13d63837-ae77-42fe-9455-4ffdb901b699" />
 
 #### Dash Mob
+<img width="460" height="801" alt="Dash Mob 1" src="https://github.com/user-attachments/assets/e1d79a73-ab2b-43d0-9c12-ffa46eb1bfe4" />
+<img width="386" height="898" alt="Dash Mob 2" src="https://github.com/user-attachments/assets/d8182b14-619b-434b-860e-171e21dbed79" />
 
 #### Reg Mob Dark
+<img width="459" height="932" alt="Reg Mob Dark" src="https://github.com/user-attachments/assets/557ad0ba-5b1b-4f6d-acd2-6536da332d3f" />
 
 #### LogIn Mob Dark
+<img width="456" height="835" alt="LogIn Mob Dark" src="https://github.com/user-attachments/assets/956eb373-d3d1-4007-8855-0e7124ec90bd" />
 
 #### Reg Mob
+<img width="459" height="941" alt="Reg Mob" src="https://github.com/user-attachments/assets/531267fc-3e3b-481c-90fb-0075adc0a0b3" />
 
 #### Registration Creating Account
+<img width="1280" height="903" alt="Registration Creating Account" src="https://github.com/user-attachments/assets/0dc8f73a-0aa0-47c5-be82-15bdca7cee19" />
 
 #### Registration Creating
+<img width="1280" height="906" alt="Registration Creating" src="https://github.com/user-attachments/assets/a82ba11b-481e-4717-bc2f-45185646f5be" />
 
 #### Registration Dark Creating Account Error
+<img width="1280" height="914" alt="Registration Dark Creating Account Error" src="https://github.com/user-attachments/assets/802ce04a-ae1b-4e56-b25e-6d36d90e6dbe" />
 
 #### Registration Dark Creating Account
+<img width="1280" height="909" alt="Registration Dark Creating Account" src="https://github.com/user-attachments/assets/4bd2ddca-e1e9-4fe4-b7af-f3f1ac87bcdf" />
 
 #### Registration Dark Creating
+<img width="1280" height="904" alt="Registration Dark Creating" src="https://github.com/user-attachments/assets/77ebad8c-2339-40b8-b129-04134f9d485c" />
 
 #### Registration Dark
+<img width="1280" height="904" alt="Registration Dark" src="https://github.com/user-attachments/assets/2448c48c-1410-43f9-985f-95a13c040392" />
 
 #### Registration Success
+<img width="1280" height="910" alt="Registration Success" src="https://github.com/user-attachments/assets/2f9ac49c-43ab-4410-b62b-5f967bdc4886" />
 
 #### Registration Creating Account Error
+<img width="1280" height="907" alt="Registration Creating Account Error" src="https://github.com/user-attachments/assets/6e0fcfe7-3bb4-4a40-a92f-ab755dd661b5" />
 
 #### Login Dark Error
+<img width="1280" height="902" alt="Login Dark Error" src="https://github.com/user-attachments/assets/bd3613d2-5228-4f9b-a741-06f65939c272" />
 
 #### Login Dark Loading
+<img width="1280" height="910" alt="Login Dark Loading" src="https://github.com/user-attachments/assets/6c674433-d882-4ffd-a748-293b587ce86b" />
 
 #### Login Dark
+<img width="1280" height="899" alt="Login Dark" src="https://github.com/user-attachments/assets/2263aef2-2e2e-4fd9-b18a-3aa80670d5d8" />
 
 #### Login Error
+<img width="1280" height="904" alt="Login Error" src="https://github.com/user-attachments/assets/d5abcf33-4db8-4ac5-94b3-d438a88a7bf9" />
 
 #### Login Loading
+<img width="1280" height="909" alt="Login Loading" src="https://github.com/user-attachments/assets/ec756ab9-a916-43f0-bdba-4d5188c9bfdb" />
 
 ---
 
