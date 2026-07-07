@@ -337,10 +337,11 @@ are recorded here so they are decisions, not surprises.
   invite/link provenance or an explicit fingerprint confirmation) that reshare
   seals to instead. Deferred to M4 with the recovery/authority work; until then,
   trust in the server for *recipient membership* (not for plaintext) is assumed.
-- **Recovery key is not yet a reshare recipient (M4).** `account.recovery_pubkey`
-  is never minted (stays null), and reshare's recipient set is devices only. When
-  the recovery key lands, reshare **must** include it, or the first reshare after
-  setup would rotate the account beyond the recovery key's reach.
+- **Recovery key: CLI inclusion done, browser generation pending.** Reshare now
+  seals every secret to `account.recovery_pubkey` when the server reports one (see
+  §10), so the data-recovery half is wired and forward-compatible. What remains is
+  the **browser generating** the recovery keypair at registration (other dev) and
+  recovery-as-*authority* (revoke/recover with the recovery key) in M4.
 - **Revocation is not enforceable end-to-end yet (M4).** The auth path now
   re-checks `Device.may_authenticate()` per request (so a revoked device is
   denied immediately once revoke exists), but there is no revoke endpoint/flow to
@@ -358,3 +359,52 @@ are recorded here so they are decisions, not surprises.
   as *enroll* (context), *join* (backend method/endpoint), and *link* (CLI/user).
   "Invite" is consistent for the code itself. Reconciling on one verb (likely
   *link*) before the activity log hard-codes `device.linked` is a follow-up.
+
+## 10. Web account plane & CLI onboarding
+
+Account **registration moved off the CLI onto the web**. The web is a pure
+*authority* plane: it authenticates a human and can act as the account, but holds
+**no age key and can decrypt nothing**. Two credentials therefore coexist:
+
+| Credential | Proof | Principal | Can decrypt? |
+|---|---|---|---|
+| Web session | email + password (argon2) | `AccountPrincipal(account_id)` | no |
+| Device session | age challenge/response | `DevicePrincipal(device, account)` | yes (its own key) |
+
+Auth methods are modeled for extension: `account_identities (provider,
+identifier, secret)` — `password` today, OAuth later as a new provider with no
+schema change.
+
+**Endpoints**
+
+- `POST /accounts` — register `{email, password, recovery_pubkey?}` → web session.
+- `POST /accounts/login` — `{email, password}` → web session.
+- `GET /accounts/me` — current account incl. `recovery_pubkey`; accepts a **web
+  or device** token (the CLI reads its recovery key here).
+- `POST /enroll/invite` — accepts a **web or device** principal (via
+  `get_account_id`), so the browser can mint a CLI device's code.
+
+**CLI onboarding — link, don't register.** Every device, including the first,
+joins via an invite:
+
+1. Web: register (browser mints the recovery keypair, sends only the pubkey,
+   shows the private half once) → logged-in session.
+2. Web "Link a device" → `POST /enroll/invite` → shows `goph link <code>`.
+3. CLI: `goph link <code>` → `POST /enroll/join` → device enrolled (first device
+   becomes the first key-holder).
+4. CLI `goph sync` authenticates (age challenge) and, in reshare, reads
+   `GET /accounts/me` and seals every secret to the devices **plus the recovery
+   key** (mirrored locally as a trusted recipient; the server drops it from the
+   pull mirror since it is a key, not a device).
+
+**Linking handshake — path A (implemented) vs B (planned).** Today the web is
+"an authority that mints an invite code" (path **A**), reusing the existing
+invite/join machinery — the code is copied to the terminal. The nicer future UX
+is path **B**, an OAuth 2.0 **Device Authorization Grant** (`gh auth login`
+style): the CLI shows a `user_code` + URL, the user approves in the logged-in
+browser, and the CLI polls to completion — no code pasting. B is deferred.
+
+**Still pending in this migration:** removing the CLI's own account-bootstrap
+(`POST /devices` register + auto-register on first sync) so onboarding is
+link-only; and the browser recovery-keypair generation (other dev). Until the
+CLI bootstrap is removed, `goph sync` on an unlinked device still self-registers.
