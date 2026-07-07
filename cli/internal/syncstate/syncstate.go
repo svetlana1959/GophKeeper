@@ -25,9 +25,9 @@ type Dirty struct {
 type Repository interface {
 	GetState() (*State, error) // ErrNoState before the first sync
 	SaveState(s *State) error
-	MarkDirty(secretID string) error                    // a local change needs push
+	MarkDirty(secretID string) error                     // a local change needs push
 	MarkSynced(secretID string, serverVersion int) error // reconciled with the server
-	ListDirty() ([]Dirty, error)                        // secrets needing push
+	ListDirty() ([]Dirty, error)                         // secrets needing push
 }
 
 // ErrNoState is returned by GetState before this device has synced.

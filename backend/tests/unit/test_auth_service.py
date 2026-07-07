@@ -89,9 +89,7 @@ async def test_challenge_verify_issues_usable_session():
 
     # The device decrypts the challenge with its private key.
     nonce = decrypt(ciphertext, [identity])
-    access_token, expires_in = await service.verify(
-        challenge_token=challenge_token, nonce=nonce
-    )
+    access_token, expires_in = await service.verify(challenge_token=challenge_token, nonce=nonce)
     assert expires_in > 0
     assert device.last_seen_at is not None  # verify recorded the login
 
