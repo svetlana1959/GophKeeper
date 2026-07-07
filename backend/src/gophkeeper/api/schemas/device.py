@@ -8,11 +8,6 @@ from pydantic import BaseModel, Field
 from gophkeeper.domain.device import Device
 
 
-class RegisterDeviceRequest(BaseModel):
-    device_name: str = Field(description="Human-readable name for this device.")
-    public_key: str = Field(description="The device's age public key (age1…).")
-
-
 class DeviceResponse(BaseModel):
     id: UUID
     account_id: UUID

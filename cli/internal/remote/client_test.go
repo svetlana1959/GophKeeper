@@ -21,7 +21,6 @@ import (
 // end to end without the Python backend.
 type fakeBackend struct {
 	publicKey     string
-	registerConf  bool // make /devices answer 409
 	unknownDevice bool // make /auth/challenge answer 401
 	nonceByToken  map[string][]byte
 	issuedToken   string
@@ -40,16 +39,6 @@ func newFakeBackend(publicKey string) *fakeBackend {
 
 func (f *fakeBackend) handler(t *testing.T) http.Handler {
 	mux := http.NewServeMux()
-
-	mux.HandleFunc("POST /devices", func(w http.ResponseWriter, r *http.Request) {
-		if f.registerConf {
-			writeJSON(w, http.StatusConflict, map[string]string{"detail": "device already exists"})
-			return
-		}
-		writeJSON(w, http.StatusCreated, remote.Device{
-			ID: "dev-1", AccountID: "acc-1", Name: "laptop", PublicKey: f.publicKey, Status: "active",
-		})
-	})
 
 	mux.HandleFunc("POST /auth/challenge", func(w http.ResponseWriter, r *http.Request) {
 		if f.unknownDevice {
@@ -208,34 +197,6 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 func decryptWith(priv string) remote.DecryptFunc {
 	return func(ciphertext []byte) ([]byte, error) {
 		return crypto.Engine{}.Open(ciphertext, priv)
-	}
-}
-
-func TestRegister(t *testing.T) {
-	kp, _ := crypto.GenerateKeyPair()
-	be := newFakeBackend(kp.Public)
-	srv := httptest.NewServer(be.handler(t))
-	defer srv.Close()
-
-	dev, err := remote.New(srv.URL).Register(context.Background(), "laptop", kp.Public)
-	if err != nil {
-		t.Fatalf("register: %v", err)
-	}
-	if dev.ID == "" || dev.AccountID == "" || dev.PublicKey != kp.Public {
-		t.Fatalf("unexpected device: %+v", dev)
-	}
-}
-
-func TestRegisterConflict(t *testing.T) {
-	kp, _ := crypto.GenerateKeyPair()
-	be := newFakeBackend(kp.Public)
-	be.registerConf = true
-	srv := httptest.NewServer(be.handler(t))
-	defer srv.Close()
-
-	_, err := remote.New(srv.URL).Register(context.Background(), "laptop", kp.Public)
-	if !errors.Is(err, remote.ErrConflict) {
-		t.Fatalf("want ErrConflict, got %v", err)
 	}
 }
 

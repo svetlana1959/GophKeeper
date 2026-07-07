@@ -4,7 +4,7 @@ import pytest
 
 from gophkeeper.domain.account import Account
 from gophkeeper.domain.device import Device
-from gophkeeper.domain.errors import DeviceAlreadyExists, DeviceNotFound
+from gophkeeper.domain.errors import DeviceNotFound
 from gophkeeper.services.device_service import DeviceService
 
 
@@ -61,46 +61,6 @@ class FakeUnitOfWork:
 
     async def rollback(self):
         pass
-
-
-async def test_register_creates_account_and_active_device():
-    uow = FakeUnitOfWork()
-    service = DeviceService(uow)
-
-    device = await service.register(
-        device_name="MacBook",
-        public_key="pubkey",
-    )
-
-    assert device.id is not None
-    assert device.device_name == "MacBook"
-    assert device.public_key == "pubkey"
-    assert device.is_active is True
-    assert device.account_id in uow.accounts.accounts
-    assert uow.committed is True
-
-
-async def test_register_duplicate_public_key_raises_device_already_exists():
-    uow = FakeUnitOfWork()
-
-    existing = Device(
-        id=uuid4(),
-        account_id=uuid4(),
-        device_name="MacBook",
-        public_key="pubkey",
-    )
-    await uow.devices.add(existing)
-
-    service = DeviceService(uow)
-
-    with pytest.raises(DeviceAlreadyExists):
-        await service.register(
-            device_name="Another Name",
-            public_key="pubkey",
-        )
-
-    # The duplicate is rejected before any account is created.
-    assert uow.accounts.accounts == {}
 
 
 async def test_fetch_returns_device():

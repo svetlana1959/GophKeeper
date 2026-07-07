@@ -46,13 +46,6 @@ func (b *syncBackend) authed(r *http.Request) bool {
 func (b *syncBackend) handler(t *testing.T) http.Handler {
 	mux := http.NewServeMux()
 
-	mux.HandleFunc("POST /devices", func(w http.ResponseWriter, _ *http.Request) {
-		respond(w, http.StatusCreated, map[string]any{
-			"id": "dev-1", "account_id": "acc-1", "device_name": "d",
-			"public_key": b.publicKey, "status": "active",
-		})
-	})
-
 	mux.HandleFunc("POST /auth/challenge", func(w http.ResponseWriter, _ *http.Request) {
 		ct, err := crypto.Engine{}.Seal(b.nonce, []string{b.publicKey})
 		if err != nil {
@@ -184,7 +177,16 @@ func respond(w http.ResponseWriter, status int, v any) {
 	_ = json.NewEncoder(w).Encode(v)
 }
 
-func TestSync_RegistersAndPushes(t *testing.T) {
+// mustLink onboards the session onto an account via an invite code, the only way
+// a device joins now that the CLI no longer bootstraps accounts.
+func mustLink(t *testing.T, sess *app.Session) {
+	t.Helper()
+	if err := sess.Link(context.Background(), "GK-CODE"); err != nil {
+		t.Fatalf("Link: %v", err)
+	}
+}
+
+func TestSync_PushesAfterLink(t *testing.T) {
 	setHome(t)
 	be := newSyncBackend()
 	srv := httptest.NewServer(be.handler(t))
@@ -201,6 +203,8 @@ func TestSync_RegistersAndPushes(t *testing.T) {
 		t.Fatalf("Open: %v", err)
 	}
 	defer sess.Close()
+
+	mustLink(t, sess)
 
 	mustSet(t, sess, app.SetParams{Name: "a", Value: []byte("1")})
 	mustSet(t, sess, app.SetParams{Name: "b", Value: []byte("2")})
@@ -253,6 +257,8 @@ func TestSync_ConcurrentEditForksConflictCopy(t *testing.T) {
 		t.Fatalf("Open: %v", err)
 	}
 	defer sess.Close()
+
+	mustLink(t, sess)
 
 	// Create and sync "a" (server version 1).
 	mustSet(t, sess, app.SetParams{Name: "a", Value: []byte("local-v1")})
@@ -319,6 +325,8 @@ func TestSync_PullsRemoteSecret(t *testing.T) {
 	}
 	defer sess.Close()
 
+	mustLink(t, sess)
+
 	out, err := sess.Sync(context.Background(), "")
 	if err != nil {
 		t.Fatalf("Sync: %v", err)
@@ -360,6 +368,8 @@ func TestCreateInvite(t *testing.T) {
 	}
 	defer sess.Close()
 
+	mustLink(t, sess)
+
 	inv, err := sess.CreateInvite(context.Background(), "")
 	if err != nil {
 		t.Fatalf("CreateInvite: %v", err)
@@ -391,6 +401,8 @@ func TestSync_SealsSecretsToRecoveryKey(t *testing.T) {
 		t.Fatalf("Open: %v", err)
 	}
 	defer sess.Close()
+
+	mustLink(t, sess)
 
 	mustSet(t, sess, app.SetParams{Name: "a", Value: []byte("1")})
 	out, err := sess.Sync(context.Background(), "")
@@ -432,6 +444,8 @@ func TestListDevices(t *testing.T) {
 		t.Fatalf("Open: %v", err)
 	}
 	defer sess.Close()
+
+	mustLink(t, sess)
 
 	// ListDevices is read-only and won't bootstrap an account; sync first to bind.
 	if _, err := sess.Sync(context.Background(), ""); err != nil {
@@ -528,6 +542,8 @@ func TestSync_ResharesToAccountDevices(t *testing.T) {
 	}
 	defer sess.Close()
 
+	mustLink(t, sess)
+
 	mustSet(t, sess, app.SetParams{Name: "gh", Value: []byte("tok")})
 
 	out, err := sess.Sync(context.Background(), "")
@@ -592,6 +608,8 @@ func TestSync_PullRecoversNameFromPayload(t *testing.T) {
 		t.Fatalf("Open: %v", err)
 	}
 	defer sess.Close()
+
+	mustLink(t, sess)
 
 	if _, err := sess.Sync(context.Background(), ""); err != nil {
 		t.Fatalf("Sync: %v", err)

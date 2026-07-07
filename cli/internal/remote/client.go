@@ -71,17 +71,6 @@ type Identity struct {
 	AccountID string `json:"account_id"`
 }
 
-// Register creates a fresh account owning this device and returns it. The server
-// mints the device id. ErrConflict means the public key is already registered.
-func (c *Client) Register(ctx context.Context, deviceName, publicKey string) (Device, error) {
-	body := map[string]string{"device_name": deviceName, "public_key": publicKey}
-	var out Device
-	if err := c.do(ctx, http.MethodPost, "/devices", body, &out); err != nil {
-		return Device{}, err
-	}
-	return out, nil
-}
-
 // Authenticate runs the age challenge/response and stores the resulting session
 // token on the client. decrypt recovers the nonce from the challenge ciphertext.
 // ErrUnauthorized means the device is unknown or revoked.

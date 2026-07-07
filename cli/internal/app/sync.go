@@ -92,8 +92,13 @@ func (s *Session) connect(
 
 	client := remote.New(s.cfg.Remote)
 	st := s.db.Sync()
-	state, err := s.ensureRegistered(ctx, client, st)
-	if err != nil {
+	// This device must already be linked to an account. Onboarding is
+	// link-only (`goph link <code>` with a code from the web or another
+	// device); the CLI never creates an account.
+	state, err := st.GetState()
+	if errors.Is(err, syncstate.ErrNoState) {
+		return nil, nil, nil, "", ErrNotLinked
+	} else if err != nil {
 		return nil, nil, nil, "", err
 	}
 
@@ -104,29 +109,6 @@ func (s *Session) connect(
 		return nil, nil, nil, "", fmt.Errorf("app: authenticate: %w", err)
 	}
 	return client, st, state, priv, nil
-}
-
-// ensureRegistered loads the device's account binding, registering on first sync.
-func (s *Session) ensureRegistered(
-	ctx context.Context, client *remote.Client, st syncstate.Repository,
-) (*syncstate.State, error) {
-	state, err := st.GetState()
-	if err == nil {
-		return state, nil
-	}
-	if !errors.Is(err, syncstate.ErrNoState) {
-		return nil, err
-	}
-
-	dev, err := client.Register(ctx, s.cfg.DeviceName, s.localPub)
-	if err != nil {
-		return nil, fmt.Errorf("app: register device: %w", err)
-	}
-	state = &syncstate.State{AccountID: dev.AccountID, DeviceID: dev.ID}
-	if err := st.SaveState(state); err != nil {
-		return nil, err
-	}
-	return state, nil
 }
 
 // applyPull fetches the server delta and applies it locally, returning how many

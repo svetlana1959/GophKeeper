@@ -1,41 +1,20 @@
-"""Devices endpoints"""
+"""Devices endpoints.
+
+Devices are read-only here: they are created by joining an account with an
+invite (`/enroll/join`), never by the CLI bootstrapping an account. Account
+creation lives on the web (`/accounts`).
+"""
 
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends
 
 from gophkeeper.api.deps import get_principal, provide
-from gophkeeper.api.schemas.device import (
-    DeviceResponse,
-    RegisterDeviceRequest,
-)
+from gophkeeper.api.schemas.device import DeviceResponse
 from gophkeeper.security.principal import DevicePrincipal
 from gophkeeper.services.device_service import DeviceService
 
 router = APIRouter(prefix="/devices", tags=["devices"])
-
-
-@router.post(
-    "",
-    response_model=DeviceResponse,
-    status_code=status.HTTP_201_CREATED,
-    summary="Register a first device (bootstrap a new account)",
-    responses={409: {"description": "This public key is already registered."}},
-)
-async def register_device(
-    body: RegisterDeviceRequest,
-    service: DeviceService = Depends(provide(DeviceService)),
-) -> DeviceResponse:
-    """Create a new account owning this device.
-
-    Used by the first device of an account; the server mints the device id.
-    Additional devices join an existing account via `/enroll/join` instead.
-    """
-    device = await service.register(
-        device_name=body.device_name,
-        public_key=body.public_key,
-    )
-    return DeviceResponse.from_domain(device)
 
 
 @router.get(
