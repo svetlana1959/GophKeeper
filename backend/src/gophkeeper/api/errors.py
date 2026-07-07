@@ -13,6 +13,7 @@ from gophkeeper.domain.errors import (
     AuthenticationError,
     DeviceAlreadyExists,
     DeviceNotFound,
+    EmailAlreadyRegistered,
     InvalidInvite,
     SecretNotFound,
     VersionConflict,
@@ -38,7 +39,7 @@ async def _not_found_handler(
 
 
 async def _conflict_handler(
-    request: Request, exc: VersionConflict | DeviceAlreadyExists
+    request: Request, exc: VersionConflict | DeviceAlreadyExists | EmailAlreadyRegistered
 ) -> JSONResponse:
     body = {"detail": str(exc)}
     if isinstance(exc, VersionConflict):
@@ -67,5 +68,6 @@ def register_exception_handlers(app: FastAPI) -> None:
     app.add_exception_handler(SecretNotFound, _not_found_handler)  # type: ignore[arg-type]
     app.add_exception_handler(DeviceNotFound, _not_found_handler)
     app.add_exception_handler(DeviceAlreadyExists, _conflict_handler)
+    app.add_exception_handler(EmailAlreadyRegistered, _conflict_handler)
     app.add_exception_handler(VersionConflict, _conflict_handler)  # type: ignore[arg-type]
     app.add_exception_handler(IntegrityError, _integrity_handler)  # type: ignore[arg-type]

@@ -1,11 +1,12 @@
 """Enrollment endpoints — invite a device, join with a code."""
 
+from uuid import UUID
+
 from fastapi import APIRouter, Depends, status
 
-from gophkeeper.api.deps import get_principal, provide
+from gophkeeper.api.deps import get_account_id, provide
 from gophkeeper.api.schemas.device import DeviceResponse
 from gophkeeper.api.schemas.enroll import CreateInviteResponse, JoinRequest
-from gophkeeper.security.principal import DevicePrincipal
 from gophkeeper.services.enrollment_service import EnrollmentService
 
 router = APIRouter(prefix="/enroll", tags=["enroll"])
@@ -18,15 +19,16 @@ router = APIRouter(prefix="/enroll", tags=["enroll"])
     responses={401: {"description": "Missing, invalid, or expired bearer token."}},
 )
 async def create_invite(
-    principal: DevicePrincipal = Depends(get_principal),
+    account_id: UUID = Depends(get_account_id),
     service: EnrollmentService = Depends(provide(EnrollmentService)),
 ) -> CreateInviteResponse:
     """Mint a single-use, expiring code for a new device to join this account.
 
-    The plaintext code is returned **once** (only its hash is stored). Share it
-    with the new device, which calls `/enroll/join`.
+    Callable by a logged-in **web session** (the webapp linking a CLI device) or
+    by an already-linked **device**. The plaintext code is returned **once**
+    (only its hash is stored); the new device calls `/enroll/join`.
     """
-    invite, code = await service.create_invite(account_id=principal.account_id)
+    invite, code = await service.create_invite(account_id=account_id)
     return CreateInviteResponse(code=code, expires_at=invite.expires_at)
 
 

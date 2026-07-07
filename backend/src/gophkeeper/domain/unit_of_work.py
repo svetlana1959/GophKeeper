@@ -16,6 +16,7 @@ from typing import Protocol, Self
 
 from gophkeeper.domain.account import AccountRepository
 from gophkeeper.domain.device import DeviceRepository
+from gophkeeper.domain.identity import IdentityRepository
 from gophkeeper.domain.invite import InviteRepository
 from gophkeeper.domain.secret import SecretRepository
 
@@ -29,6 +30,7 @@ class UnitOfWork(Protocol):
     secrets: SecretRepository
     devices: DeviceRepository
     invites: InviteRepository
+    identities: IdentityRepository
 
     async def __aenter__(self) -> Self: ...
 

@@ -14,7 +14,7 @@ from fastapi import FastAPI
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from gophkeeper.api.errors import register_exception_handlers
-from gophkeeper.api.routers import auth, device, enroll, sync
+from gophkeeper.api.routers import account, auth, device, enroll, sync
 from gophkeeper.infrastructure.adapters.database import SqlAlchemyAdapter
 from gophkeeper.settings.settings import settings
 
@@ -33,6 +33,14 @@ _TAGS_METADATA = [
             "Zero-knowledge synchronization. Push opaque ciphertext under optimistic "
             "concurrency and pull the per-device delta since a cursor. The server never "
             "decrypts; it only relays and orders."
+        ),
+    },
+    {
+        "name": "accounts",
+        "description": (
+            "Web account authority. Register / log in with email + password and read "
+            "the current account. Issues a bearer session that identifies the account "
+            "but holds no key and can decrypt nothing."
         ),
     },
     {
@@ -80,6 +88,7 @@ def create_app() -> FastAPI:
         return {"status": "ok"}
 
     app.include_router(auth.router)
+    app.include_router(account.router)
     app.include_router(sync.router)
     app.include_router(enroll.router)
     app.include_router(device.router)
