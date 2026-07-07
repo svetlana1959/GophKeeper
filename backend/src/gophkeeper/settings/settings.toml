@@ -3,6 +3,13 @@ application_name = "GophKeeper"
 description = "Zero-knowledge secret store. The server only ever sees ciphertext."
 trusted_hosts = ["*"]
 
+[default.security]
+# Local-dev HMAC key. Override in production via GOPH_SECURITY__SECRET_KEY.
+secret_key = "dev-insecure-change-me"
+challenge_ttl_seconds = 120
+session_ttl_seconds = 3600
+invite_ttl_seconds = 600
+
 [default.run_settings]
 logging_level = "INFO"
 
