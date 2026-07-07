@@ -21,6 +21,7 @@ import (
 type syncBackend struct {
 	publicKey      string
 	extraDevicePub string // a second account device, if set
+	recoveryPubkey string // the account recovery key, if set
 	token          string
 	nonce          []byte
 	secrets        map[string]storedSecret
@@ -117,6 +118,16 @@ func (b *syncBackend) handler(t *testing.T) http.Handler {
 			})
 		}
 		respond(w, http.StatusOK, devices)
+	})
+
+	mux.HandleFunc("GET /accounts/me", func(w http.ResponseWriter, r *http.Request) {
+		if !b.authed(r) {
+			respond(w, http.StatusUnauthorized, map[string]any{"detail": "unauthorized"})
+			return
+		}
+		respond(w, http.StatusOK, map[string]any{
+			"id": "acc-1", "recovery_pubkey": b.recoveryPubkey,
+		})
 	})
 
 	mux.HandleFunc("POST /enroll/invite", func(w http.ResponseWriter, r *http.Request) {
@@ -355,6 +366,50 @@ func TestCreateInvite(t *testing.T) {
 	}
 	if inv.Code != "GK-CODE" {
 		t.Fatalf("invite code = %q, want GK-CODE", inv.Code)
+	}
+}
+
+func TestSync_SealsSecretsToRecoveryKey(t *testing.T) {
+	setHome(t)
+	be := newSyncBackend()
+	recovery, err := crypto.GenerateKeyPair()
+	if err != nil {
+		t.Fatalf("GenerateKeyPair: %v", err)
+	}
+	be.recoveryPubkey = recovery.Public
+	srv := httptest.NewServer(be.handler(t))
+	defer srv.Close()
+
+	res, err := app.Init(app.InitParams{DeviceName: "laptop", Remote: srv.URL})
+	if err != nil {
+		t.Fatalf("Init: %v", err)
+	}
+	be.publicKey = res.PublicKey
+
+	sess, err := app.Open()
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	defer sess.Close()
+
+	mustSet(t, sess, app.SetParams{Name: "a", Value: []byte("1")})
+	out, err := sess.Sync(context.Background(), "")
+	if err != nil {
+		t.Fatalf("Sync: %v", err)
+	}
+	if out.Reshared < 1 {
+		t.Fatalf("sync = %+v, want the secret resealed to include the recovery key", out)
+	}
+
+	// The pushed ciphertext must be decryptable with the recovery private key —
+	// proof it was sealed to the recovery recipient, so an all-devices-lost
+	// recovery could read it.
+	var ct []byte
+	for _, s := range be.secrets {
+		ct = s.ct
+	}
+	if _, err := (crypto.Engine{}).Open(ct, recovery.Private); err != nil {
+		t.Fatalf("recovery key cannot decrypt the pushed secret: %v", err)
 	}
 }
 

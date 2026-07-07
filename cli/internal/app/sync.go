@@ -258,7 +258,7 @@ func (s *Session) applyReshare(
 		return 0, fmt.Errorf("app: list devices: %w", err)
 	}
 
-	desired := make([]string, 0, len(devices))
+	desired := make([]string, 0, len(devices)+1)
 	for _, d := range devices {
 		if d.Status != "active" {
 			continue
@@ -267,6 +267,21 @@ func (s *Session) applyReshare(
 		if err := s.rememberDevice(d); err != nil {
 			return 0, err
 		}
+	}
+
+	// The account's recovery key is a standing recipient of every secret, so its
+	// offline private key can decrypt them if all devices are lost. It is a key,
+	// not a device (it never pulls), so the server drops it from the recipient
+	// mirror; we still seal the ciphertext to it. Empty until the web mints one.
+	acc, err := client.Account(ctx)
+	if err != nil {
+		return 0, fmt.Errorf("app: fetch account: %w", err)
+	}
+	if acc.RecoveryPubkey != "" {
+		if err := s.rememberRecoveryKey(acc.RecoveryPubkey); err != nil {
+			return 0, err
+		}
+		desired = append(desired, acc.RecoveryPubkey)
 	}
 
 	secs, err := s.secrets.List(false) // active secrets only; tombstones carry no payload
@@ -311,6 +326,24 @@ func (s *Session) rememberDevice(d remote.Device) error {
 	}
 	return s.db.Devices().Save(&device.Device{
 		ID: d.ID, Name: d.Name, PublicKey: d.PublicKey, Active: true, UpdatedAt: time.Now().UTC(),
+	})
+}
+
+// recoveryKeyID is the stable local id for the account recovery key. It is not a
+// real device (never a UUID, never pulls); mirroring it as a trusted recipient
+// just lets the vault resolve it when a secret is sealed to it.
+const recoveryKeyID = "recovery-key"
+
+// rememberRecoveryKey mirrors the account recovery public key into the local
+// trusted set so secrets can be sealed to it.
+func (s *Session) rememberRecoveryKey(pub string) error {
+	if _, err := s.db.Devices().FindByPublicKey(pub); err == nil {
+		return nil
+	} else if !errors.Is(err, device.ErrNotFound) {
+		return err
+	}
+	return s.db.Devices().Save(&device.Device{
+		ID: recoveryKeyID, Name: "recovery", PublicKey: pub, Active: true, UpdatedAt: time.Now().UTC(),
 	})
 }
 

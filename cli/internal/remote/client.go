@@ -256,6 +256,25 @@ func (c *Client) ListDevices(ctx context.Context) ([]Device, error) {
 	return devices, nil
 }
 
+// Account is the caller's account as reported by the server.
+type Account struct {
+	ID             string `json:"id"`
+	RecoveryPubkey string `json:"recovery_pubkey"` // "" when no recovery key is set
+}
+
+// Account returns the caller's account (including its recovery public key, if
+// set). Requires a prior Authenticate.
+func (c *Client) Account(ctx context.Context) (Account, error) {
+	if c.token == "" {
+		return Account{}, ErrNotAuthed
+	}
+	var acc Account
+	if err := c.do(ctx, http.MethodGet, "/accounts/me", nil, &acc); err != nil {
+		return Account{}, err
+	}
+	return acc, nil
+}
+
 // Invite is a single-use pairing code for linking a new device.
 type Invite struct {
 	Code      string    `json:"code"`
