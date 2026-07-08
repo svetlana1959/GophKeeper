@@ -30,8 +30,10 @@ function Authorization() {
                         <label htmlFor="input">Username</label>
                         <input className={`${styles.input} ${styles.userInput}`} name='username' placeholder='Enter your username' />
                         <label htmlFor="input">Password</label>
-                        <input className={`${styles.input} ${styles.passInput}`} name='password' type='password' placeholder='Enter your password' />
-                        <button className={styles.submitButton} style={{marginTop: "64px"}}>Log in</button>
+                        <dir className={styles.inputWrapper}>
+                            <input className={`${styles.input} ${styles.passInput}`} name='password' type='password' placeholder='Enter your password' />
+                        </dir>
+                        <button className={styles.submitButton} style={{ marginTop: "64px" }}>Log in</button>
                     </form>
                     <div className={styles.hr}>
                         <div className={styles.hrLine}></div>
@@ -39,7 +41,7 @@ function Authorization() {
                         <div className={styles.hrLine}></div>
                     </div>
                     <div className={styles.footer}>
-                        Don't have account? <Link to='/register' style={{color: "#23BD21", fontWeight: "500"}}>Create account</Link>
+                        Don't have account? <Link to='/register' style={{ color: "#23BD21", fontWeight: "500" }}>Create account</Link>
                     </div>
                 </div>
             </div>
