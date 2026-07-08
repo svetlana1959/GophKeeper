@@ -69,6 +69,8 @@
     background-repeat: no-repeat;
 }
 
+/* ~~~~~~~~ Why Us Section ~~~~~~~~ */
+
 .whyUs {
     display: flex;
     flex-direction: column;
@@ -98,10 +100,12 @@
 }
 
 .whyUsContainer {
+    position: relative;
     margin-top: 35px;
     display: flex;
     justify-content: space-between;
     gap: 4.5%;
+    width: 100%;
 }
 
 .whyUsContainerChild {
@@ -109,11 +113,10 @@
     display: flex;
     flex-direction: column;
     /* min-height: 40vh; */
-    min-width: 300px;
     background: linear-gradient(#0173364C, #00150A4C);
     border-radius: 40px;
     border: 1px solid #23BD21;
-    flex: 1 0 0;
+    width: calc((100% - (4.5% * 3)) / 4);
     padding: 4% 2% 2% 2%;
     box-sizing: border-box;
 }
@@ -129,6 +132,7 @@
     border-radius: 15px;
     padding: 20px 25px;
     box-sizing: border-box;
+
     img {
         width: 100%;
         height: 100%;
@@ -136,11 +140,12 @@
 }
 
 .whyUsContainerChildTitle {
-    height: 72px;
+    min-height: 72px;
     font-size: 32px;
     color: #F4F5F5;
     font-weight: 600;
     margin-top: 24px;
+    max-width: 100%;
 }
 
 .whyUsContainerChildSubtitle {
@@ -158,11 +163,12 @@
     flex-direction: column;
     gap: 24px;
     bottom: 0;
-    width: 100%;
+    width: 80%;
 }
 
 .whyUsContainerChildFooterHr {
     width: 16.6%;
+    min-width: 40px;
     background: #23BD21;
     height: 3px;
     border-radius: 1px;
@@ -234,4 +240,714 @@
 .whyUsFooterContent:last-child::after {
     height: 0;
     width: 0;
+}
+
+
+/* ~~~~~~~~ How It Works Section ~~~~~~~~ */
+
+.howItWorks {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 100px 10%;
+    box-sizing: border-box;
+    /* gap: 10px; */
+}
+
+.howItWorksTitle {
+    font-size: 64px;
+    color: #FFFFFF;
+    font-weight: 600;
+    display: flex;
+    gap: 20px;
+}
+
+.howItWorksSubtitle {
+    font-size: 24px;
+    color: #D9D9D9;
+    opacity: 0.65;
+    display: flex;
+    font-weight: 200;
+    text-align: center;
+}
+
+.howItWorksContainer {
+    position: relative;
+    display: flex;
+    justify-content: space-between;
+    align-items: start;
+    width: 100%;
+    gap: 10%;
+    margin-top: 102px;
+}
+
+.howItWorksContainerChildren {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    width: calc((100% - (10% * 3)) / 4);
+    /* background: red; */
+}
+
+.howItWorksContainerChildren::after {
+    content: "";
+    position: absolute;
+    top: 40px;
+    right: 0;
+    width: calc((100% / 25) * 10 * 1.4);
+    height: 2px;
+    background-image: linear-gradient(90deg, #23bd21 30%, transparent 30%);
+    background-position: bottom;
+    background-size: 5px 2px;
+    background-repeat: repeat-x;
+    border: none;
+    transform: translateX(80%);
+}
+
+.howItWorksContainerChildren:last-child:after {
+    content: "";
+    background: none;
+    width: 0;
+}
+
+.howItWorksContainerChildrenMain {
+    position: relative;
+    display: flex;
+    width: 80%;
+    align-items: center;
+    gap: 40px;
+}
+
+.howItWorksContainerChildrenMainNumber {
+    width: 62px;
+    height: 62px;
+    border-radius: 50%;
+    background: linear-gradient(#23BD21, #005C2B);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #FFFFFF;
+    font-size: 32px;
+    font-weight: 600;
+    margin-top: 12px;
+    margin-bottom: 7px;
+}
+
+
+.howItWorksContainerChildrenMainIcon {
+    flex: 1 0 0;
+    height: 81px;
+    background-repeat: no-repeat;
+    background-size: contain;
+    background-position: 0 center;
+}
+
+.howItWorksContainerChildrenTitle {
+    height: 38px;
+    color: #008645;
+    font-size: 32px;
+    font-weight: 600;
+    margin-top: 52px;
+    word-spacing: 10%;
+}
+
+.howItWorksContainerChildrenSubtitle {
+    color: #FEFDFD;
+    opacity: 0.7;
+    font-size: 20px;
+    margin-top: 48px;
+    font-weight: 200;
+}
+
+/* ~~~~~~~~ Built Section ~~~~~~~~ */
+
+.built {
+    position: relative;
+    display: flex;
+    width: 100%;
+    padding: 2% 10%;
+    box-sizing: border-box;
+    align-items: stretch;
+    gap: 38px;
+    margin-top: 102px;
+}
+
+.builtLeftBlock {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    width: 32%;
+}
+
+.builtTitle {
+    font-size: 58px;
+    font-weight: 600;
+    color: #FFFFFF;
+}
+
+.builtSubtitle {
+    font-size: 24px;
+    font-weight: 200;
+    color: #D9D9D9;
+    opacity: 0.65;
+    margin-top: 36px;
+}
+
+.builtTerminal {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    padding: 5% 7%;
+    box-sizing: border-box;
+    font-weight: 200;
+    font-size: 16px;
+    background: linear-gradient(140deg, #b1b1b136, #0f0f0f36);
+    border: 1px solid rgba(255, 255, 255, 0.29);
+    border-radius: 10px;
+    margin-top: 102px;
+    width: 100%;
+    min-width: 340px;
+}
+
+.builtTerminalComment {
+    color: #23BD21;
+    margin-top: 20px;
+    pointer-events: none
+}
+
+.builtTerminalComment:first-child {
+    margin-top: 0;
+}
+
+.builtTerminalCode {
+    color: #FFFFFF;
+    margin-top: 5px;
+    pointer-events: none
+}
+
+.builtTerminalCopyButton {
+    position: absolute;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 23px;
+    width: 23px;
+    background: none;
+    border: none;
+    right: 4.55%;
+    top: 6%;
+    cursor: pointer;
+}
+
+.builtRightBlock {
+    position: relative;
+    display: flex;
+    align-items: stretch;
+    justify-content: space-between;
+    flex: 1 0 0;
+    gap: 38px;
+}
+
+.builtSecretsList {
+    position: relative;
+    display: flex;
+    /* ИСПРАВЛЕНИЕ: Проценты в padding заменяем на фиксированные px, чтобы на мобильных не съедалось место */
+    padding: 40px 24px;
+    box-sizing: border-box;
+    height: 100%;
+    flex-direction: column;
+    background: linear-gradient(140deg, #b1b1b136, #0f0f0f36);
+    border: 1px solid rgba(255, 255, 255, 0.29);
+    border-radius: 10px;
+
+    /* ИСПРАВЛЕНИЕ: Убираем max-content. Блок теперь занимает всю доступную ширину и сжимается */
+    width: 100%;
+    max-width: 1200px;
+    /* Опционально: максимальная ширина дашборда на больших мониторах */
+    margin: 0 auto;
+    /* Центрируем блок, если экран очень большой */
+}
+
+.builtSecretsListTitle {
+    font-size: 32px;
+    font-weight: 600;
+    color: #FFFFFF;
+}
+
+.builtSecretsListActionPanel {
+    display: flex;
+    width: 100%;
+    margin-top: 36px;
+    gap: 16px;
+    /* Чуть уменьшили зазор для мобильных */
+    box-sizing: border-box;
+}
+
+
+
+.builtSecretsListActionPanelInput {
+    /* ИСПРАВЛЕНИЕ: flex-grow позволит инпуту забирать все свободное место слева от кнопки */
+    flex-grow: 1;
+    outline: none;
+    background: rgba(0, 0, 0, 0.19);
+    border: 1px solid rgba(255, 255, 255, 0.5);
+    border-radius: 5px;
+    color: rgba(255, 255, 255, 0.5);
+    font-size: 14px;
+    padding: 20px 25px;
+    padding-left: 40px;
+    background-position: 15px center;
+    background-repeat: no-repeat;
+    background-size: 21px 21px;
+}
+
+.builtSecretsListActionPanelAddButton {
+    /* ИСПРАВЛЕНИЕ: Запрещаем кнопке сжиматься и фиксируем её ширину/отступы */
+    flex-shrink: 0;
+    background: #008645;
+    padding: 20px 28px;
+    border: none;
+    min-width: 140px;
+    color: #FFFFFF;
+    border-radius: 7px;
+    cursor: pointer;
+}
+
+.builtSecretsListTableBlock {
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 12px;
+    padding: 24px;
+    margin-top: 48px;
+    box-sizing: border-box;
+
+    /* ИСПРАВЛЕНИЕ: Это ключевое свойство. Если таблица шире экрана, */
+    /* скролл появится ТОЛЬКО внутри этого серого блока */
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    /* Плавный скролл на iOS */
+}
+
+/* Опционально: делаем скроллбар более красивым и тонким в Webkit (Chrome/Safari) */
+.builtSecretsListTableBlock::-webkit-scrollbar {
+    height: 6px;
+}
+
+.builtSecretsListTableBlock::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.1);
+    border-radius: 10px;
+}
+
+.builtSecretsListTableBlock::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 10px;
+}
+
+.builtSecretsListTableBlock::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.4);
+}
+
+.builtSecretsListTable {
+    width: 100%;
+    border-collapse: collapse;
+    /* ИСПРАВЛЕНИЕ: Задаем минимальную ширину самой таблице. */
+    /* Ниже этого значения она не сожмется, гарантируя, что текст не налезет друг на друга */
+    min-width: 300px;
+}
+
+
+.builtSecretsListTableTr {
+    /* УБРАЛИ display: flex */
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Стили ячеек (и th, и td) */
+.builtSecretsListTableHeadTr th,
+.builtSecretsListTableTr td {
+    padding: 20px 24px;
+    /* Задаем внутренние отступы между колонками */
+    vertical-align: middle;
+    /* Выравниваем контент внутри ячеек по центру */
+    text-align: left;
+    white-space: nowrap;
+    /* Запрещаем перенос текста везде, кроме колонки Name */
+}
+
+/* Первую колонку прижимаем к левому краю, последнюю к правому */
+.builtSecretsListTableHeadTr th:first-child,
+.builtSecretsListTableTr td:first-child {
+    padding-left: 0;
+}
+
+.builtSecretsListTableHeadTr th:last-child,
+.builtSecretsListTableTr td:last-child {
+    padding-right: 0;
+}
+
+/* Шапка */
+.builtSecretsListTableHeadTr th {
+    color: rgba(255, 255, 255, 0.4);
+    font-size: 13px;
+    font-weight: 500;
+    padding-top: 0;
+    /* Убираем верхний отступ у шапки */
+}
+
+/* ---- УПРАВЛЕНИЕ ШИРИНОЙ КОЛОНОК ЧЕРЕЗ АВТО-РАСТЯЖЕНИЕ ---- */
+
+.colType {
+    width: 1%;
+    /* Занимает самый минимум места по размеру иконки */
+}
+
+.colName {
+    white-space: normal;
+    word-break: break-word;
+}
+
+.colLastUpdated {
+    width: 1%;
+    /* Занимает место ровно под ширину даты */
+}
+
+.colDeviceAccess {
+    width: 1%;
+    /* Занимает место ровно под иконки + текст девайсов */
+}
+
+/* Компоненты ячеек */
+.builtSecretsListTableType {
+    width: 40px;
+    height: 40px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.builtSecretsListTableType.password {
+    background-color: rgba(21, 128, 61, 0.2);
+    border: 1px solid rgba(21, 128, 61, 0.3);
+}
+
+.builtSecretsListTableType.bankCard {
+    background-color: rgba(161, 98, 7, 0.2);
+    border: 1px solid rgba(161, 98, 7, 0.3);
+}
+
+.builtSecretsListTableType.file {
+    background-color: rgba(21, 128, 61, 0.2);
+    border: 1px solid rgba(21, 128, 61, 0.3);
+}
+
+.builtSecretsListTableTdNameCell {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.builtSecretsListTableTdNameText {
+    color: #ffffff;
+    font-size: 15px;
+    font-weight: 600;
+}
+
+.builtSecretsListTableTdTypeText {
+    color: rgba(255, 255, 255, 0.4);
+    font-size: 13px;
+    font-weight: 400;
+}
+
+.builtSecretsListTableTdContentLastUpdate {
+    color: rgba(255, 255, 255, 0.5);
+    font-size: 14px;
+}
+
+.builtSecretsListTableTdContentDevices {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.deviceIconsGap {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.deviceIconsGap img {
+    height: 18px;
+    width: auto;
+    opacity: 0.7;
+}
+
+.deviceCountText {
+    color: rgba(255, 255, 255, 0.4);
+    font-size: 14px;
+}
+
+.builtSecret {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 27px 39px;
+    background: linear-gradient(140deg, #b1b1b136, #0f0f0f36);
+    border: 1px solid rgba(255, 255, 255, 0.29);
+    border-radius: 10px;
+    width: 40%;
+    min-width: 250px;
+    max-width: 300px;
+}
+
+.builtSecretHeader {
+    position: relative;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.builtSecretIcon {
+    position: relative;
+    width: 60px;
+    height: 60px;
+    border-radius: 5px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #103C23;
+
+    img {
+        width: 25px;
+        height: 23px;
+    }
+}
+
+
+.builtSecretVerif {
+    position: absolute;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 25px;
+    height: 25px;
+    right: 0;
+    top: 45%;
+    transform: translateY(-50%);
+    background: #313131;
+    border-radius: 50%;
+}
+
+.builtSecretTitle {
+    margin-top: 24px;
+    font-size: 20px;
+    font-weight: 600;
+    color: #FFFFFF;
+}
+
+.builtSecretSubtitle {
+    margin-top: 4px;
+    font-size: 13px;
+    font-weight: 200;
+    color: rgba(255, 255, 255, 0.5);
+}
+
+.builtSecretDescription {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    margin-top: 24px;
+}
+
+.builtSecretDescriptionType {
+    display: flex;
+    justify-content: space-between;
+    text-align: left;
+    margin-top: 18px;
+}
+
+.builtSecretDescriptionLeft {
+    font-size: 12px;
+    font-weight: 400;
+    color: rgba(255, 255, 255, 0.5);
+}
+
+.builtSecretDescriptionRight {
+    font-size: 12px;
+    font-weight: 400;
+    color: rgba(255, 255, 255, 1);
+}
+
+.builtSecretHr {
+    width: 100%;
+    margin-top: 18px;
+    margin-bottom: 18px;
+    height: 2px;
+    border-radius: 1px;
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.builtSecretDevices {
+    position: relative;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+.builtSecretDevicesTitle {
+    color: #FFFFFF;
+    font-weight: 600;
+    font-size: 16px;
+}
+
+.builtSecretDevicesContent {
+    position: relative;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 12px;
+}
+
+.builtSecretDevice {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.builtSecretDeviceIcon {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #313030;
+}
+
+.builtSecretDeviceName {
+    color: #FFFFFF;
+    font-weight: 500;
+    font-size: 12px;
+}
+
+.builtSecretDeviceVersion {
+    font-size: 12px;
+    font-weight: 200;
+    color: rgba(255, 255, 255, 0.5);
+    margin-top: 8px;
+}
+
+.builtSecretDeviceStatus {
+    position: relative;
+    color: #008645;
+    font-size: 12px;
+}
+
+.builtSecretDeviceStatus::before {
+    position: absolute;
+    top: 55%;
+    content: '';
+    background: #008645;
+    height: 9px;
+    width: 9px;
+    border-radius: 50%;
+    transform: translateY(-50%) translateX(-18px);
+}
+
+.builtSecretActionPanel {
+    position: relative;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    margin-top: 48px;
+    gap: 12px;
+}
+
+.builtSecretActionPanelButton {
+    border: none;
+    padding: 14px;
+    border-radius: 5px;
+    color: #FFFFFF;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+/* ~~~~~~~~ Get Started ~~~~~~~~ */
+
+.getStarted {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    margin: auto;
+    margin-top: 100px;
+    box-sizing: border-box;
+    align-items: center;
+    width: max-content;
+    /* gap: 10px; */
+}
+
+.getStartedTitle {
+    color: #FFFFFF;
+    font-size: 58px;
+    width: max-content;
+    font-weight: 600;
+}
+
+.getStartedSubtitle {
+    color: #D9D9D9;
+    opacity: 0.65;
+    font-size: 32px;
+    font-weight: 200;
+    max-width: 70%;
+    text-align: center;
+    margin-top: 32px;
+}
+
+.getStartedHr {
+    width: 100%;
+    height: 1px;
+    background: #23BD21;
+    margin-top: 98px;
+    margin-bottom: 64px;
+}
+
+.getStartedActionPanel {
+    display: flex;
+    align-items: center;
+    gap: 64px;
+    justify-content: center;
+    margin-bottom: 120px;
+}
+
+.getStartedActionPanelStartButton, .getStartedActionPanelGithubButton {
+    color: #FFFFFF;
+    font-weight: 600;
+    font-size: 24px;
+    border: none;
+    background: none;
+    border-radius: 15px;
+    padding: 20px 64px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    cursor: pointer;
+    width: 212px;
+}
+
+.getStartedActionPanelStartButton {
+    background: #008645;
+}
+
+.getStartedActionPanelGithubButton {
+    border: 3px solid rgba(255, 255, 255, 0.6);
 }

@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom'
 import styles from './Header.module.css'
 import logo from '../assets/logo.png'
 import Title from './Title';
@@ -11,9 +12,9 @@ function Header() {
         </div>
         <div className={styles.nav}>
             <a href="#features" className={styles.navLink}>Features</a>
-            <a href="#how-it-works" className={styles.navLink}>How it works</a>
-            <a href="#github" className={styles.navLink}>GitHub</a>
-            <a href="#contact" className={styles.navBtn}>Get Started</a>
+            <a href="#howItWorks" className={styles.navLink}>How it works</a>
+            <Link to="/login" className={styles.navLink}>Log in</Link>
+            <Link to="/register" className={styles.navBtn}>Get Started</Link>
         </div>
     </header>
   )

@@ -4,7 +4,8 @@ from uuid import uuid4
 
 import pytest
 
-from gophkeeper.domain.device import Device
+from gophkeeper.domain.account import Account
+from gophkeeper.domain.device import ACTIVE, REVOKED, Device
 from gophkeeper.domain.errors import DeviceNotFound
 from gophkeeper.infrastructure.unit_of_work import SqlAlchemyUnitOfWork
 
@@ -12,14 +13,17 @@ pytestmark = pytest.mark.integration
 
 
 async def test_store_and_fetch_device(database):
+    account_id = uuid4()
     device_id = uuid4()
     async with SqlAlchemyUnitOfWork(database) as uow:
+        await uow.accounts.add(Account(id=account_id))
         await uow.devices.add(
             Device(
                 id=device_id,
+                account_id=account_id,
                 device_name="laptop",
                 public_key="age1testpublickey",
-                is_active=True,
+                status=ACTIVE,
             )
         )
         await uow.commit()
@@ -33,14 +37,17 @@ async def test_store_and_fetch_device(database):
 
 
 async def test_rollback_discards_uncommitted_device(database):
+    account_id = uuid4()
     device_id = uuid4()
     async with SqlAlchemyUnitOfWork(database) as uow:
+        await uow.accounts.add(Account(id=account_id))
         await uow.devices.add(
             Device(
                 id=device_id,
+                account_id=account_id,
                 device_name="phone",
                 public_key="age1phonekey",
-                is_active=True,
+                status=ACTIVE,
             )
         )
         await uow.rollback()
@@ -50,33 +57,37 @@ async def test_rollback_discards_uncommitted_device(database):
             await uow.devices.get(device_id)
 
 
-async def test_list_active_devices(database):
+async def test_list_for_account_returns_all_statuses(database):
+    account_id = uuid4()
     active_id = uuid4()
-    inactive_id = uuid4()
+    revoked_id = uuid4()
 
     async with SqlAlchemyUnitOfWork(database) as uow:
+        await uow.accounts.add(Account(id=account_id))
         await uow.devices.add(
             Device(
                 id=active_id,
+                account_id=account_id,
                 device_name="laptop",
                 public_key="key1",
-                is_active=True,
+                status=ACTIVE,
             )
         )
-
         await uow.devices.add(
             Device(
-                id=inactive_id,
+                id=revoked_id,
+                account_id=account_id,
                 device_name="phone",
                 public_key="key2",
-                is_active=False,
+                status=REVOKED,
             )
         )
-
         await uow.commit()
 
     async with SqlAlchemyUnitOfWork(database) as uow:
-        devices = await uow.devices.list_active()
+        devices = await uow.devices.list_for_account(account_id)
 
-    assert len(devices) == 1
-    assert devices[0].id == active_id
+    by_id = {d.id: d for d in devices}
+    assert set(by_id) == {active_id, revoked_id}
+    assert by_id[active_id].is_active is True
+    assert by_id[revoked_id].is_active is False

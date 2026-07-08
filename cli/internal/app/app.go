@@ -29,10 +29,13 @@ var (
 	ErrFieldNotFound      = errors.New("field not found in secret")
 )
 
-// content is the JSON shape encrypted into a secret's payload. Value is a []byte
-// so encoding/json base64-encodes it, preserving binary secrets exactly; folder
-// lives in a column (metadata), not here.
+// content is the JSON shape encrypted into a secret's payload. Name and folder
+// live here (not just in local columns) so another device can fully reconstruct
+// a pulled secret by decrypting it. Value is a []byte so encoding/json
+// base64-encodes it, preserving binary secrets exactly.
 type content struct {
+	Name        string `json:"name"`
+	Folder      string `json:"folder,omitempty"`
 	Value       []byte `json:"value"`
 	Description string `json:"description,omitempty"`
 }
@@ -207,11 +210,6 @@ type SetParams struct {
 // Set creates a new secret sealed to this device, or updates the existing one
 // with that name (re-sealing to its current recipients and bumping the version).
 func (s *Session) Set(p SetParams) error {
-	plain, err := json.Marshal(content{Value: p.Value, Description: p.Description})
-	if err != nil {
-		return fmt.Errorf("app: encode secret: %w", err)
-	}
-
 	// Start from the existing secret, or a fresh one sealed to this device.
 	sec, err := s.secrets.FindByName(p.Name)
 	switch {
@@ -229,12 +227,22 @@ func (s *Session) Set(p SetParams) error {
 	}
 	sec.Deleted = false // writing a value resurrects a tombstoned name
 
+	plain, err := json.Marshal(content{
+		Name: p.Name, Folder: sec.FolderID, Value: p.Value, Description: p.Description,
+	})
+	if err != nil {
+		return fmt.Errorf("app: encode secret: %w", err)
+	}
+
 	ct, err := s.cipher.Seal(plain, sec.Recipients)
 	if err != nil {
 		return err
 	}
 	sec.Reseal(ct, time.Now().UTC()) // sets payload, bumps version, refreshes updated_at
-	return s.secrets.Save(sec)
+	if err := s.secrets.Save(sec); err != nil {
+		return err
+	}
+	return s.db.Sync().MarkDirty(sec.ID) // queue for the next push
 }
 
 // Get decrypts a secret by name and returns the requested field (default
@@ -281,7 +289,10 @@ func (s *Session) Delete(name string) error {
 		return ErrSecretNotFound
 	}
 	sec.Delete(time.Now().UTC())
-	return s.secrets.Save(sec)
+	if err := s.secrets.Save(sec); err != nil {
+		return err
+	}
+	return s.db.Sync().MarkDirty(sec.ID) // queue the tombstone for the next push
 }
 
 // SecretInfo is metadata about a stored secret, with no decrypted value.

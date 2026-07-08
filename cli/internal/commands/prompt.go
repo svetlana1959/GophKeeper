@@ -1,7 +1,6 @@
 package commands
 
 import (
-	"bufio"
 	"bytes"
 	"fmt"
 	"io"
@@ -34,21 +33,44 @@ func promptHidden(cmd *cobra.Command, label string) (string, error) {
 		fmt.Fprintln(cmd.OutOrStdout())
 		return string(b), err
 	}
-	s := bufio.NewScanner(in)
-	if s.Scan() {
-		return s.Text(), nil
+	return readLine(in)
+}
+
+// readLine reads a single line, consuming exactly up to and including the first
+// newline. It reads byte-by-byte rather than buffering ahead, so a command that
+// prompts more than once (e.g. init's PIN + confirmation) reads piped input
+// line-by-line instead of losing the rest to a buffered reader.
+func readLine(r io.Reader) (string, error) {
+	var sb strings.Builder
+	buf := make([]byte, 1)
+	for {
+		n, err := r.Read(buf)
+		if n > 0 {
+			if buf[0] == '\n' {
+				break
+			}
+			if buf[0] != '\r' {
+				sb.WriteByte(buf[0])
+			}
+		}
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+			return "", err
+		}
 	}
-	return "", s.Err()
+	return sb.String(), nil
 }
 
 // confirm asks a yes/no question, defaulting to no.
 func confirm(cmd *cobra.Command, question string) (bool, error) {
 	fmt.Fprintf(cmd.OutOrStdout(), "%s [y/N] ", question)
-	s := bufio.NewScanner(cmd.InOrStdin())
-	if !s.Scan() {
-		return false, s.Err()
+	line, err := readLine(cmd.InOrStdin())
+	if err != nil {
+		return false, err
 	}
-	switch strings.ToLower(strings.TrimSpace(s.Text())) {
+	switch strings.ToLower(strings.TrimSpace(line)) {
 	case "y", "yes":
 		return true, nil
 	default:
