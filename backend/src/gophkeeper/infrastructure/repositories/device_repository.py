@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from gophkeeper.domain.device import Device, DeviceRepository
 from gophkeeper.domain.errors import DeviceNotFound
 
-_COLUMNS = ("id", "device_name", "public_key", "is_active", "updated_at")
+_COLUMNS = ("id", "account_id", "device_name", "public_key", "status", "last_seen_at", "updated_at")
 _COLUMN_LIST = ", ".join(_COLUMNS)
 _INSERT_VALUES = ", ".join(f":{c}" for c in _COLUMNS)
 
@@ -17,9 +17,11 @@ _INSERT_VALUES = ", ".join(f":{c}" for c in _COLUMNS)
 def _to_params(device: Device) -> dict[str, Any]:
     return {
         "id": device.id,
+        "account_id": device.account_id,
         "device_name": device.device_name,
         "public_key": device.public_key,
-        "is_active": device.is_active,
+        "status": device.status,
+        "last_seen_at": device.last_seen_at,
         "updated_at": device.updated_at,
     }
 
@@ -27,9 +29,11 @@ def _to_params(device: Device) -> dict[str, Any]:
 def _from_row(row: RowMapping) -> Device:
     return Device(
         id=row["id"],
+        account_id=row["account_id"],
         device_name=row["device_name"],
         public_key=row["public_key"],
-        is_active=bool(row["is_active"]),
+        status=row["status"],
+        last_seen_at=row["last_seen_at"],
         updated_at=row["updated_at"],
     )
 
@@ -54,6 +58,14 @@ class SqlAlchemyDeviceRepository(DeviceRepository):
             raise DeviceNotFound(device_id)
         return _from_row(row)
 
+    async def find_by_public_key(self, public_key: str) -> Device | None:
+        result = await self._session.execute(
+            text(f"SELECT {_COLUMN_LIST} FROM devices WHERE public_key = :public_key"),
+            {"public_key": public_key},
+        )
+        row = result.mappings().first()
+        return _from_row(row) if row is not None else None
+
     async def exists(self, device_id: UUID) -> bool:
         result = await self._session.execute(
             text("SELECT 1 FROM devices WHERE id = :id"),
@@ -61,18 +73,25 @@ class SqlAlchemyDeviceRepository(DeviceRepository):
         )
         return result.first() is not None
 
-    async def list_active(self) -> list[Device]:
-        query = f"SELECT {_COLUMN_LIST} FROM devices WHERE is_active = TRUE ORDER BY device_name"
-        result = await self._session.execute(text(query))
+    async def list_for_account(self, account_id: UUID) -> list[Device]:
+        result = await self._session.execute(
+            text(
+                f"SELECT {_COLUMN_LIST} FROM devices "
+                "WHERE account_id = :account_id ORDER BY device_name"
+            ),
+            {"account_id": account_id},
+        )
         return [_from_row(row) for row in result.mappings().all()]
 
     async def save(self, device: Device) -> None:
         await self._session.execute(
             text(
                 "UPDATE devices SET "
+                "account_id = :account_id, "
                 "device_name = :device_name, "
                 "public_key = :public_key, "
-                "is_active = :is_active, "
+                "status = :status, "
+                "last_seen_at = :last_seen_at, "
                 "updated_at = :updated_at "
                 "WHERE id = :id"
             ),

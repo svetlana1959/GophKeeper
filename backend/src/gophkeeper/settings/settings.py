@@ -41,6 +41,15 @@ class APISettings(BaseModel):
     trusted_hosts: list[str]
 
 
+class SecuritySettings(BaseModel):
+    # NOTE: HMAC key for challenge/session tokens. The committed value is for local dev
+    # only; override in production via GOPH_SECURITY__SECRET_KEY.
+    secret_key: str
+    challenge_ttl_seconds: int = 120
+    session_ttl_seconds: int = 3600
+    invite_ttl_seconds: int = 600
+
+
 class RunSettings(BaseModel):
     env: str = _DEFAULT_ENV
     logging_level: str = "INFO"
@@ -56,6 +65,7 @@ class ServerSettings(BaseModel):
 class Settings(BaseModel):
     database: DatabaseSettings
     api: APISettings
+    security: SecuritySettings
     run_settings: RunSettings
     server: ServerSettings
 
@@ -77,6 +87,7 @@ def _load() -> Settings:
     settings = Settings(
         database=DatabaseSettings(**_dynaconf.database),
         api=APISettings(**_dynaconf.api),
+        security=SecuritySettings(**_dynaconf.security),
         run_settings=RunSettings(**_dynaconf.run_settings),
         server=ServerSettings(**_dynaconf.server),
     )

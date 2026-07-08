@@ -12,12 +12,15 @@ from uuid import UUID
 from sqlalchemy import RowMapping, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from gophkeeper.domain.errors import SecretNotFound
+from gophkeeper.domain.errors import SecretNotFound, VersionConflict
 from gophkeeper.domain.secret import Secret, SecretRepository
 
-_COLUMNS = ("id", "account_id", "ciphertext", "version", "deleted", "updated_at")
-_COLUMN_LIST = ", ".join(_COLUMNS)
-_INSERT_VALUES = ", ".join(f":{c}" for c in _COLUMNS)
+# seq is excluded from writes: the DB assigns it (default nextval on insert,
+# nextval explicitly on update) and we read it back via RETURNING.
+_WRITE_COLUMNS = ("id", "account_id", "ciphertext", "version", "deleted", "updated_at")
+_INSERT_LIST = ", ".join(_WRITE_COLUMNS)
+_INSERT_VALUES = ", ".join(f":{c}" for c in _WRITE_COLUMNS)
+_READ_LIST = ", ".join((*_WRITE_COLUMNS, "seq"))
 
 
 def _to_params(secret: Secret) -> dict[str, Any]:
@@ -39,6 +42,7 @@ def _from_row(row: RowMapping) -> Secret:
         version=row["version"],
         deleted=row["deleted"],
         updated_at=row["updated_at"],
+        seq=row["seq"],
     )
 
 
@@ -47,14 +51,15 @@ class SqlAlchemySecretRepository(SecretRepository):
         self._session = session
 
     async def add(self, secret: Secret) -> None:
-        await self._session.execute(
-            text(f"INSERT INTO secrets ({_COLUMN_LIST}) VALUES ({_INSERT_VALUES})"),
+        result = await self._session.execute(
+            text(f"INSERT INTO secrets ({_INSERT_LIST}) VALUES ({_INSERT_VALUES}) RETURNING seq"),
             _to_params(secret),
         )
+        secret.seq = result.scalar_one()
 
     async def get(self, secret_id: UUID) -> Secret:
         result = await self._session.execute(
-            text(f"SELECT {_COLUMN_LIST} FROM secrets WHERE id = :id"),
+            text(f"SELECT {_READ_LIST} FROM secrets WHERE id = :id"),
             {"id": secret_id},
         )
         row = result.mappings().first()
@@ -65,20 +70,73 @@ class SqlAlchemySecretRepository(SecretRepository):
     async def list_for_account(
         self, account_id: str, *, include_deleted: bool = False
     ) -> list[Secret]:
-        query = f"SELECT {_COLUMN_LIST} FROM secrets WHERE account_id = :account_id"
+        query = f"SELECT {_READ_LIST} FROM secrets WHERE account_id = :account_id"
         if not include_deleted:
             query += " AND deleted = FALSE"
         query += " ORDER BY id"
         result = await self._session.execute(text(query), {"account_id": account_id})
         return [_from_row(row) for row in result.mappings().all()]
 
-    async def save(self, secret: Secret) -> None:
-        await self._session.execute(
+    async def list_changed_since(
+        self, account_id: str, device_id: UUID, since_seq: int, *, limit: int
+    ) -> list[Secret]:
+        result = await self._session.execute(
             text(
-                "UPDATE secrets SET "
-                "ciphertext = :ciphertext, version = :version, "
-                "deleted = :deleted, updated_at = :updated_at "
-                "WHERE id = :id"
+                f"SELECT {_READ_LIST} FROM secrets s "
+                "JOIN secret_recipients sr ON sr.secret_id = s.id "
+                "WHERE s.account_id = :account_id AND sr.device_id = :device_id "
+                "AND s.seq > :since_seq ORDER BY s.seq LIMIT :limit"
             ),
-            _to_params(secret),
+            {
+                "account_id": account_id,
+                "device_id": device_id,
+                "since_seq": since_seq,
+                "limit": limit,
+            },
         )
+        return [_from_row(row) for row in result.mappings().all()]
+
+    async def set_recipients(self, secret_id: UUID, device_ids: list[UUID]) -> None:
+        await self._session.execute(
+            text("DELETE FROM secret_recipients WHERE secret_id = :secret_id"),
+            {"secret_id": secret_id},
+        )
+        for device_id in device_ids:
+            await self._session.execute(
+                text(
+                    "INSERT INTO secret_recipients (secret_id, device_id) "
+                    "VALUES (:secret_id, :device_id)"
+                ),
+                {"secret_id": secret_id, "device_id": device_id},
+            )
+
+    async def save(self, secret: Secret, *, expected_version: int | None = None) -> None:
+        set_clause = (
+            "ciphertext = :ciphertext, version = :version, "
+            "deleted = :deleted, updated_at = :updated_at, "
+            "seq = nextval('secret_seq') "
+        )
+        if expected_version is None:
+            # Unconditional write (tombstone): the row is known to exist.
+            result = await self._session.execute(
+                text(f"UPDATE secrets SET {set_clause} WHERE id = :id RETURNING seq"),
+                _to_params(secret),
+            )
+            secret.seq = result.scalar_one()
+            return
+
+        # Compare-and-set: the UPDATE only matches if the stored version is still
+        # the one the client edited. Concurrent pushes can no longer both read
+        # v1, both pass an in-app check, and both blindly write v2.
+        result = await self._session.execute(
+            text(
+                f"UPDATE secrets SET {set_clause} "
+                "WHERE id = :id AND version = :expected_version RETURNING seq"
+            ),
+            {**_to_params(secret), "expected_version": expected_version},
+        )
+        seq = result.scalar_one_or_none()
+        if seq is None:
+            current = await self.get(secret.id)
+            raise VersionConflict(secret.id, expected=expected_version, actual=current.version)
+        secret.seq = seq
