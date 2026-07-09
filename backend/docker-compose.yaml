@@ -28,12 +28,12 @@ services:
       postgres:
         condition: service_healthy
     ports:
-      - "8080:8080"
+      - "8000:8000"
     volumes:
       - ./src:/app/src:delegated # Mount source for live reload in development.
       - ./db:/db
     command:
-      ["uvicorn", "gophkeeper.main:app", "--host", "0.0.0.0", "--port", "8080", "--reload"]
+      ["uvicorn", "gophkeeper.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
 
   migrations:
     image: amacneil/dbmate:latest
