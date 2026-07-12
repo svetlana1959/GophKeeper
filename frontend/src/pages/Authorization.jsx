@@ -1,9 +1,38 @@
+import { useState } from 'react'
+import { Link, Navigate, useNavigate } from 'react-router-dom'
 import styles from './Registration.module.css'
 import logo from '../assets/logo.png'
-import { Link } from 'react-router-dom'
 import regLogo from '../assets/authLogo.svg'
+import { api, getToken, setToken } from '../api/client'
 
 function Authorization() {
+    const navigate = useNavigate()
+    const [email, setEmail] = useState('')
+    const [password, setPassword] = useState('')
+    const [error, setError] = useState('')
+    const [isSubmitting, setIsSubmitting] = useState(false)
+    const isAuthed = Boolean(getToken())
+
+    if (isAuthed) {
+        return <Navigate to="/logout" replace />
+    }
+
+    const handleSubmit = async (event) => {
+        event.preventDefault()
+        setError('')
+        setIsSubmitting(true)
+
+        try {
+            const response = await api.login(email, password)
+            setToken(response.access_token)
+            navigate('/')
+        } catch (err) {
+            setError(err.message || 'Не удалось войти')
+        } finally {
+            setIsSubmitting(false)
+        }
+    }
+
     return (
         <div className={styles.container}>
             <div className={styles.sidebar}>
@@ -24,16 +53,39 @@ function Authorization() {
                     <div className={styles.regLogo}>
                         <img src={regLogo} alt="Registration" />
                     </div>
-                    <div className={styles.title}>Create your account</div>
-                    <div className={styles.subtitle}>Join GophKeeper and keep your data secure.</div>
-                    <form action="">
-                        <label htmlFor="input">Username</label>
-                        <input className={`${styles.input} ${styles.userInput}`} name='username' placeholder='Enter your username' />
-                        <label htmlFor="input">Password</label>
-                        <dir className={styles.inputWrapper}>
-                            <input className={`${styles.input} ${styles.passInput}`} name='password' type='password' placeholder='Enter your password' />
-                        </dir>
-                        <button className={styles.submitButton} style={{ marginTop: "64px" }}>Log in</button>
+                    <div className={styles.title}>Sign in</div>
+                    <div className={styles.subtitle}>Use your account email and password.</div>
+                    <form onSubmit={handleSubmit}>
+                        <label htmlFor="email">Email</label>
+                        <input
+                            className={`${styles.input} ${styles.userInput}`}
+                            id="email"
+                            name='email'
+                            type='email'
+                            placeholder='Enter your email'
+                            value={email}
+                            onChange={(event) => setEmail(event.target.value)}
+                            autoComplete="email"
+                            required
+                        />
+                        <label htmlFor="password">Password</label>
+                        <div className={styles.inputWrapper}>
+                            <input
+                                className={`${styles.input} ${styles.passInput}`}
+                                id="password"
+                                name='password'
+                                type='password'
+                                placeholder='Enter your password'
+                                value={password}
+                                onChange={(event) => setPassword(event.target.value)}
+                                autoComplete="current-password"
+                                required
+                            />
+                        </div>
+                        {error ? <div className={styles.error}>{error}</div> : null}
+                        <button className={styles.submitButton} style={{ marginTop: "64px" }} disabled={isSubmitting}>
+                            {isSubmitting ? 'Signing in...' : 'Log in'}
+                        </button>
                     </form>
                     <div className={styles.hr}>
                         <div className={styles.hrLine}></div>
