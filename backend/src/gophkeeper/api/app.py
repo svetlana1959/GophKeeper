@@ -14,7 +14,11 @@ from fastapi import FastAPI
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from gophkeeper.api.errors import register_exception_handlers
+<<<<<<< Updated upstream
 from gophkeeper.api.routers import account, auth, device, enroll, sync
+=======
+from gophkeeper.api.routers import auth, device, enroll, stats, sync
+>>>>>>> Stashed changes
 from gophkeeper.infrastructure.adapters.database import SqlAlchemyAdapter
 from gophkeeper.settings.settings import settings
 
@@ -48,6 +52,10 @@ _TAGS_METADATA = [
         "description": "Link new devices into an account with single-use, expiring invite codes.",
     },
     {"name": "devices", "description": "Account device registry."},
+    {
+        "name": "stats",
+        "description": "Temporary static Dashboard statistics for frontend integration.",
+    },
     {"name": "health", "description": "Liveness."},
 ]
 
@@ -92,5 +100,6 @@ def create_app() -> FastAPI:
     app.include_router(sync.router)
     app.include_router(enroll.router)
     app.include_router(device.router)
+    app.include_router(stats.router)
 
     return app
