@@ -323,7 +323,7 @@ func TestJoin(t *testing.T) {
 	srv := httptest.NewServer(be.handler(t))
 	defer srv.Close()
 
-	dev, err := remote.New(srv.URL).Join(context.Background(), "GK-TEST-CODE", "phone", kp.Public)
+	dev, err := remote.New(srv.URL).Join(context.Background(), "GK-TEST-CODE", "phone", kp.Public, "sign-pub")
 	if err != nil {
 		t.Fatalf("join: %v", err)
 	}
@@ -338,7 +338,7 @@ func TestJoinBadCode(t *testing.T) {
 	srv := httptest.NewServer(be.handler(t))
 	defer srv.Close()
 
-	_, err := remote.New(srv.URL).Join(context.Background(), "wrong", "phone", kp.Public)
+	_, err := remote.New(srv.URL).Join(context.Background(), "wrong", "phone", kp.Public, "sign-pub")
 	var apiErr *remote.APIError
 	if !errors.As(err, &apiErr) || apiErr.StatusCode != http.StatusBadRequest {
 		t.Fatalf("want 400 APIError, got %v", err)

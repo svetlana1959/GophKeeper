@@ -93,7 +93,7 @@ func (s *Session) Link(ctx context.Context, code string) error {
 	}
 
 	client := remote.New(s.cfg.Remote)
-	dev, err := client.Join(ctx, code, s.cfg.DeviceName, s.localPub)
+	dev, err := client.Join(ctx, code, s.cfg.DeviceName, s.localPub, s.localSignPub)
 	if err != nil {
 		return fmt.Errorf("app: link: %w", err)
 	}

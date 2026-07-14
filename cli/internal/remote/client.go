@@ -58,11 +58,12 @@ func New(baseURL string) *Client {
 
 // Device is a registered device as the server reports it.
 type Device struct {
-	ID        string `json:"id"`
-	AccountID string `json:"account_id"`
-	Name      string `json:"device_name"`
-	PublicKey string `json:"public_key"`
-	Status    string `json:"status"`
+	ID            string `json:"id"`
+	AccountID     string `json:"account_id"`
+	Name          string `json:"device_name"`
+	PublicKey     string `json:"public_key"`
+	SignPublicKey string `json:"sign_public_key"`
+	Status        string `json:"status"`
 }
 
 // Identity is who the server says the current session belongs to.
@@ -285,10 +286,13 @@ func (c *Client) CreateInvite(ctx context.Context) (Invite, error) {
 
 // Join links this device into an account using a pairing code. It is
 // unauthenticated — the code is the authorization. ErrConflict means the public
-// key is already registered.
-func (c *Client) Join(ctx context.Context, code, deviceName, publicKey string) (Device, error) {
+// key is already registered. signPublicKey is the device's Ed25519 trust key.
+func (c *Client) Join(
+	ctx context.Context, code, deviceName, publicKey, signPublicKey string,
+) (Device, error) {
 	body := map[string]string{
-		"code": code, "device_name": deviceName, "public_key": publicKey,
+		"code": code, "device_name": deviceName,
+		"public_key": publicKey, "sign_public_key": signPublicKey,
 	}
 	var dev Device
 	if err := c.do(ctx, http.MethodPost, "/enroll/join", body, &dev); err != nil {

@@ -150,12 +150,13 @@ func newOrImportedKey(privateKey string) (crypto.KeyPair, error) {
 
 // Session is an opened GophKeeper environment: config + vault + local identity.
 type Session struct {
-	cfg      *config.Config
-	db       *vault.DB
-	secrets  secret.Repository
-	local    *device.LocalDevice
-	localPub string
-	cipher   secret.Cipher
+	cfg          *config.Config
+	db           *vault.DB
+	secrets      secret.Repository
+	local        *device.LocalDevice
+	localPub     string
+	localSignPub string
+	cipher       secret.Cipher
 }
 
 // Open loads the config, opens the vault, and resolves the local identity. It
@@ -200,7 +201,7 @@ func Open() (*Session, error) {
 	return &Session{
 		cfg: cfg, db: db,
 		secrets: db.Secrets(),
-		local:   local, localPub: dev.PublicKey,
+		local:   local, localPub: dev.PublicKey, localSignPub: dev.SignPublicKey,
 		cipher: crypto.Engine{},
 	}, nil
 }
