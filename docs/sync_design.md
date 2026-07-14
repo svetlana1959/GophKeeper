@@ -404,7 +404,92 @@ is path **B**, an OAuth 2.0 **Device Authorization Grant** (`gh auth login`
 style): the CLI shows a `user_code` + URL, the user approves in the logged-in
 browser, and the CLI polls to completion — no code pasting. B is deferred.
 
-**Still pending in this migration:** removing the CLI's own account-bootstrap
-(`POST /devices` register + auto-register on first sync) so onboarding is
-link-only; and the browser recovery-keypair generation (other dev). Until the
-CLI bootstrap is removed, `goph sync` on an unlinked device still self-registers.
+**Migration status.** The CLI's own account-bootstrap is removed — onboarding is
+link-only (`goph link <code>`); an unlinked `goph sync` returns `ErrNotLinked`
+rather than self-registering. Still pending: the browser recovery-keypair
+generation (other dev).
+
+## 11. Device trust graph (M4)
+
+Closes the §9 gap "reshare trusts the server's device list." Reshare must seal
+plaintext only to keys the *client* has verified belong to account devices —
+never to whatever `GET /devices` returns, since a malicious server could inject a
+rogue recipient and break the zero-knowledge guarantee of §6.
+
+**Two orthogonal layers.**
+
+- **Access = full mesh.** Every trusted device is a recipient of every
+  mesh-scoped secret; a newly trusted device is resealed to by the whole mesh on
+  the next sync. (Per-secret *recipient policies* — sharing a secret with only a
+  subset of the mesh — are a future layer on top; the trust graph is unchanged by
+  them.)
+- **Trust = a provenance DAG**, rooted at an anchor. A device is trusted iff it
+  is **reachable from the root through non-revoked vouches**. Revocation prunes
+  by reachability.
+
+**Device identity gains a signing key.** age keys are X25519 (encryption only),
+so a device cannot *sign* an attestation. Each device therefore also holds an
+**Ed25519 signing key**; identity becomes `(id, enc_pub, sign_pub)`, all three
+registered at enroll and mirrored to peers. `enc_pub` is the age recipient;
+`sign_pub` verifies the device's certs.
+
+**Certs.** Two signed, published records, each with a per-issuer monotonic `seq`
+and a `prev_hash` linking the issuer's previous cert (tamper-evident chain). The
+signed bytes are a versioned, field-ordered canonical encoding — never map/JSON
+key order.
+
+- **Vouch** — `sign_issuer(account_id, issuer_id, seq, prev_hash, subject_id,
+  subject_enc_pub, subject_sign_pub, issued_at)`: "issuer attests subject's keys
+  and admits it." **Genesis** is a *self-vouch* (issuer == subject): the founding
+  device anchors the tree.
+- **Revoke** — `sign_issuer(account_id, issuer_id, seq, prev_hash, target_id,
+  issued_at)`: "issuer revokes target." `target == issuer` is **self-revoke**.
+
+**Trust computation (each device, locally, from the verified cert log).** Verify
+every cert's signature against its issuer's `sign_pub` and its chain; then
+`Trusted = { d : a non-revoked vouch path exists from Root to d }`. Reshare's
+recipient set is `Trusted ∩ server-active` (the server still gates *availability*,
+never *identity*), plus the recovery key.
+
+**Roots & recovery.** Interim root = the **founding device** (its self-vouch).
+The **recovery key is a bearer super-authority sitting *outside* the DAG** — not
+a structural root: whoever holds it can issue vouches/revokes that are
+authoritative regardless of graph position (revoke anyone, re-vouch, re-root).
+This needs an Ed25519 **recovery signing** key (browser, other dev); until it
+lands the founding device is the sole root and recovery is data-recovery only
+(§10). A new device pins the root's (and recovery's) `sign_pub` through the
+**invite-code channel** at link time, so it never trusts the server for the
+anchor identity.
+
+**Enrollment issues a vouch.** The invite code bootstraps *first contact* — the
+inviter learns the joiner's real keys (join bound to the code) and the joiner
+learns the anchor keys (roster authenticated by the code). The durable artifact
+is the **inviter's vouch cert** over the joiner's keys, published to the log. No
+per-pair invites: once vouched, the joiner is reachable from the root, so the
+whole mesh reseals to it automatically.
+
+**Revocation authority = the vouch tree.** `A` may revoke `B` iff `A` is an
+**ancestor of `B`** in the DAG (A introduced B, directly or transitively), or `A`
+holds the recovery key. Revoking `A` voids A's outgoing vouches, so any device
+reachable *only* through `A` becomes unreachable and is dropped — the cascade.
+Remaining devices then **rotate keys** (the tested reshare path guarantees a
+removed recipient loses future access). Self-revoke is always permitted.
+
+**Transport — dedicated trust log (option A).** `POST /trust/certs` publishes one
+cert; `GET /trust/certs?since=<cursor>` returns new certs in order (same cursor
+pattern as `/sync/changes`). Kept separate from `/devices` and `/sync` on
+purpose: trust is a first-class, client-verified artifact, and re-entangling it
+with the server's device list is the very bug being fixed. The server relays but
+cannot forge (all certs signed). Integrity: per-issuer monotonic `seq` +
+`prev_hash` chain detect drops/reorders *within* an issuer; a signed **log head**
+(`issuer, latest_seq, latest_hash`) that peers refuse to roll back detects the
+server hiding an issuer's *latest* certs (hardening, after the core).
+
+**Forward secrecy only.** Rotation protects future ciphertext; a revoked device
+keeps any plaintext it already pulled. Standard for key rotation, stated so it is
+a decision.
+
+**Implementation order (atomic commits).** signing keys at init/enroll → cert
+format + sign/verify (crypto) → `/trust/certs` transport (backend + CLI client) →
+trusted-set computation → reshare seals to it → vouch-on-enroll → revoke +
+self-revoke + cascade → recovery-as-bearer (when the browser signing key lands).
