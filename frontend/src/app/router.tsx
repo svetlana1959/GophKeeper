@@ -48,13 +48,13 @@ export const router = createBrowserRouter([
           {
             path: '/statistics',
             lazy: async () => ({
-              Component: (await import('@/features/placeholder/coming-soon')).StatisticsPage,
+              Component: (await import('@/features/statistics/statistics-page')).StatisticsPage,
             }),
           },
           {
             path: '/settings',
             lazy: async () => ({
-              Component: (await import('@/features/placeholder/coming-soon')).SettingsPage,
+              Component: (await import('@/features/settings/settings-page')).SettingsPage,
             }),
           },
         ],

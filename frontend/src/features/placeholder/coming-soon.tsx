@@ -9,6 +9,3 @@ export function ComingSoon({ title }: { title: string }) {
 }
 
 export const SecretsPage = () => <ComingSoon title="Secrets" />
-export const DevicesPage = () => <ComingSoon title="Devices" />
-export const StatisticsPage = () => <ComingSoon title="Statistics" />
-export const SettingsPage = () => <ComingSoon title="Settings" />
