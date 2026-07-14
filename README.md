@@ -334,26 +334,23 @@ Provides telemetry data for the web UI integration and deployment health probes.
 
 ---
 
-## 🔗 Deployment
+## Deployment
 
-* **Production API Endpoint:** [https://api.goph.dev](https://www.google.com/search?q=https://api.goph.dev) *(Replace with actual URL)*
-* **Web Dashboard UI:** [https://app.goph.dev](https://www.google.com/search?q=https://app.goph.dev) *(Deferred Stage 5 Web Portal)*
+* **API & Web Dashboard UI:** [http://10.93.27.16/](http://10.93.27.16/) *(Central self-hosted deployment)*
 
 ---
 
-## 👥 Tracks & Contribution
+## Tracks & Contribution
+GophKeeper is a monorepo holding two independent programs: the **Go CLI client** (`cli/`) and the **Python Backend API** (`backend/`). 
+
+For detailed guidelines on commit signing, codebase boundaries, and development setup, please refer to the [CONTRIBUTING.md](CONTRIBUTING.md) guide.
 
 ### Project Development Track (GitFlow)
 
-We use **GitFlow** branching model:
+We use the **GitFlow** branching model:
 
-* Features are developed in isolated branches: `feature/*` -> Merge into `develop` via Pull Request templates.
-* Production releases are tagged on `main`.
-
-### Contribution Checklist
-
-When submitting a Pull Request to `develop`, ensure you adhere to the repository standards:
-
-1. **Boundary Separation:** Packages inside `cli/` must **never** import modules from `backend/`. They communicate solely over the network protocol.
-2. **Symmetric Data Types:** PostgreSQL database fields must store raw binary `BYTEA` blocks. Base64 encoding/decoding is performed exclusively by the backend service layer.
-3. **Commit Signing:** All Git commits must be cryptographically signed using your SSH key.
+* `main` — production-ready releases only.
+* `dev` — integration branch; all work branches from and merges back into `dev`.
+* `feature/*` — new features. Branch from `dev`, merge into `dev`.
+* `hotfix/*` — urgent production fixes. Branch from `main`, merge into `main` and `dev`.
+* `docs/*` — documentation. Branch from `dev`, merge into `dev`.
