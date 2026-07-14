@@ -56,5 +56,6 @@ async def join(
         code=body.code,
         device_name=body.device_name,
         public_key=body.public_key,
+        sign_public_key=body.sign_public_key,
     )
     return DeviceResponse.from_domain(device)

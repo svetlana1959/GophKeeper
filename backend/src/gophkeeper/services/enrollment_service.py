@@ -47,7 +47,9 @@ class EnrollmentService:
             await uow.commit()
         return invite, code
 
-    async def join(self, *, code: str, device_name: str, public_key: str) -> Device:
+    async def join(
+        self, *, code: str, device_name: str, public_key: str, sign_public_key: str = ""
+    ) -> Device:
         """Admit a device into the invite's account, consuming the invite."""
         async with self._uow as uow:
             invite = await uow.invites.find_by_code_hash(_hash_code(code))
@@ -63,6 +65,7 @@ class EnrollmentService:
                 account_id=invite.account_id,
                 device_name=device_name,
                 public_key=public_key,
+                sign_public_key=sign_public_key,
                 status=ACTIVE,
             )
             await uow.devices.add(device)
