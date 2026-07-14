@@ -7,7 +7,7 @@ import type { LoginValues } from './login-schema'
 export function useLogin() {
   const { login } = useAuth()
   return useMutation({
-    mutationFn: ({ email, password }: LoginValues) => accountsApi.login(email, password),
+    mutationFn: ({ username, password }: LoginValues) => accountsApi.login(username, password),
     onSuccess: (session) => login(session.access_token),
   })
 }
