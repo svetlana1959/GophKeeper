@@ -250,17 +250,87 @@ uvicorn gophkeeper.main:app --host 127.0.0.1 --port 8080 --env-file .env --reloa
 
 ---
 
-## 🔌 REST API Endpoints Overview
+## REST API Endpoints Overview
+
+### Device Authentication (`auth`)
+
+These endpoints are used by CLI devices to prove ownership of their private key via an **age challenge/response** mechanism without exposing keys to the network.
 
 | Method | Endpoint | Description | Auth Required |
 | --- | --- | --- | --- |
-| **POST** | `/accounts` | Register a new account (stores `recovery_pubkey` only) | No |
-| **POST** | `/auth/challenge` | Request an age-encrypted challenge nonce | No |
-| **POST** | `/auth/verify` | Prove challenge decryption to receive session token | No |
-| **GET** | `/sync/changes` | Pull changes since the last sequence ID (`?since=<seq>`) | **Yes** |
-| **POST** | `/sync/push` | Batch-push locally updated or deleted secrets | **Yes** |
-| **POST** | `/enroll/invite` | Generate a single-use pairing code | **Yes** |
-| **POST** | `/enroll/join` | Consume pairing code to link a pending device | No (Code Verified) |
+| **POST** | `/auth/challenge` | Start login: get base64 challenge ciphertext encrypted to the device's public key | No |
+| **POST** | `/auth/verify` | Submit the decrypted challenge nonce to receive a session Bearer token | No |
+| **GET** | `/auth/whoami` | Identify the account and device bound to the current session | **Yes** |
+
+---
+
+### Web Account Management (`accounts`)
+
+Web-level credentials management (email/password). These sessions identify the account but hold no cryptographic keys.
+
+| Method | Endpoint | Description | Auth Required |
+| --- | --- | --- | --- |
+| **POST** | `/accounts` | Register a new account (stores the browser-generated `recovery_pubkey` only) | No |
+| **POST** | `/accounts/login` | Log in to an account with email & password to receive a web session token | No |
+| **GET** | `/accounts/me` | Fetch the current account's details and its recovery public key | **Yes** |
+
+---
+
+### Zero-Knowledge Sync (`sync`)
+
+Endpoints for pushing and pulling encrypted items. The server relays and orders changes but cannot decrypt payloads.
+
+| Method | Endpoint | Description | Auth Required |
+| --- | --- | --- | --- |
+| **GET** | `/sync/changes` | Pull encrypted secrets modified since a cursor (`?since=<seq>`) | **Yes** |
+| **POST** | `/sync/push` | Batch-push local creations, updates, or tombstones under optimistic concurrency | **Yes** |
+
+---
+
+### Device Enrollment (`enroll`)
+
+Used to link new devices into an existing account utilizing temporary high-entropy pairing codes.
+
+| Method | Endpoint | Description | Auth Required |
+| --- | --- | --- | --- |
+| **POST** | `/enroll/invite` | Register a client-generated pairing invite (stores code hash and MAC'd roster) | **Yes** |
+| **POST** | `/enroll/join` | Consume an invite code to instantly register a new device under the account | No (Code Hash verified) |
+| **GET** | `/enroll/invite/{invite_id}` | Poll an invite status to retrieve the join proof (the redeeming device and its join MAC) | **Yes** |
+
+---
+
+### Device Registry (`devices`)
+
+Endpoints to view registered endpoints in the client's account.
+
+| Method | Endpoint | Description | Auth Required |
+| --- | --- | --- | --- |
+| **GET** | `/devices` | List all devices linked to the caller's account | **Yes** |
+| **GET** | `/devices/{device_id}` | Retrieve details of a specific device within the caller's account | **Yes** |
+
+---
+
+### Trust Graph Log (`trust`)
+
+Manages the account's append-only trust log containing signed certificates.
+
+| Method | Endpoint | Description | Auth Required |
+| --- | --- | --- | --- |
+| **POST** | `/trust/certs` | Publish a signed vouch or revoke certificate (`vouch` / `revoke` log chain) | **Yes (Issuer device)** |
+| **GET** | `/trust/certs` | Pull all published trust log certificates since a sequence cursor (`?since=<seq>`) | **Yes** |
+
+---
+
+### Web Dashboard Statistics (`stats` & `health`)
+
+Provides telemetry data for the web UI integration and deployment health probes.
+
+| Method | Endpoint | Description | Auth Required |
+| --- | --- | --- | --- |
+| **GET** | `/stats/overview` | Fetch static dashboard card counts (passwords, notes, active/revoked devices) | No |
+| **GET** | `/stats/activity` | Fetch chronological mock timeline series of events (`?period=[7d|30d|90d]`) | No |
+| **GET** | `/stats/security` | Fetch mock aggregate security health, active alerts, and last sync time | No |
+| **GET** | `/health` | Liveness check (returns `{"status": "ok"}`) | No |
 
 ---
 
