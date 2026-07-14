@@ -454,8 +454,7 @@ https://github.com/svetlana1959/GophKeeper/blob/main/README.md
 https://www.figma.com/design/e9yJfGqSkREVk5sjPocKHN/Untitled?node-id=0-1&t=u4j6RSIVCZZWmd5j-1
 
 ---
-## Docker / Deployment
-!МАЛИК ТУТ ТОЖЕ ДОПИШИ!
+## Deployment
 - VM host: `10.93.27.16`
 - Live deployment link: http://10.93.27.16/
 
