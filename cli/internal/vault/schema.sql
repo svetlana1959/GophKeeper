@@ -47,6 +47,14 @@ CREATE TABLE IF NOT EXISTS trust_anchors (
     sign_pub  TEXT NOT NULL  -- Ed25519 public key (base64), verifies the anchor's certs
 );
 
+-- Invites this device minted, kept until the joiner redeems them so the inviter
+-- can verify the join proof under the code and vouch for the joiner. The code is
+-- stored locally only (the server never sees it).
+CREATE TABLE IF NOT EXISTS pending_invites (
+    invite_id  TEXT PRIMARY KEY,
+    code       TEXT NOT NULL
+);
+
 -- This device's binding to the server account and the pull cursor (single row).
 CREATE TABLE IF NOT EXISTS sync_state (
     id         INTEGER PRIMARY KEY CHECK (id = 1),

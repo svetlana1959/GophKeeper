@@ -36,16 +36,41 @@ type DeviceInfo struct {
 }
 
 // CreateInvite mints a pairing code another device can use to join this account.
+// The code is generated locally and never sent to the server: only its hash and
+// a roster of this device's trusted devices (each MAC'd under the code) are
+// uploaded, so the joiner can verify the roster and adopt those devices as trust
+// anchors. The invite is remembered locally until redeemed, so this device can
+// verify the join proof and vouch for the joiner on a later sync.
 func (s *Session) CreateInvite(ctx context.Context, pin string) (Invite, error) {
 	client, _, _, _, err := s.connect(ctx, pin)
 	if err != nil {
 		return Invite{}, err
 	}
-	inv, err := client.CreateInvite(ctx)
+	code, err := trust.GenerateInviteCode()
 	if err != nil {
 		return Invite{}, err
 	}
-	return Invite{Code: inv.Code, ExpiresAt: inv.ExpiresAt}, nil
+	trusted, err := s.trustedSet(ctx, client)
+	if err != nil {
+		return Invite{}, err
+	}
+	inv, err := client.CreateInvite(ctx, trust.HashCode(code), trust.BuildRoster(code, trustedSlice(trusted)))
+	if err != nil {
+		return Invite{}, err
+	}
+	if err := s.db.PendingInvites().Save(trust.PendingInvite{InviteID: inv.ID, Code: code}); err != nil {
+		return Invite{}, err
+	}
+	return Invite{Code: code, ExpiresAt: inv.ExpiresAt}, nil
+}
+
+// trustedSlice flattens a trusted set into a stable-free slice for roster building.
+func trustedSlice(m map[string]trust.TrustedDevice) []trust.TrustedDevice {
+	out := make([]trust.TrustedDevice, 0, len(m))
+	for _, d := range m {
+		out = append(out, d)
+	}
+	return out
 }
 
 // ListDevices returns the account's devices, flagging the local one. It never
@@ -94,17 +119,28 @@ func (s *Session) Link(ctx context.Context, code string) error {
 	}
 
 	client := remote.New(s.cfg.Remote)
-	dev, err := client.Join(ctx, code, s.cfg.DeviceName, s.localPub, s.localSignPub)
+	joinMAC := trust.JoinMAC(code, s.localPub, s.localSignPub)
+	dev, roster, err := client.Join(
+		ctx, trust.HashCode(code), s.cfg.DeviceName, s.localPub, s.localSignPub, joinMAC,
+	)
 	if err != nil {
 		return fmt.Errorf("app: link: %w", err)
 	}
 	// This device trusts itself: anchor its own keys under the server-assigned id
-	// so the trust graph has a root to grow from. Roster anchors (the inviter's
-	// devices, verified via the code) are added here too once bootstrap lands.
+	// so the trust graph has a root to grow from.
 	if err := s.db.Anchors().Save(trust.Anchor{
 		DeviceID: dev.ID, EncPub: s.localPub, SignPub: s.localSignPub,
 	}); err != nil {
 		return err
+	}
+	// Adopt the inviter's devices as anchors, but only the roster entries whose
+	// MAC verifies under the code — a server-tampered or injected entry is dropped.
+	// (A web-minted invite carries an empty roster; the first device just
+	// self-anchors.)
+	for _, a := range trust.VerifiedAnchors(code, roster) {
+		if err := s.db.Anchors().Save(a); err != nil {
+			return err
+		}
 	}
 	return st.SaveState(&syncstate.State{AccountID: dev.AccountID, DeviceID: dev.ID})
 }

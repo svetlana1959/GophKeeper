@@ -130,3 +130,8 @@ func (db *DB) Sync() syncstate.Repository { return &syncRepo{db: db.sql} }
 
 // Anchors returns the trust-anchor repository.
 func (db *DB) Anchors() trust.AnchorRepository { return &anchorRepo{db: db.sql} }
+
+// PendingInvites returns the outstanding-minted-invites repository.
+func (db *DB) PendingInvites() trust.PendingInviteRepository {
+	return &pendingInviteRepo{db: db.sql}
+}

@@ -27,7 +27,8 @@ type syncBackend struct {
 	nonce          []byte
 	secrets        map[string]storedSecret
 	seq            int64
-	certs          []trust.Cert // trust log
+	certs          []trust.Cert        // trust log
+	roster         []trust.RosterEntry // roster returned on join
 }
 
 type storedSecret struct {
@@ -131,7 +132,7 @@ func (b *syncBackend) handler(t *testing.T) http.Handler {
 			return
 		}
 		respond(w, http.StatusOK, map[string]any{
-			"code": "GK-CODE", "expires_at": "2026-07-01T00:00:00Z",
+			"invite_id": "inv-1", "expires_at": "2026-07-01T00:00:00Z",
 		})
 	})
 
@@ -139,11 +140,15 @@ func (b *syncBackend) handler(t *testing.T) http.Handler {
 		var body struct {
 			DeviceName string `json:"device_name"`
 			PublicKey  string `json:"public_key"`
+			SignPubKey string `json:"sign_public_key"`
 		}
 		_ = json.NewDecoder(r.Body).Decode(&body)
 		respond(w, http.StatusCreated, map[string]any{
-			"id": "dev-joined", "account_id": "acc-1", "device_name": body.DeviceName,
-			"public_key": body.PublicKey, "status": "active",
+			"device": map[string]any{
+				"id": "dev-joined", "account_id": "acc-1", "device_name": body.DeviceName,
+				"public_key": body.PublicKey, "sign_public_key": body.SignPubKey, "status": "active",
+			},
+			"roster": b.roster,
 		})
 	})
 
@@ -395,8 +400,9 @@ func TestCreateInvite(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CreateInvite: %v", err)
 	}
-	if inv.Code != "GK-CODE" {
-		t.Fatalf("invite code = %q, want GK-CODE", inv.Code)
+	// The code is generated locally (never server-made) and non-empty.
+	if inv.Code == "" {
+		t.Fatal("CreateInvite returned an empty code")
 	}
 }
 

@@ -169,6 +169,31 @@ func TestAnchorRepo(t *testing.T) {
 	}
 }
 
+func TestPendingInviteRepo(t *testing.T) {
+	db, _ := openTestDB(t)
+	repo := db.PendingInvites()
+
+	if err := repo.Save(trust.PendingInvite{InviteID: "inv-1", Code: "code-1"}); err != nil {
+		t.Fatalf("Save: %v", err)
+	}
+	if err := repo.Save(trust.PendingInvite{InviteID: "inv-2", Code: "code-2"}); err != nil {
+		t.Fatalf("Save 2: %v", err)
+	}
+
+	got, err := repo.List()
+	if err != nil || len(got) != 2 {
+		t.Fatalf("List = %v, %v; want 2", got, err)
+	}
+
+	if err := repo.Delete("inv-1"); err != nil {
+		t.Fatalf("Delete: %v", err)
+	}
+	got, _ = repo.List()
+	if len(got) != 1 || got[0].InviteID != "inv-2" || got[0].Code != "code-2" {
+		t.Fatalf("after delete = %v, want only inv-2", got)
+	}
+}
+
 func TestLocalRepo(t *testing.T) {
 	db, _ := openTestDB(t)
 

@@ -42,3 +42,43 @@ func (r *anchorRepo) List() ([]trust.Anchor, error) {
 	}
 	return anchors, rows.Err()
 }
+
+type pendingInviteRepo struct{ db *sql.DB }
+
+var _ trust.PendingInviteRepository = (*pendingInviteRepo)(nil)
+
+func (r *pendingInviteRepo) Save(p trust.PendingInvite) error {
+	_, err := r.db.Exec(`
+		INSERT INTO pending_invites (invite_id, code) VALUES (?, ?)
+		ON CONFLICT(invite_id) DO UPDATE SET code = excluded.code`,
+		p.InviteID, p.Code)
+	if err != nil {
+		return fmt.Errorf("vault: save pending invite: %w", err)
+	}
+	return nil
+}
+
+func (r *pendingInviteRepo) List() ([]trust.PendingInvite, error) {
+	rows, err := r.db.Query(`SELECT invite_id, code FROM pending_invites`)
+	if err != nil {
+		return nil, fmt.Errorf("vault: list pending invites: %w", err)
+	}
+	defer rows.Close()
+
+	var invites []trust.PendingInvite
+	for rows.Next() {
+		var p trust.PendingInvite
+		if err := rows.Scan(&p.InviteID, &p.Code); err != nil {
+			return nil, fmt.Errorf("vault: scan pending invite: %w", err)
+		}
+		invites = append(invites, p)
+	}
+	return invites, rows.Err()
+}
+
+func (r *pendingInviteRepo) Delete(inviteID string) error {
+	if _, err := r.db.Exec(`DELETE FROM pending_invites WHERE invite_id = ?`, inviteID); err != nil {
+		return fmt.Errorf("vault: delete pending invite: %w", err)
+	}
+	return nil
+}

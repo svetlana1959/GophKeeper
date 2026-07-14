@@ -238,15 +238,10 @@ func (s *Session) metaFromPayload(ciphertext []byte, priv string) (content, bool
 func (s *Session) applyReshare(
 	ctx context.Context, client *remote.Client, priv string,
 ) (int, error) {
-	certs, _, err := client.TrustChanges(ctx, 0)
-	if err != nil {
-		return 0, fmt.Errorf("app: pull trust log: %w", err)
-	}
-	anchors, err := s.db.Anchors().List()
+	trusted, err := s.trustedSet(ctx, client)
 	if err != nil {
 		return 0, err
 	}
-	trusted := trust.ComputeTrusted(certs, anchors)
 
 	desired := make([]string, 0, len(trusted)+1)
 	for _, d := range trusted {
@@ -299,6 +294,23 @@ func (s *Session) applyReshare(
 		reshared++
 	}
 	return reshared, nil
+}
+
+// trustedSet computes this device's trusted set from the signed trust-cert log
+// and its local anchors — the account's authoritative recipient set, derived
+// without trusting the server's device list.
+func (s *Session) trustedSet(
+	ctx context.Context, client *remote.Client,
+) (map[string]trust.TrustedDevice, error) {
+	certs, _, err := client.TrustChanges(ctx, 0)
+	if err != nil {
+		return nil, fmt.Errorf("app: pull trust log: %w", err)
+	}
+	anchors, err := s.db.Anchors().List()
+	if err != nil {
+		return nil, err
+	}
+	return trust.ComputeTrusted(certs, anchors), nil
 }
 
 // rememberTrusted mirrors a trusted device into the local trusted_devices table

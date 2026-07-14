@@ -30,16 +30,16 @@ func TestHashCodeMatchesServerScheme(t *testing.T) {
 
 func TestJoinMACRoundTrip(t *testing.T) {
 	code := "code-abc"
-	tag := trust.JoinMAC(code, "dev-2", "age1-2", "sign-2")
+	tag := trust.JoinMAC(code, "age1-2", "sign-2")
 
-	if !trust.VerifyJoinMAC(code, "dev-2", "age1-2", "sign-2", tag) {
+	if !trust.VerifyJoinMAC(code, "age1-2", "sign-2", tag) {
 		t.Fatal("valid join MAC did not verify")
 	}
-	// Wrong code, wrong identity, and a swapped key all fail.
-	if trust.VerifyJoinMAC("other", "dev-2", "age1-2", "sign-2", tag) {
+	// Wrong code and a swapped key both fail.
+	if trust.VerifyJoinMAC("other", "age1-2", "sign-2", tag) {
 		t.Fatal("join MAC verified under the wrong code")
 	}
-	if trust.VerifyJoinMAC(code, "dev-2", "age1-ATTACKER", "sign-2", tag) {
+	if trust.VerifyJoinMAC(code, "age1-ATTACKER", "sign-2", tag) {
 		t.Fatal("join MAC verified with a swapped enc key")
 	}
 }

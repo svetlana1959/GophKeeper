@@ -296,40 +296,73 @@ func (c *Client) TrustChanges(ctx context.Context, since int64) ([]trust.Cert, i
 	return resp.Certs, resp.Cursor, nil
 }
 
-// Invite is a single-use pairing code for linking a new device.
+// Invite is a minted pairing invite. The server assigns ID and expiry; the code
+// itself is generated and held by the client (never sent), so it is not here.
 type Invite struct {
-	Code      string    `json:"code"`
+	ID        string    `json:"invite_id"`
 	ExpiresAt time.Time `json:"expires_at"`
 }
 
-// CreateInvite mints a pairing code for a new device to join this account.
-// Requires a prior Authenticate.
-func (c *Client) CreateInvite(ctx context.Context) (Invite, error) {
+// CreateInvite registers a client-generated invite: the hash of the code plus a
+// roster of the inviter's trusted devices, each MAC'd under the code. The server
+// never sees the code. Requires a prior Authenticate.
+func (c *Client) CreateInvite(
+	ctx context.Context, codeHash string, roster []trust.RosterEntry,
+) (Invite, error) {
 	if c.token == "" {
 		return Invite{}, ErrNotAuthed
 	}
+	if roster == nil {
+		roster = []trust.RosterEntry{}
+	}
+	body := map[string]any{"code_hash": codeHash, "roster": roster}
 	var inv Invite
-	if err := c.do(ctx, http.MethodPost, "/enroll/invite", nil, &inv); err != nil {
+	if err := c.do(ctx, http.MethodPost, "/enroll/invite", body, &inv); err != nil {
 		return Invite{}, err
 	}
 	return inv, nil
 }
 
-// Join links this device into an account using a pairing code. It is
-// unauthenticated — the code is the authorization. ErrConflict means the public
-// key is already registered. signPublicKey is the device's Ed25519 trust key.
+// Join links this device into an account using a pairing code hash and a join MAC
+// binding its keys to the code. It is unauthenticated — the code is the
+// authorization. It returns the inviter's roster for the joiner to verify and
+// adopt as anchors. ErrConflict means the public key is already registered.
 func (c *Client) Join(
-	ctx context.Context, code, deviceName, publicKey, signPublicKey string,
-) (Device, error) {
+	ctx context.Context, codeHash, deviceName, publicKey, signPublicKey, joinMAC string,
+) (Device, []trust.RosterEntry, error) {
 	body := map[string]string{
-		"code": code, "device_name": deviceName,
-		"public_key": publicKey, "sign_public_key": signPublicKey,
+		"code_hash": codeHash, "device_name": deviceName,
+		"public_key": publicKey, "sign_public_key": signPublicKey, "join_mac": joinMAC,
 	}
-	var dev Device
-	if err := c.do(ctx, http.MethodPost, "/enroll/join", body, &dev); err != nil {
-		return Device{}, err
+	var resp struct {
+		Device Device              `json:"device"`
+		Roster []trust.RosterEntry `json:"roster"`
 	}
-	return dev, nil
+	if err := c.do(ctx, http.MethodPost, "/enroll/join", body, &resp); err != nil {
+		return Device{}, nil, err
+	}
+	return resp.Device, resp.Roster, nil
+}
+
+// InviteProof is the join proof for an invite this device minted: whether it was
+// redeemed, by which device, and that device's join MAC.
+type InviteProof struct {
+	Consumed bool   `json:"consumed"`
+	JoinMAC  string `json:"join_mac"`
+	Device   Device `json:"device"`
+}
+
+// InviteProof fetches the join proof for a minted invite, so the inviter can
+// verify who redeemed its code and vouch for them. Requires a prior Authenticate.
+func (c *Client) InviteProof(ctx context.Context, inviteID string) (InviteProof, error) {
+	if c.token == "" {
+		return InviteProof{}, ErrNotAuthed
+	}
+	var proof InviteProof
+	if err := c.do(ctx, http.MethodGet, "/enroll/invite/"+inviteID, nil, &proof); err != nil {
+		return InviteProof{}, err
+	}
+	return proof, nil
 }
 
 // do performs a request, encoding body as JSON (when non-nil), attaching the

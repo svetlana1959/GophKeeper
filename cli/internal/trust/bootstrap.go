@@ -44,15 +44,34 @@ func deviceBinding(deviceID, encPub, signPub string) string {
 	return strings.Join([]string{deviceID, encPub, signPub}, "\n")
 }
 
-// JoinMAC binds a joining device's identity to the invite code, proving to the
-// inviter (who knows the code) that this exact device redeemed the code it minted.
-func JoinMAC(code, deviceID, encPub, signPub string) string {
-	return mac(code, "join", deviceBinding(deviceID, encPub, signPub))
+// JoinMAC binds a joining device's keys to the invite code, proving to the
+// inviter (who knows the code) that the device presenting these keys redeemed the
+// code it minted. It covers the keys only, not the device id — the server assigns
+// the id at join time, so the joiner cannot know it yet; the inviter verifies
+// against the keys reported in the join proof.
+func JoinMAC(code, encPub, signPub string) string {
+	return mac(code, "join", encPub+"\n"+signPub)
 }
 
-// VerifyJoinMAC reports whether tag is a valid join MAC for the given identity.
-func VerifyJoinMAC(code, deviceID, encPub, signPub, tag string) bool {
-	return hmac.Equal([]byte(tag), []byte(JoinMAC(code, deviceID, encPub, signPub)))
+// VerifyJoinMAC reports whether tag is a valid join MAC for the given keys.
+func VerifyJoinMAC(code, encPub, signPub, tag string) bool {
+	return hmac.Equal([]byte(tag), []byte(JoinMAC(code, encPub, signPub)))
+}
+
+// PendingInvite is an invite this device minted, kept until the joiner redeems it
+// so the inviter can verify the join proof under the code and vouch for the
+// joiner. The code is retained locally (the server never has it).
+type PendingInvite struct {
+	InviteID string
+	Code     string
+}
+
+// PendingInviteRepository persists this device's outstanding minted invites. It
+// is the port; the SQLite implementation is the adapter in internal/vault.
+type PendingInviteRepository interface {
+	Save(p PendingInvite) error
+	List() ([]PendingInvite, error)
+	Delete(inviteID string) error
 }
 
 // RosterEntry is one of the inviter's trusted devices, MAC'd by the code so the

@@ -164,23 +164,27 @@ func (f *fakeBackend) handler(t *testing.T) http.Handler {
 			return
 		}
 		writeJSON(w, http.StatusOK, map[string]string{
-			"code": "GK-TEST-CODE", "expires_at": "2026-07-01T00:00:00Z",
+			"invite_id": "inv-1", "expires_at": "2026-07-01T00:00:00Z",
 		})
 	})
 
 	mux.HandleFunc("POST /enroll/join", func(w http.ResponseWriter, r *http.Request) {
 		var body struct {
-			Code      string `json:"code"`
+			CodeHash  string `json:"code_hash"`
 			Name      string `json:"device_name"`
 			PublicKey string `json:"public_key"`
 		}
 		_ = json.NewDecoder(r.Body).Decode(&body)
-		if body.Code != "GK-TEST-CODE" {
+		if body.CodeHash != "GK-TEST-HASH" {
 			writeJSON(w, http.StatusBadRequest, map[string]string{"detail": "invalid invite"})
 			return
 		}
-		writeJSON(w, http.StatusCreated, remote.Device{
-			ID: "dev-new", AccountID: "acc-1", Name: body.Name, PublicKey: body.PublicKey, Status: "active",
+		writeJSON(w, http.StatusCreated, map[string]any{
+			"device": remote.Device{
+				ID: "dev-new", AccountID: "acc-1", Name: body.Name,
+				PublicKey: body.PublicKey, Status: "active",
+			},
+			"roster": []trust.RosterEntry{{DeviceID: "inviter", EncPub: "age1inv", SignPub: "signinv", Mac: "m"}},
 		})
 	})
 
@@ -333,11 +337,11 @@ func TestCreateInvite(t *testing.T) {
 	if err := c.Authenticate(context.Background(), kp.Public, decryptWith(kp.Private)); err != nil {
 		t.Fatalf("authenticate: %v", err)
 	}
-	inv, err := c.CreateInvite(context.Background())
+	inv, err := c.CreateInvite(context.Background(), "GK-TEST-HASH", nil)
 	if err != nil {
 		t.Fatalf("create invite: %v", err)
 	}
-	if inv.Code != "GK-TEST-CODE" || inv.ExpiresAt.IsZero() {
+	if inv.ID != "inv-1" || inv.ExpiresAt.IsZero() {
 		t.Fatalf("unexpected invite: %+v", inv)
 	}
 }
@@ -348,12 +352,16 @@ func TestJoin(t *testing.T) {
 	srv := httptest.NewServer(be.handler(t))
 	defer srv.Close()
 
-	dev, err := remote.New(srv.URL).Join(context.Background(), "GK-TEST-CODE", "phone", kp.Public, "sign-pub")
+	dev, roster, err := remote.New(srv.URL).Join(
+		context.Background(), "GK-TEST-HASH", "phone", kp.Public, "sign-pub", "jmac")
 	if err != nil {
 		t.Fatalf("join: %v", err)
 	}
 	if dev.ID != "dev-new" || dev.PublicKey != kp.Public {
 		t.Fatalf("unexpected device: %+v", dev)
+	}
+	if len(roster) != 1 || roster[0].DeviceID != "inviter" {
+		t.Fatalf("unexpected roster: %+v", roster)
 	}
 }
 
@@ -413,7 +421,7 @@ func TestJoinBadCode(t *testing.T) {
 	srv := httptest.NewServer(be.handler(t))
 	defer srv.Close()
 
-	_, err := remote.New(srv.URL).Join(context.Background(), "wrong", "phone", kp.Public, "sign-pub")
+	_, _, err := remote.New(srv.URL).Join(context.Background(), "wrong", "phone", kp.Public, "sign-pub", "jmac")
 	var apiErr *remote.APIError
 	if !errors.As(err, &apiErr) || apiErr.StatusCode != http.StatusBadRequest {
 		t.Fatalf("want 400 APIError, got %v", err)
