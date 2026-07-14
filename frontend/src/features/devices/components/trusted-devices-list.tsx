@@ -3,6 +3,7 @@ import { cn } from '@/lib/utils'
 import { DeviceIcon } from '@/features/dashboard/components/device-icon'
 import { SectionCard } from '@/features/dashboard/components/section-card'
 import { ViewAllLink } from '@/features/dashboard/components/atoms'
+import { useEnrollment } from '@/features/enrollment/enrollment-context'
 import type { DeviceView } from '../sample-devices'
 import { SAMPLE_DEVICES } from '../sample-devices'
 
@@ -49,6 +50,8 @@ function DeviceRow({ device }: { device: DeviceView }) {
 }
 
 export function TrustedDevicesList() {
+  const { openAddDevice } = useEnrollment()
+
   return (
     <SectionCard title="Trusted Devices" action={<ViewAllLink to="/devices" />}>
       <div className="divide-border/60 divide-y">
@@ -58,6 +61,7 @@ export function TrustedDevicesList() {
       </div>
       <button
         type="button"
+        onClick={openAddDevice}
         className="border-border text-primary hover:bg-primary/5 mt-4 flex w-full items-center justify-center gap-2 rounded-xl border border-dashed py-4 text-sm font-semibold transition-colors"
       >
         <Plus className="size-4" strokeWidth={2.5} />

@@ -1,5 +1,7 @@
 import { useAuth } from '@/app/auth-context'
 import { displayNameFromIdentity } from '@/lib/format'
+import { useAccount } from '@/features/enrollment/use-account'
+import { RecoveryKeyCallout } from '@/features/enrollment/recovery-key-callout'
 import { LastSync } from './components/last-sync'
 import { StatCards } from './components/stat-cards'
 import { TrustedDevicesCard } from './components/trusted-devices-card'
@@ -14,6 +16,8 @@ export function DashboardPage() {
   const overview = useStatsOverview()
   const security = useStatsSecurity()
   const devices = useDevices()
+  const account = useAccount()
+  const needsSetup = account.data?.recovery_pubkey === null
 
   return (
     <div className="mx-auto max-w-[1400px]">
@@ -25,6 +29,12 @@ export function DashboardPage() {
           Here's what's happening with your vault.
         </p>
       </header>
+
+      {needsSetup ? (
+        <div className="mt-8">
+          <RecoveryKeyCallout />
+        </div>
+      ) : null}
 
       <div className="mt-8">
         <LastSync lastSyncAt={security.data?.last_sync_at} />

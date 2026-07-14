@@ -41,4 +41,11 @@ export const accountsApi = {
     const { data } = await http.get('/accounts/me')
     return accountSchema.parse(data)
   },
+
+  /** Set the account's recovery public key (write-once; the backend 409s if one
+   *  is already set). The private half is minted in the browser and never sent. */
+  async setRecoveryKey(recoveryPubkey: string): Promise<Account> {
+    const { data } = await http.put('/accounts/me/recovery', { recovery_pubkey: recoveryPubkey })
+    return accountSchema.parse(data)
+  },
 }

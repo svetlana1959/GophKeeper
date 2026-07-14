@@ -8,13 +8,15 @@ the account's recovery public key.
 
 from fastapi import APIRouter, Depends, status
 
-from gophkeeper.api.deps import get_account_id, provide
+from gophkeeper.api.deps import get_account_id, get_account_principal, provide
 from gophkeeper.api.schemas.account import (
     AccountResponse,
     AccountSessionResponse,
     LoginRequest,
     RegisterAccountRequest,
+    SetRecoveryKeyRequest,
 )
+from gophkeeper.security.principal import AccountPrincipal
 from gophkeeper.services.account_auth_service import AccountAuthService
 from gophkeeper.settings.settings import settings
 
@@ -79,4 +81,28 @@ async def me(
     recovery key it must seal secrets to.
     """
     account = await service.fetch_account(account_id)
+    return AccountResponse(id=account.id, recovery_pubkey=account.recovery_pubkey)
+
+
+@router.put(
+    "/me/recovery",
+    response_model=AccountResponse,
+    summary="Set the account's recovery key",
+    responses={
+        401: {"description": "Missing, invalid, or expired web session token."},
+        409: {"description": "This account already has a recovery key."},
+    },
+)
+async def set_recovery_key(
+    body: SetRecoveryKeyRequest,
+    principal: AccountPrincipal = Depends(get_account_principal),
+    service: AccountAuthService = Depends(provide(AccountAuthService)),
+) -> AccountResponse:
+    """Set the account's recovery public key (minted in the browser), once.
+
+    Registration can carry a recovery key already; this lets an account that
+    signed up without one mint it later. It is write-once — a second attempt is
+    refused (409) so secrets sealed to the existing key are never stranded.
+    """
+    account = await service.set_recovery_key(principal.account_id, body.recovery_pubkey)
     return AccountResponse(id=account.id, recovery_pubkey=account.recovery_pubkey)
