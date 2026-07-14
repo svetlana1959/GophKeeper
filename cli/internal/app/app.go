@@ -90,12 +90,23 @@ func Init(p InitParams) (InitResult, error) {
 	if err != nil {
 		return InitResult{}, err
 	}
+	// The Ed25519 signing key is this device's trust identity (issues vouch/revoke
+	// certs); always fresh, never imported alongside an age key.
+	skp, err := crypto.GenerateSigningKey()
+	if err != nil {
+		return InitResult{}, err
+	}
 
-	// Private key at rest: PIN-encrypted, or plaintext guarded by 0600.
+	// Private keys at rest: PIN-encrypted, or plaintext guarded by 0600.
 	storedKey := []byte(kp.Private)
+	signStoredKey := []byte(skp.Private)
 	pinProtected := false
 	if p.PIN != "" {
 		storedKey, err = crypto.SealWithPassword([]byte(kp.Private), p.PIN)
+		if err != nil {
+			return InitResult{}, err
+		}
+		signStoredKey, err = crypto.SealWithPassword([]byte(skp.Private), p.PIN)
 		if err != nil {
 			return InitResult{}, err
 		}
@@ -115,12 +126,14 @@ func Init(p InitParams) (InitResult, error) {
 	deviceID := uuid.NewString()
 	now := time.Now().UTC()
 	if err := db.Devices().Save(&device.Device{
-		ID: deviceID, Name: p.DeviceName, PublicKey: kp.Public, Active: true, UpdatedAt: now,
+		ID: deviceID, Name: p.DeviceName, PublicKey: kp.Public, SignPublicKey: skp.Public,
+		Active: true, UpdatedAt: now,
 	}); err != nil {
 		return InitResult{}, err
 	}
 	if err := db.Local().Save(&device.LocalDevice{
-		DeviceID: deviceID, StoredKey: storedKey, PINProtected: pinProtected,
+		DeviceID: deviceID, StoredKey: storedKey, SignStoredKey: signStoredKey,
+		PINProtected: pinProtected,
 	}); err != nil {
 		return InitResult{}, err
 	}

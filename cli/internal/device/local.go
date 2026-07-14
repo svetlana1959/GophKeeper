@@ -8,9 +8,10 @@ import "errors"
 // interprets StoredKey — it only persists and returns it; deriving a PIN key and
 // decrypting is an application concern.
 type LocalDevice struct {
-	DeviceID     string
-	StoredKey    []byte // age private key at rest, encrypted iff PINProtected
-	PINProtected bool
+	DeviceID      string
+	StoredKey     []byte // age private key at rest, encrypted iff PINProtected
+	SignStoredKey []byte // Ed25519 signing private key at rest, encrypted iff PINProtected
+	PINProtected  bool
 }
 
 // LocalRepository stores the single local device (1:1). It is the port; the

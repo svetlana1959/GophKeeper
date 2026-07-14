@@ -12,11 +12,12 @@ import (
 // Device is a device that secrets can be shared with, identified by its age
 // public key. Both the local machine and remote devices are represented here.
 type Device struct {
-	ID        string
-	Name      string // human-readable, e.g. "laptop"
-	PublicKey string // age public key ("age1…")
-	Active    bool   // false once the device is revoked
-	UpdatedAt time.Time
+	ID            string
+	Name          string // human-readable, e.g. "laptop"
+	PublicKey     string // age public key ("age1…"), the encryption recipient
+	SignPublicKey string // Ed25519 signing public key (base64), verifies trust certs
+	Active        bool   // false once the device is revoked
+	UpdatedAt     time.Time
 }
 
 // Repository persists trusted devices. It is the port; the SQLite

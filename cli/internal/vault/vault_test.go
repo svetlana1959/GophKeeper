@@ -29,11 +29,12 @@ func openTestDB(t *testing.T) (*vault.DB, string) {
 
 func newDevice(name string) *device.Device {
 	return &device.Device{
-		ID:        name + "-id",
-		Name:      name,
-		PublicKey: "age1-pub-" + name,
-		Active:    true,
-		UpdatedAt: time.Now().UTC(),
+		ID:            name + "-id",
+		Name:          name,
+		PublicKey:     "age1-pub-" + name,
+		SignPublicKey: "sign-pub-" + name,
+		Active:        true,
+		UpdatedAt:     time.Now().UTC(),
 	}
 }
 
@@ -80,6 +81,9 @@ func TestDeviceRepo_CRUD(t *testing.T) {
 	}
 	if got.Name != d.Name || got.PublicKey != d.PublicKey || !got.Active {
 		t.Errorf("Get = %+v", got)
+	}
+	if got.SignPublicKey != d.SignPublicKey {
+		t.Errorf("SignPublicKey = %q, want %q", got.SignPublicKey, d.SignPublicKey)
 	}
 	if !got.UpdatedAt.Equal(d.UpdatedAt) {
 		t.Errorf("UpdatedAt = %v, want %v", got.UpdatedAt, d.UpdatedAt)
@@ -141,7 +145,10 @@ func TestLocalRepo(t *testing.T) {
 		t.Fatalf("Save device: %v", err)
 	}
 
-	ld := &device.LocalDevice{DeviceID: d.ID, StoredKey: []byte("encrypted"), PINProtected: true}
+	ld := &device.LocalDevice{
+		DeviceID: d.ID, StoredKey: []byte("encrypted"),
+		SignStoredKey: []byte("sign-encrypted"), PINProtected: true,
+	}
 	if err := db.Local().Save(ld); err != nil {
 		t.Fatalf("Save local: %v", err)
 	}
@@ -152,6 +159,18 @@ func TestLocalRepo(t *testing.T) {
 	}
 	if got.DeviceID != d.ID || !got.PINProtected || string(got.StoredKey) != "encrypted" {
 		t.Errorf("Get local = %+v", got)
+	}
+	if string(got.SignStoredKey) != "sign-encrypted" {
+		t.Errorf("SignStoredKey = %q, want %q", got.SignStoredKey, "sign-encrypted")
+	}
+
+	// A nil signing key (legacy/partial record) must persist as an empty blob,
+	// not trip the NOT NULL constraint.
+	if err := db.Local().Save(&device.LocalDevice{DeviceID: d.ID, StoredKey: []byte("k")}); err != nil {
+		t.Fatalf("Save local with nil signing key: %v", err)
+	}
+	if got, _ := db.Local().Get(); len(got.SignStoredKey) != 0 {
+		t.Errorf("nil signing key round-trip = %q, want empty", got.SignStoredKey)
 	}
 
 	// Save replaces the single row.

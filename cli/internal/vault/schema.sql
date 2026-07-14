@@ -1,17 +1,19 @@
 CREATE TABLE IF NOT EXISTS trusted_devices (
-    id          TEXT PRIMARY KEY,        -- device UUID
-    device_name TEXT NOT NULL,           -- human-readable name
-    public_key  TEXT NOT NULL UNIQUE,    -- age public key (age1...)
-    is_active   INTEGER NOT NULL DEFAULT 1,
-    updated_at  INTEGER NOT NULL         -- unix nanoseconds
+    id              TEXT PRIMARY KEY,        -- device UUID
+    device_name     TEXT NOT NULL,           -- human-readable name
+    public_key      TEXT NOT NULL UNIQUE,    -- age public key (age1...)
+    sign_public_key TEXT NOT NULL DEFAULT '',-- Ed25519 signing public key (base64), verifies trust certs
+    is_active       INTEGER NOT NULL DEFAULT 1,
+    updated_at      INTEGER NOT NULL         -- unix nanoseconds
 );
 
 -- The current local device only (1:1 with trusted_devices).
 CREATE TABLE IF NOT EXISTS local_device (
-    device_id     TEXT PRIMARY KEY REFERENCES trusted_devices(id) ON DELETE CASCADE,
-    stored_key    BLOB NOT NULL,         -- age private key at rest (PIN-encrypted or plaintext+0600)
-    pin_protected INTEGER NOT NULL DEFAULT 0,
-    created_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+    device_id       TEXT PRIMARY KEY REFERENCES trusted_devices(id) ON DELETE CASCADE,
+    stored_key      BLOB NOT NULL,           -- age private key at rest (PIN-encrypted or plaintext+0600)
+    sign_stored_key BLOB NOT NULL DEFAULT x'', -- Ed25519 signing private key at rest, same protection
+    pin_protected   INTEGER NOT NULL DEFAULT 0,
+    created_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS secrets (
