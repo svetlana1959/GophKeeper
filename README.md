@@ -145,52 +145,77 @@ goph device revoke
 
 ---
 
-## 🖥️ Backend Service: Local Spin-up
+## Backend Service & Infrastructure
 
-### Prerequisites
+The backend architecture consists of a stateless asynchronous **FastAPI** service, a stateful **PostgreSQL** storage instance, and **dbmate** for schema migration runner orchestration.
 
-* Python 3.11+
-* PostgreSQL 15+ or Docker
-* `dbmate` migration tool installed locally
+We provide a pre-configured `docker-compose.yaml` file under the `/backend` directory for instant local infrastructure spin-up.
 
-### Setup Instructions
+### Running via Docker Compose (Recommended)
 
-1. **Clone & Configure Workspace:**
+This is the fastest way to orchestrate the entire development environment, including automatic health checks, database volume mapping, and live reload for source modifications.
+
+#### 1. Setup Environment Configuration
+Before spinning up the containers, copy the template environment file and adjust your local credentials:
 ```bash
 cd backend
-# Install dependencies using uv
+cp .env.default .env
+```
+
+*(By default, `.env` includes development credentials `postgres/docker` for out-of-the-box local setup).*
+
+#### 2. Spin Up the Infrastructure
+
+Start the database and the backend app (with hot reload mounted in `/src` for rapid local development):
+
+```bash
+cd backend
+docker compose up --build
+```
+
+* **Postgres Storage:** Available on the host machine at `localhost:5432`. Data is persisted locally inside the `./postgres-data` directory.
+* **Stateless Backend:** Available at `http://localhost:8080`. API specification pages can be visited at `http://localhost:8080/docs`.
+* *Note: Database migrations are applied **automatically** by the backend container upon startup.*
+
+#### 3. Run Manual Database Migrations (Optional)
+
+If you need to manually run, verify, or manage migrations without starting the full application server, you can use the dedicated `dbmate` container wrapper:
+
+```bash
+# Apply migrations manually using the companion tools profile
+docker compose --profile tools run --rm migrations
+```
+
+---
+
+### Alternative Manual Run (Host Machine)
+
+If you prefer to run the FastAPI process bare-metal while keeping only the database inside Docker, follow these steps:
+
+1. **Spin up Postgres only:**
+```bash
+docker compose up -d postgres
+```
+
+2. **Initialize Virtual Environment & Packages:**
+Make sure you have [uv](https://github.com/astral-sh/uv) installed:
+```bash
 uv venv
-source .venv/bin/activate
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 uv pip install -r pyproject.toml
-
 ```
 
-
-2. **Environment Variables:**
-Create a `.env` file in the `backend/` root directory:
-```env
-DATABASE_URL="postgresql://postgres:postgres@localhost:5432/goph_db?sslmode=disable"
-ENV_FOR_DYNACONF="development"
-
-```
-
-
-3. **Run Database Migrations:**
-We use `dbmate` for keeping database schema tracks in pure SQL:
+3. **Run Migrations Locally (requires [dbmate](https://github.com/amacneil/dbmate) binary):**
 ```bash
-dbmate -u "postgresql://postgres:postgres@localhost:5432/goph_db?sslmode=disable" up
-
+dbmate -u "postgresql://postgres:docker@localhost:5432/gophkeeper?sslmode=disable" up
 ```
 
+4. **Launch the App Server:**
+Start the Uvicorn development server locally. We pass the `--env-file` flag so Uvicorn automatically loads your local database credentials and configuration:
 
-4. **Start Development Server:**
 ```bash
-uvicorn src.main:app --reload --port 8000
-
+uvicorn gophkeeper.main:app --host 127.0.0.1 --port 8080 --env-file .env --reload
 ```
-
-
-Once started, interactive API Swagger documentation is available at `http://localhost:8000/docs`.
 
 ---
 
