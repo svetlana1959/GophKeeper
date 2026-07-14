@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import styles from './MainPage.module.css'
 import logo from '../assets/logo.png'
 import notificationIcon from '../assets/clarity_notification-line.svg'
@@ -14,16 +14,63 @@ import devicesActiveIcon from '../assets/devicesIconActive.svg'
 import statisticsActiveIcon from '../assets/statisticsIconActive.svg'
 import settingsActiveIcon from '../assets/settingsIconActive.svg'
 import { useNavigate } from 'react-router-dom';
+import { api, clearToken, getToken } from '../api/client';
 
 function MainPage({ linkPage }) {
 
     const [page, setPage] = useState(linkPage || 'dashboard');
+    const [isCheckingSession, setIsCheckingSession] = useState(true)
+    const [account, setAccount] = useState(null)
 
     const pages = {
-        'dashboard': <Dashboard />,
+        'dashboard': <Dashboard account={account} />,
     }
 
     const navigate = useNavigate();
+
+    useEffect(() => {
+        let isMounted = true
+
+        const verifySession = async () => {
+            const token = getToken()
+            if (!token) {
+                navigate('/auth', { replace: true })
+                return
+            }
+
+            try {
+                const me = await api.me()
+                if (isMounted) {
+                    setAccount(me)
+                }
+            } catch {
+                clearToken()
+                if (isMounted) {
+                    navigate('/auth', { replace: true })
+                }
+            } finally {
+                if (isMounted) {
+                    setIsCheckingSession(false)
+                }
+            }
+        }
+
+        verifySession()
+
+        return () => {
+            isMounted = false
+        }
+    }, [navigate])
+
+    if (isCheckingSession) {
+        return (
+            <div className={styles.container}>
+                <div className={styles.content}>
+                    <div className={styles.placeholder}>Checking authorization...</div>
+                </div>
+            </div>
+        )
+    }
 
     return (
         <div className={styles.container}>
@@ -60,7 +107,7 @@ function MainPage({ linkPage }) {
                 <div className={styles.account}>
                     <div className={styles.accountIcon}>S</div>
                     <div className={styles.accountInfo}>
-                        <div className={styles.accountName}>Sergey</div>
+                        <div className={styles.accountName}>Account {account?.id?.slice(0, 8) ?? 'User'}</div>
                         <div className={styles.accountType}>Personal account</div>
                     </div>
                     <div className={styles.accountSettings} onClick={() => navigate('/logout', { replace: false })}>

@@ -14,7 +14,7 @@ function Authorization() {
     const isAuthed = Boolean(getToken())
 
     if (isAuthed) {
-        return <Navigate to="/logout" replace />
+        return <Navigate to="/dashboard" replace />
     }
 
     const handleSubmit = async (event) => {

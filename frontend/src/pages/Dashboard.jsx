@@ -7,44 +7,185 @@ import filesIcon from '../assets/dashFiles.svg'
 import laptopIcon from '../assets/laptopLightGreen.svg'
 import mobileIcon from '../assets/mobileGreen.svg'
 import windowsIcon from '../assets/windowsGreen.svg'
-import { useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { api } from '../api/client'
 
-function Dashboard() {
+function Dashboard({ account }) {
     const deviceTypeToIcon = {
         'laptop': laptopIcon,
         'mobile': mobileIcon,
         'windows': windowsIcon
     }
 
-    const [devices] = useState([
-        {
-            type: 'laptop',
-            name: 'MacBook Pro',
-            os: 'macOS 14.4',
-            status: 'online'
-        },
-        {
-            type: 'mobile',
-            name: 'iPhone 17 Pro Max',
-            os: 'iOS 26',
-            status: 'online'
-        },
-        {
-            type: 'windows',
-            name: 'Windows PC',
-            os: 'Windows 11',
-            status: 'offline'
-        }
-    ])
+    const [period, setPeriod] = useState('7d')
+    const [isLoading, setIsLoading] = useState(true)
+    const [isRefreshing, setIsRefreshing] = useState(false)
+    const [error, setError] = useState('')
+    const [overview, setOverview] = useState(null)
+    const [security, setSecurity] = useState(null)
+    const [activityPoints, setActivityPoints] = useState([])
+    const [devices, setDevices] = useState([])
+    const [lastSyncedAt, setLastSyncedAt] = useState('')
+    const [invite, setInvite] = useState({ isSubmitting: false, error: '', code: '', expiresAt: '' })
+    const [optionalApiStatus, setOptionalApiStatus] = useState({ health: 'n/a', whoami: 'n/a', changes: 'n/a' })
 
-    const [accessRequests] = useState([
-        {
-            type: 'laptop',
-            name: 'New MacBook Air',
-            os: 'macOS 14.5',
-            timestamp: '2026-06-14T12:45:00Z'
-        },
-    ])
+    const inferDeviceType = (name = '') => {
+        const lower = name.toLowerCase()
+        if (lower.includes('iphone') || lower.includes('android') || lower.includes('mobile') || lower.includes('phone')) {
+            return 'mobile'
+        }
+        if (lower.includes('windows') || lower.includes('win')) {
+            return 'windows'
+        }
+        return 'laptop'
+    }
+
+    const resolvePresence = (device) => {
+        if (device.status !== 'active') {
+            return 'offline'
+        }
+
+        if (!device.last_seen_at) {
+            return 'offline'
+        }
+
+        const lastSeen = new Date(device.last_seen_at).getTime()
+        const tenMinutesMs = 10 * 60 * 1000
+        return Date.now() - lastSeen <= tenMinutesMs ? 'online' : 'offline'
+    }
+
+    const normalizedDevices = useMemo(() => {
+        return devices.map((device) => ({
+            ...device,
+            type: inferDeviceType(device.device_name),
+            name: device.device_name,
+            os: device.status,
+            status: resolvePresence(device),
+        }))
+    }, [devices])
+
+    const accessRequests = useMemo(() => {
+        return devices
+            .filter((device) => device.status === 'pending')
+            .map((device) => ({
+                id: device.id,
+                type: inferDeviceType(device.device_name),
+                name: device.device_name,
+                os: device.status,
+                timestamp: device.updated_at,
+            }))
+    }, [devices])
+
+    const loadData = useCallback(async ({ keepSpinner = false } = {}) => {
+        if (keepSpinner) {
+            setIsRefreshing(true)
+        } else {
+            setIsLoading(true)
+        }
+
+        setError('')
+
+        const [
+            overviewResult,
+            securityResult,
+            activityResult,
+            devicesResult,
+            meResult,
+            healthResult,
+            whoamiResult,
+            changesResult,
+        ] = await Promise.allSettled([
+            api.statsOverview(),
+            api.statsSecurity(),
+            api.statsActivity(period),
+            api.listDevices(),
+            api.me(),
+            api.health(),
+            api.whoami(),
+            api.syncChanges(0),
+        ])
+
+        if (overviewResult.status === 'fulfilled') {
+            setOverview(overviewResult.value)
+        }
+
+        if (securityResult.status === 'fulfilled') {
+            setSecurity(securityResult.value)
+        }
+
+        if (activityResult.status === 'fulfilled') {
+            setActivityPoints(activityResult.value.points ?? [])
+        }
+
+        if (devicesResult.status === 'fulfilled') {
+            setDevices(devicesResult.value ?? [])
+        }
+
+        if (meResult.status === 'fulfilled' && !account) {
+            // Keep account endpoint connected even when MainPage already loaded it.
+        }
+
+        const nextOptionalStatus = {
+            health: healthResult.status === 'fulfilled' ? (healthResult.value.status ?? 'ok') : 'unavailable',
+            whoami: whoamiResult.status === 'fulfilled' ? 'ok' : 'unavailable',
+            changes: changesResult.status === 'fulfilled' ? 'ok' : 'unavailable',
+        }
+        setOptionalApiStatus(nextOptionalStatus)
+
+        if (changesResult.status === 'fulfilled') {
+            const cursor = changesResult.value.cursor
+            setLastSyncedAt(`cursor ${cursor}`)
+        } else if (securityResult.status === 'fulfilled') {
+            setLastSyncedAt(new Date(securityResult.value.last_sync_at).toLocaleString())
+        } else {
+            setLastSyncedAt('never')
+        }
+
+        const hardFailures = [overviewResult, securityResult, activityResult, devicesResult].every((result) => result.status === 'rejected')
+        if (hardFailures) {
+            setError('Failed to load dashboard data. Please refresh.')
+        }
+
+        setIsLoading(false)
+        setIsRefreshing(false)
+    }, [account, period])
+
+    useEffect(() => {
+        loadData()
+    }, [loadData])
+
+    const handleCreateInvite = async () => {
+        setInvite((prev) => ({ ...prev, isSubmitting: true, error: '' }))
+
+        try {
+            const response = await api.createInvite()
+            setInvite({
+                isSubmitting: false,
+                error: '',
+                code: response.code,
+                expiresAt: response.expires_at,
+            })
+        } catch (err) {
+            setInvite((prev) => ({
+                ...prev,
+                isSubmitting: false,
+                error: err.message || 'Failed to create invite',
+            }))
+        }
+    }
+
+    const renderCardValue = (value) => (typeof value === 'number' ? value : '-')
+
+    if (isLoading) {
+        return (
+            <>
+                <div className={styles.header}>
+                    <div className={styles.title}>Welcome to the Dashboard</div>
+                    <div className={styles.subtitle}>Loading data from API...</div>
+                </div>
+            </>
+        )
+    }
 
     return (
         <>
@@ -54,11 +195,12 @@ function Dashboard() {
             </div>
             <div className={styles.content}>
                 <div className={styles.sync}>
-                    <button className={styles.syncButton}>
+                    <button className={styles.syncButton} onClick={() => loadData({ keepSpinner: true })} disabled={isRefreshing}>
                         <img src={reloadIcon} alt="Reload" />
                     </button>
-                    <div className={styles.syncStatus}>Last synced: <span className={styles.syncTimestamp}>14 June 2026, 12:43</span></div>
+                    <div className={styles.syncStatus}>Last synced: <span className={styles.syncTimestamp}>{lastSyncedAt || 'never'}</span></div>
                 </div>
+                {error ? <div className={styles.emptyMessage}>{error}</div> : null}
                 <div className={styles.cards}>
                     <div className={styles.card} style={{ backgroundColor: '#13181C' }}>
                         <div className={styles.cardIcon}>
@@ -66,7 +208,7 @@ function Dashboard() {
                         </div>
                         <div className={styles.cardContent}>
                             <div className={styles.cardTitle}>Passwords</div>
-                            <div className={styles.cardNumber}>12</div>
+                            <div className={styles.cardNumber}>{renderCardValue(overview?.passwords)}</div>
                             <div className={styles.cardTitle}>Total</div>
                         </div>
                     </div>
@@ -76,7 +218,7 @@ function Dashboard() {
                         </div>
                         <div className={styles.cardContent}>
                             <div className={styles.cardTitle}>Bank Cards</div>
-                            <div className={styles.cardNumber}>12</div>
+                            <div className={styles.cardNumber}>{renderCardValue(overview?.bank_cards)}</div>
                             <div className={styles.cardTitle}>Total</div>
                         </div>
                     </div>
@@ -86,7 +228,7 @@ function Dashboard() {
                         </div>
                         <div className={styles.cardContent}>
                             <div className={styles.cardTitle}>Notes</div>
-                            <div className={styles.cardNumber}>12</div>
+                            <div className={styles.cardNumber}>{renderCardValue(overview?.notes)}</div>
                             <div className={styles.cardTitle}>Total</div>
                         </div>
                     </div>
@@ -96,7 +238,7 @@ function Dashboard() {
                         </div>
                         <div className={styles.cardContent}>
                             <div className={styles.cardTitle}>Files</div>
-                            <div className={styles.cardNumber}>12</div>
+                            <div className={styles.cardNumber}>{renderCardValue(overview?.files)}</div>
                             <div className={styles.cardTitle}>Total</div>
                         </div>
                     </div>
@@ -109,12 +251,12 @@ function Dashboard() {
                                 <button className={styles.blockTitleButton}>View All</button>
                             </div>
                             <table className={styles.deviceTable}>
-                                {devices && devices.length > 0 ?
-                                    devices.map((device, ind) =>
+                                {normalizedDevices && normalizedDevices.length > 0 ?
+                                    normalizedDevices.map((device, ind) =>
                                         <tr key={`trusted-devices-${ind}`} className={styles.deviceRow}>
                                             <td className={styles.deviceIcon}>
                                                 <div className={styles.deviceIconBlock}>
-                                                    <img src={deviceTypeToIcon[device.type]} alt="icon" />
+                                                    <img src={deviceTypeToIcon[device.type] ?? laptopIcon} alt="icon" />
                                                 </div>
                                             </td>
                                             <td className={styles.deviceNames}>
@@ -131,7 +273,15 @@ function Dashboard() {
                                 }
                             </table>
                             <div className={styles.addDevice}>
-                                <button className={styles.addDeviceButton}>+ Add new device</button>
+                                <button className={styles.addDeviceButton} onClick={handleCreateInvite} disabled={invite.isSubmitting}>
+                                    {invite.isSubmitting ? 'Creating invite...' : '+ Add new device'}
+                                </button>
+                                {invite.code ? (
+                                    <div className={styles.emptyMessage}>
+                                        Invite code: {invite.code} (expires {new Date(invite.expiresAt).toLocaleString()})
+                                    </div>
+                                ) : null}
+                                {invite.error ? <div className={styles.emptyMessage}>{invite.error}</div> : null}
                             </div>
                         </div>
                         <div className={styles.block}>
@@ -156,8 +306,8 @@ function Dashboard() {
                                             </svg>
                                         </div>
                                         <div className={styles.statusBlockContent}>
-                                            <div className={styles.statusBlockTitle}>4 trusted devices</div>
-                                            <div className={styles.statusBlockSubtitle}>Your devices are secure </div>
+                                            <div className={styles.statusBlockTitle}>{renderCardValue(security?.trusted_devices)} trusted devices</div>
+                                            <div className={styles.statusBlockSubtitle}>Health: {optionalApiStatus.health}</div>
                                         </div>
                                     </div>
                                     <div className={styles.statusBlock}>
@@ -169,8 +319,8 @@ function Dashboard() {
                                             </svg>
                                         </div>
                                         <div className={styles.statusBlockContent}>
-                                            <div className={styles.statusBlockTitle}>No security alerts </div>
-                                            <div className={styles.statusBlockSubtitle}>Everything looks good </div>
+                                            <div className={styles.statusBlockTitle}>{renderCardValue(security?.alerts)} security alerts</div>
+                                            <div className={styles.statusBlockSubtitle}>Session check: {optionalApiStatus.whoami}</div>
                                         </div>
                                     </div>
                                 </div>
@@ -189,7 +339,7 @@ function Dashboard() {
                                         <div key={`access-request-${ind}`} className={styles.accessRequest}>
                                             <div className={styles.accessRequestInfo}>
                                                 <div className={styles.accessRequestIcon}>
-                                                    <img src={deviceTypeToIcon[request.type]} alt="icon" />
+                                                    <img src={deviceTypeToIcon[request.type] ?? laptopIcon} alt="icon" />
                                                 </div>
                                                 <div className={styles.accessRequestNames}>
                                                     <div className={styles.accessRequestName}>{request.name}</div>
@@ -202,7 +352,7 @@ function Dashboard() {
 
                                             <div className={styles.accessRequestActionsBlock}>
                                                 <div className={styles.accessRequestIcon} style={{ opacity: 0 }}>
-                                                    <img src={deviceTypeToIcon[request.type]} alt="icon" />
+                                                    <img src={deviceTypeToIcon[request.type] ?? laptopIcon} alt="icon" />
                                                 </div>
                                                 <div className={styles.accessRequestActions}>
                                                     <button className={`${styles.accessRequestAction} ${styles.approveButton}`}>Approve</button>
@@ -221,7 +371,27 @@ function Dashboard() {
                         <div className={styles.block}>
                             <div className={styles.blockTitle}>
                                 <div className={styles.blockTitleText}>Recent Activity</div>
-                                <button className={styles.blockTitleButton}>View All</button>
+                                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                    <button className={styles.blockTitleButton} onClick={() => setPeriod('7d')}>7d</button>
+                                    <button className={styles.blockTitleButton} onClick={() => setPeriod('30d')}>30d</button>
+                                    <button className={styles.blockTitleButton} onClick={() => setPeriod('90d')}>90d</button>
+                                </div>
+                            </div>
+                            <div className={styles.accessRequests}>
+                                {activityPoints.length > 0 ? activityPoints.slice(-5).map((point) => (
+                                    <div key={point.date} className={styles.accessRequest}>
+                                        <div className={styles.accessRequestInfo}>
+                                            <div className={styles.accessRequestNames}>
+                                                <div className={styles.accessRequestName}>{point.date}</div>
+                                                <div className={styles.accessRequestOS}>
+                                                    created: {point.created}, updated: {point.updated}, deleted: {point.deleted}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )) : <div className={styles.emptyMessage}>No activity for period {period}</div>}
+                                <div className={styles.emptyMessage}>changes endpoint: {optionalApiStatus.changes}</div>
+                                <div className={styles.emptyMessage}>account: {account?.id ?? 'unknown'}</div>
                             </div>
                         </div>
                     </div>
