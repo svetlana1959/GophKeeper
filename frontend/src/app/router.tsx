@@ -36,7 +36,7 @@ export const router = createBrowserRouter([
           {
             path: '/secrets',
             lazy: async () => ({
-              Component: (await import('@/features/placeholder/coming-soon')).SecretsPage,
+              Component: (await import('@/features/secrets/secrets-page')).SecretsPage,
             }),
           },
           {
