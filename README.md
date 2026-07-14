@@ -10,32 +10,35 @@ A secure, local-first, end-to-end encrypted secret manager utilizing **age (X255
 
 ---
 
-## 🌟 Features
+## Features
 
-* **Zero-Knowledge Architecture:** Payloads are encrypted client-side using `age` (X25519 AEAD) before transmission. The server only sees opaque binary blocks (`BYTEA`) and non-secret metadata.
-* **Multi-Device Synchronization:** Declarative sync loop using monotonic sequence cursors (`seq`) preventing race conditions and clock skew.
-* **Secure Device Linking:** Two-command pairing flow utilizing high-entropy single-use pairing codes to prevent Server MITM.
-* **Dual-Tier Authority Model:** Standard operations use local device keys. Critical actions (revoking other devices, account recovery) require an offline **Recovery Key**.
-* **Cryptographic Challenge-Response Auth:** Elimination of static tokens or passwords via `age`-encrypted nonce verification.
-* **Local-First Design:** Fully functional offline CLI. Local secrets, device states, and trust graphs are stored in a local SQLite database.
+- **End-to-end encryption** — secrets are sealed client-side with `age` (X25519); the server sees only ciphertext.
+- **Multi-device access** — secrets are sealed to multiple device keys at once, so any authorized device can open them.
+- **Zero-knowledge sync** — push/pull with per-account cursors, idempotent batch upserts, and version-based conflict resolution.
+- **Local-first CLI** — `goph` works fully offline; sync is opt-in. Set, get, list, and delete secrets from a single static binary.
+- **Two-tier authentication** — age challenge/response for devices (no secret ever sent) and email + password (Argon2id) for the web dashboard.
+- **Code-authenticated device linking** — invite/join flow that's MAC-protected against a server MITM.
+- **Client-verified device trust** — a tamper-evident graph of signed vouch/revoke certificates; the server relays but never verifies them.
+- **Device revocation** — revoke a device and its subtree, then rotate keys so it loses future access.
+- **Recovery key** — an offline key separate from everyday device keys, so a stolen device can't lock you out.
+- **Web dashboard** — metadata & management only; never handles secret plaintext or keys.
 
----
+## Components
 
-## 🏗️ Tech Stack
+| Component | Stack |
+|---|---|
+| **Backend** | Python · FastAPI · PostgreSQL · Argon2id |
+| **CLI** (`goph`) | Go · `age` · Ed25519 · SQLite vault |
+| **Frontend** | React · Vite · TypeScript · TailwindCSS |
 
-### Client (CLI)
-* **Language:** Go (Golang) — for static compilation, memory safety, and cross-platform native execution.
-* **Storage:** **SQLite** — for offline transactional storage of local trust graphs and local metadata.
-* **Configuration:** **YAML** — human-readable configuration file for user-modifiable settings (endpoints, logs).
-* **Cryptography:** Modern `age` (X25519) encryption primitives.
+## Roadmap
 
-### Server (Backend)
-* **Framework:** **FastAPI** — high-performance asynchronous ASGI presentation layer.
-* **ORM & Driver:** **SQLAlchemy (Async)** + **asyncpg** — non-blocking database queries.
-* **Database:** **PostgreSQL** — native binary storage (`BYTEA`), logical flags (`BOOLEAN`), and concurrent conflict resolution (`ON CONFLICT`).
-* **Package Management:** **uv** — lightning-fast workspace compiler.
-* **Configuration:** **Dynaconf** — layered environment-specific configuration management.
-* **Database Migrations:** **dbmate** — framework-agnostic, SQL-first migration runner.
+- Typed secret categories (passwords, cards, notes, files) — CLI currently stores a generic secret type
+- Digital inheritance (dead-man's-switch transfer to a beneficiary)
+- Backup export / restore
+- Breach-database checks and stale-password alerts
+- Server-side revocation enforcement
+- Browser-based recovery keys
 
 ---
 
