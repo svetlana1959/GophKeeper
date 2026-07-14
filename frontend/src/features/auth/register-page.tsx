@@ -22,7 +22,7 @@ export function RegisterPage() {
     defaultValues: { email: '', password: '', confirmPassword: '' },
   })
 
-  if (isAuthed) return <Navigate to="/" replace />
+  if (isAuthed) return <Navigate to="/dashboard" replace />
 
   const onSubmit = handleSubmit((values) => signup.mutate(values))
 

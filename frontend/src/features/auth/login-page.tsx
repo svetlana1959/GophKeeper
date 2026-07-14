@@ -22,7 +22,7 @@ export function LoginPage() {
     defaultValues: { username: '', password: '' },
   })
 
-  if (isAuthed) return <Navigate to="/" replace />
+  if (isAuthed) return <Navigate to="/dashboard" replace />
 
   const onSubmit = handleSubmit((values) => login.mutate(values))
 

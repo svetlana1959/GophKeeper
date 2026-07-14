@@ -2,9 +2,15 @@ import { createBrowserRouter } from 'react-router-dom'
 import { AppShell } from '@/components/layout/app-shell'
 import { ProtectedRoute } from './protected-route'
 
-// Auth routes are standalone; everything else renders inside the app shell behind
-// the auth guard. Feature routes are lazy so each is its own chunk.
+// `/` is the public landing page. Auth routes are standalone; the rest render
+// inside the app shell behind the auth guard. Feature routes are lazy chunks.
 export const router = createBrowserRouter([
+  {
+    path: '/',
+    lazy: async () => ({
+      Component: (await import('@/features/landing/landing-page')).LandingPage,
+    }),
+  },
   {
     path: '/login',
     lazy: async () => ({ Component: (await import('@/features/auth/login-page')).LoginPage }),
@@ -22,7 +28,7 @@ export const router = createBrowserRouter([
         element: <AppShell />,
         children: [
           {
-            path: '/',
+            path: '/dashboard',
             lazy: async () => ({
               Component: (await import('@/features/dashboard/dashboard-page')).DashboardPage,
             }),
@@ -36,7 +42,7 @@ export const router = createBrowserRouter([
           {
             path: '/devices',
             lazy: async () => ({
-              Component: (await import('@/features/placeholder/coming-soon')).DevicesPage,
+              Component: (await import('@/features/devices/devices-page')).DevicesPage,
             }),
           },
           {
@@ -57,6 +63,8 @@ export const router = createBrowserRouter([
   },
   {
     path: '*',
-    lazy: async () => ({ Component: (await import('@/features/auth/login-page')).LoginPage }),
+    lazy: async () => ({
+      Component: (await import('@/features/landing/landing-page')).LandingPage,
+    }),
   },
 ])
