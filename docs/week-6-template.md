@@ -154,7 +154,71 @@ Link: http://10.93.27.16/
 ---
 ## Reproducibility
 ### Deployment Instructions
-!АРСЕНИЙ ТУТ НАПИШИ!
+#### Running via Docker Compose (Recommended)
+
+This is the fastest way to orchestrate the entire development environment, including automatic health checks, database volume mapping, and live reload for source modifications.
+
+##### 1. Setup Environment Configuration
+Before spinning up the containers, copy the template environment file and adjust your local credentials:
+```bash
+cd backend
+cp .env.default .env
+```
+
+*(By default, `.env` includes development credentials `postgres/docker` for out-of-the-box local setup).*
+
+##### 2. Spin Up the Infrastructure
+
+Start the database and the backend app (with hot reload mounted in `/src` for rapid local development):
+
+```bash
+cd backend
+docker compose up --build
+```
+
+* **Postgres Storage:** Available on the host machine at `localhost:5432`. Data is persisted locally inside the `./postgres-data` directory.
+* **Stateless Backend:** Available at `http://localhost:8080`. API specification pages can be visited at `http://localhost:8080/docs`.
+* *Note: Database migrations are applied **automatically** by the backend container upon startup.*
+
+##### 3. Run Manual Database Migrations (Optional)
+
+If you need to manually run, verify, or manage migrations without starting the full application server, you can use the dedicated `dbmate` container wrapper:
+
+```bash
+# Apply migrations manually using the companion tools profile
+docker compose --profile tools run --rm migrations
+```
+
+---
+
+#### 🛠️ Alternative Manual Run (Host Machine)
+
+If you prefer to run the FastAPI process bare-metal while keeping only the database inside Docker, follow these steps:
+
+1. **Spin up Postgres only:**
+```bash
+docker compose up -d postgres
+```
+
+2. **Initialize Virtual Environment & Packages:**
+Make sure you have [uv](https://github.com/astral-sh/uv) installed:
+```bash
+uv venv
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+uv pip install -r pyproject.toml
+```
+
+3. **Run Migrations Locally (requires [dbmate](https://github.com/amacneil/dbmate) binary):**
+```bash
+dbmate -u "postgresql://postgres:docker@localhost:5432/gophkeeper?sslmode=disable" up
+```
+
+4. **Launch the App Server:**
+Start the Uvicorn development server locally. We pass the `--env-file` flag so Uvicorn automatically loads your local database credentials and configuration:
+
+```bash
+uvicorn gophkeeper.main:app --host 127.0.0.1 --port 8080 --env-file .env --reload
+```
 
 ### Docker Verification
 !МАЛИК ТУТ ТОЖЕ НАПИШИ!
