@@ -13,8 +13,8 @@
     /* align-items: center; */
     background: #141418;
     height: 100%;
-    width: 15%;
-    min-width: 385px;
+    width: 25%;
+    min-width: 335px;
     top: 0;
     left: 0;
     padding: 4% 32px;
@@ -50,16 +50,66 @@
 .navItem {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 24px;
     color: #F4F5F5;
     font-size: 18px;
     font-weight: 400;
     margin-bottom: 24px;
     cursor: pointer;
+
+    img {
+        width: 24px;
+        height: 24px;
+    }
 }
 
 .active {
     color: #008645;
+}
+
+.account {
+    position: absolute;
+    bottom: 4%;
+    width: 70%;
+    display: flex;
+    align-items: center;
+    gap: 24px;
+    padding-right: 48px;
+}
+
+.accountIcon {
+    width: 52px;
+    height: 52px;
+    background: #1B252F;
+    border-radius: 50%;
+    color: #008645;
+    font-size: 24px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.accountInfo {
+    display: flex;
+    flex-direction: column;
+    flex: 1 0 0;
+    gap: 4px;
+}
+
+.accountName {
+    font-size: 18px;
+    font-weight: 600;
+    color: #FFFFFF;
+}
+
+.accountType {
+    font-size: 14px;
+    color: #969696;
+}
+
+.accountSettings {
+    color: #FB2D34;
 }
 
 .content {

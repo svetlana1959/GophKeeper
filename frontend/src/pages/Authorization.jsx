@@ -25,7 +25,7 @@ function Authorization() {
         try {
             const response = await api.login(email, password)
             setToken(response.access_token)
-            navigate('/')
+            navigate('/dashboard', { replace: true })
         } catch (err) {
             setError(err.message || 'Не удалось войти')
         } finally {
