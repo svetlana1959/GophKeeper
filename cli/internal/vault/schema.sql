@@ -37,6 +37,16 @@ CREATE TABLE IF NOT EXISTS secret_recipients (
 
 CREATE INDEX IF NOT EXISTS idx_recipients_device ON secret_recipients(device_id);
 
+-- Trust anchors: signing identities this device verified out-of-band (its own at
+-- link, plus an inviter's roster via the invite code) and roots the trust graph
+-- at. ComputeTrusted starts reachability from these. device_id is the
+-- server-assigned id.
+CREATE TABLE IF NOT EXISTS trust_anchors (
+    device_id TEXT PRIMARY KEY,
+    enc_pub   TEXT NOT NULL, -- age public key (also a valid recipient)
+    sign_pub  TEXT NOT NULL  -- Ed25519 public key (base64), verifies the anchor's certs
+);
+
 -- This device's binding to the server account and the pull cursor (single row).
 CREATE TABLE IF NOT EXISTS sync_state (
     id         INTEGER PRIMARY KEY CHECK (id = 1),

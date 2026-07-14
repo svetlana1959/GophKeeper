@@ -8,6 +8,7 @@ import (
 
 	"github.com/svetlana1959/GophKeeper/cli/internal/remote"
 	"github.com/svetlana1959/GophKeeper/cli/internal/syncstate"
+	"github.com/svetlana1959/GophKeeper/cli/internal/trust"
 )
 
 // ErrAlreadyLinked is returned by Link when this device is already bound to an
@@ -96,6 +97,14 @@ func (s *Session) Link(ctx context.Context, code string) error {
 	dev, err := client.Join(ctx, code, s.cfg.DeviceName, s.localPub, s.localSignPub)
 	if err != nil {
 		return fmt.Errorf("app: link: %w", err)
+	}
+	// This device trusts itself: anchor its own keys under the server-assigned id
+	// so the trust graph has a root to grow from. Roster anchors (the inviter's
+	// devices, verified via the code) are added here too once bootstrap lands.
+	if err := s.db.Anchors().Save(trust.Anchor{
+		DeviceID: dev.ID, EncPub: s.localPub, SignPub: s.localSignPub,
+	}); err != nil {
+		return err
 	}
 	return st.SaveState(&syncstate.State{AccountID: dev.AccountID, DeviceID: dev.ID})
 }

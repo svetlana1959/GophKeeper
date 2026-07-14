@@ -1,13 +1,20 @@
 package trust
 
 // Anchor is a device signing identity this device verified out-of-band — its own
-// at init, or an inviter's roster entries via the invite code — and roots trust
+// at link, or an inviter's roster entries via the invite code — and roots trust
 // at. Reachability in the vouch graph starts from anchors; nothing is trusted
 // that does not chain back to one.
 type Anchor struct {
 	DeviceID string
 	EncPub   string // age public key, so anchors are themselves valid recipients
 	SignPub  string // Ed25519, verifies the anchor's certs
+}
+
+// AnchorRepository persists this device's trust anchors. It is the port; the
+// SQLite implementation is the adapter in internal/vault.
+type AnchorRepository interface {
+	Save(a Anchor) error // upsert by device id
+	List() ([]Anchor, error)
 }
 
 // TrustedDevice is a device admitted to the trusted set, carrying the keys needed

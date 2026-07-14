@@ -10,6 +10,7 @@ import (
 
 	"github.com/svetlana1959/GophKeeper/cli/internal/device"
 	"github.com/svetlana1959/GophKeeper/cli/internal/secret"
+	"github.com/svetlana1959/GophKeeper/cli/internal/trust"
 	"github.com/svetlana1959/GophKeeper/cli/internal/vault"
 
 	_ "modernc.org/sqlite"
@@ -130,6 +131,41 @@ func TestDeviceRepo_SetActiveAndList(t *testing.T) {
 
 	if err := repo.SetActive("missing", true); !errors.Is(err, device.ErrNotFound) {
 		t.Errorf("SetActive(missing) err = %v, want ErrNotFound", err)
+	}
+}
+
+func TestAnchorRepo(t *testing.T) {
+	db, _ := openTestDB(t)
+	repo := db.Anchors()
+
+	if got, err := repo.List(); err != nil || len(got) != 0 {
+		t.Fatalf("List empty = %v, %v", got, err)
+	}
+
+	a := trust.Anchor{DeviceID: "dev-1", EncPub: "age1-x", SignPub: "sign-x"}
+	if err := repo.Save(a); err != nil {
+		t.Fatalf("Save: %v", err)
+	}
+	// Upsert: saving the same id updates in place.
+	a.SignPub = "sign-y"
+	if err := repo.Save(a); err != nil {
+		t.Fatalf("re-Save: %v", err)
+	}
+	if err := repo.Save(trust.Anchor{DeviceID: "dev-2", EncPub: "age1-z", SignPub: "sign-z"}); err != nil {
+		t.Fatalf("Save 2: %v", err)
+	}
+
+	got, err := repo.List()
+	if err != nil {
+		t.Fatalf("List: %v", err)
+	}
+	if len(got) != 2 {
+		t.Fatalf("List len = %d, want 2", len(got))
+	}
+	for _, g := range got {
+		if g.DeviceID == "dev-1" && g.SignPub != "sign-y" {
+			t.Errorf("upsert failed: %+v", g)
+		}
 	}
 }
 
