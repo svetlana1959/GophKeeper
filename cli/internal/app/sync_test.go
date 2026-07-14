@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
@@ -14,6 +15,8 @@ import (
 
 	"github.com/svetlana1959/GophKeeper/cli/internal/app"
 	"github.com/svetlana1959/GophKeeper/cli/internal/crypto"
+	"github.com/svetlana1959/GophKeeper/cli/internal/remote"
+	"github.com/svetlana1959/GophKeeper/cli/internal/trust"
 )
 
 // syncBackend is a minimal stand-in for the server: it runs the age challenge
@@ -26,6 +29,14 @@ type syncBackend struct {
 	nonce          []byte
 	secrets        map[string]storedSecret
 	seq            int64
+	certs          []trust.Cert        // trust log
+	roster         []trust.RosterEntry // roster returned on join
+	// join proof recorded on POST /enroll/join, served on GET /enroll/invite/{id}
+	joinCount  int
+	joinedID   string
+	joinMac    string
+	joinedPub  string
+	joinedSign string
 }
 
 type storedSecret struct {
@@ -129,7 +140,7 @@ func (b *syncBackend) handler(t *testing.T) http.Handler {
 			return
 		}
 		respond(w, http.StatusOK, map[string]any{
-			"code": "GK-CODE", "expires_at": "2026-07-01T00:00:00Z",
+			"invite_id": "inv-1", "expires_at": "2026-07-01T00:00:00Z",
 		})
 	})
 
@@ -137,11 +148,37 @@ func (b *syncBackend) handler(t *testing.T) http.Handler {
 		var body struct {
 			DeviceName string `json:"device_name"`
 			PublicKey  string `json:"public_key"`
+			SignPubKey string `json:"sign_public_key"`
+			JoinMac    string `json:"join_mac"`
 		}
 		_ = json.NewDecoder(r.Body).Decode(&body)
+		b.joinCount++
+		id := fmt.Sprintf("dev-%d", b.joinCount) // each device gets a distinct id
+		b.joinedID = id
+		b.joinMac = body.JoinMac
+		b.joinedPub = body.PublicKey
+		b.joinedSign = body.SignPubKey
 		respond(w, http.StatusCreated, map[string]any{
-			"id": "dev-joined", "account_id": "acc-1", "device_name": body.DeviceName,
-			"public_key": body.PublicKey, "status": "active",
+			"device": map[string]any{
+				"id": id, "account_id": "acc-1", "device_name": body.DeviceName,
+				"public_key": body.PublicKey, "sign_public_key": body.SignPubKey, "status": "active",
+			},
+			"roster": b.roster,
+		})
+	})
+
+	mux.HandleFunc("GET /enroll/invite/{id}", func(w http.ResponseWriter, r *http.Request) {
+		if !b.authed(r) {
+			respond(w, http.StatusUnauthorized, map[string]any{"detail": "unauthorized"})
+			return
+		}
+		respond(w, http.StatusOK, map[string]any{
+			"consumed": b.joinedID != "",
+			"join_mac": b.joinMac,
+			"device": map[string]any{
+				"id": b.joinedID, "account_id": "acc-1", "device_name": "phone",
+				"public_key": b.joinedPub, "sign_public_key": b.joinedSign, "status": "active",
+			},
 		})
 	})
 
@@ -166,6 +203,38 @@ func (b *syncBackend) handler(t *testing.T) http.Handler {
 			}
 		}
 		respond(w, http.StatusOK, map[string]any{"secrets": out, "cursor": cursor})
+	})
+
+	mux.HandleFunc("GET /trust/certs", func(w http.ResponseWriter, r *http.Request) {
+		if !b.authed(r) {
+			respond(w, http.StatusUnauthorized, map[string]any{"detail": "unauthorized"})
+			return
+		}
+		// Honor the since cursor like the real backend: certs are 1-indexed by
+		// position, so since=N returns everything after the Nth. (A cursor-ignoring
+		// stub would make paginated pulls duplicate the log.)
+		since := 0
+		if v := r.URL.Query().Get("since"); v != "" {
+			since, _ = strconv.Atoi(v)
+		}
+		if since < 0 {
+			since = 0
+		}
+		if since > len(b.certs) {
+			since = len(b.certs)
+		}
+		respond(w, http.StatusOK, map[string]any{"certs": b.certs[since:], "cursor": len(b.certs)})
+	})
+
+	mux.HandleFunc("POST /trust/certs", func(w http.ResponseWriter, r *http.Request) {
+		if !b.authed(r) {
+			respond(w, http.StatusUnauthorized, map[string]any{"detail": "unauthorized"})
+			return
+		}
+		var c trust.Cert
+		_ = json.NewDecoder(r.Body).Decode(&c)
+		b.certs = append(b.certs, c)
+		respond(w, http.StatusCreated, c)
 	})
 
 	return mux
@@ -374,8 +443,9 @@ func TestCreateInvite(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CreateInvite: %v", err)
 	}
-	if inv.Code != "GK-CODE" {
-		t.Fatalf("invite code = %q, want GK-CODE", inv.Code)
+	// The code is generated locally (never server-made) and non-empty.
+	if inv.Code == "" {
+		t.Fatal("CreateInvite returned an empty code")
 	}
 }
 
@@ -518,7 +588,11 @@ func TestLink(t *testing.T) {
 	}
 }
 
-func TestSync_ResharesToAccountDevices(t *testing.T) {
+// A device the server merely *reports* (GET /devices) but that no trust cert
+// vouches for must never receive plaintext — reshare seals only to the
+// cert-derived trusted set. This is the §11 zero-knowledge guarantee: a malicious
+// server cannot inject a rogue recipient.
+func TestSync_DoesNotSealToUntrustedDevice(t *testing.T) {
 	setHome(t)
 	be := newSyncBackend()
 	srv := httptest.NewServer(be.handler(t))
@@ -529,12 +603,13 @@ func TestSync_ResharesToAccountDevices(t *testing.T) {
 		t.Fatalf("Init: %v", err)
 	}
 	be.publicKey = res.PublicKey
-	// A second device in the account (as if freshly linked).
-	other, err := crypto.GenerateKeyPair()
+	// The server reports a second device, but no vouch cert admits it: it is a
+	// stand-in for a server-injected rogue recipient.
+	rogue, err := crypto.GenerateKeyPair()
 	if err != nil {
 		t.Fatalf("keypair: %v", err)
 	}
-	be.extraDevicePub = other.Public
+	be.extraDevicePub = rogue.Public
 
 	sess, err := app.Open()
 	if err != nil {
@@ -543,18 +618,11 @@ func TestSync_ResharesToAccountDevices(t *testing.T) {
 	defer sess.Close()
 
 	mustLink(t, sess)
-
 	mustSet(t, sess, app.SetParams{Name: "gh", Value: []byte("tok")})
 
-	out, err := sess.Sync(context.Background(), "")
-	if err != nil {
+	if _, err := sess.Sync(context.Background(), ""); err != nil {
 		t.Fatalf("Sync: %v", err)
 	}
-	if out.Reshared < 1 {
-		t.Fatalf("sync = %+v, want at least 1 reshared", out)
-	}
-
-	// The pushed ciphertext must now be decryptable by the OTHER device.
 	if len(be.secrets) != 1 {
 		t.Fatalf("server has %d secrets, want 1", len(be.secrets))
 	}
@@ -562,16 +630,17 @@ func TestSync_ResharesToAccountDevices(t *testing.T) {
 	for _, s := range be.secrets {
 		ct = s.ct
 	}
-	plain, err := crypto.Engine{}.Open(ct, other.Private)
-	if err != nil {
-		t.Fatalf("other device cannot decrypt reshared secret: %v", err)
+	// The trusted device (self) can still read it...
+	if got, err := sess.Get("gh", "", "value"); err != nil || string(got) != "tok" {
+		t.Fatalf("self cannot read own secret: %q, %v", got, err)
 	}
-	if !bytes.Contains(plain, []byte("gh")) {
-		t.Fatalf("decrypted payload missing name: %s", plain)
+	// ...but the untrusted, server-reported device cannot decrypt the pushed ciphertext.
+	_, rogueErr := crypto.Engine{}.Open(ct, rogue.Private)
+	if !errors.Is(rogueErr, crypto.ErrWrongIdentity) {
+		t.Fatalf("rogue device decrypt = %v, want ErrWrongIdentity (not a recipient)", rogueErr)
 	}
 
-	// Once sealed to the full device set, a further sync must not reshare again
-	// (guards against the pull-clobbers-recipients ping-pong).
+	// Reshare is stable: with no trust change, a second sync reseals nothing.
 	stable, err := sess.Sync(context.Background(), "")
 	if err != nil {
 		t.Fatalf("second Sync: %v", err)
@@ -579,6 +648,207 @@ func TestSync_ResharesToAccountDevices(t *testing.T) {
 	if stable.Reshared != 0 || stable.Pushed != 0 {
 		t.Fatalf("second sync = %+v, want 0 reshared / 0 pushed (stable)", stable)
 	}
+}
+
+// The full mesh-forming path: an inviter mints a code-bound invite, a device
+// redeems it (real join MAC under the code), and on the inviter's next sync it
+// verifies the proof, publishes a vouch cert, and reshares the secret to the
+// newly-trusted device — which can then decrypt it.
+func TestSync_VouchesForJoinerThenSeals(t *testing.T) {
+	setHome(t)
+	be := newSyncBackend()
+	srv := httptest.NewServer(be.handler(t))
+	defer srv.Close()
+
+	res, err := app.Init(app.InitParams{DeviceName: "laptop", Remote: srv.URL})
+	if err != nil {
+		t.Fatalf("Init: %v", err)
+	}
+	be.publicKey = res.PublicKey
+
+	sess, err := app.Open()
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	defer sess.Close()
+
+	mustLink(t, sess)
+	mustSet(t, sess, app.SetParams{Name: "gh", Value: []byte("tok")})
+
+	// The inviter mints a code-bound invite (pending until redeemed).
+	inv, err := sess.CreateInvite(context.Background(), "")
+	if err != nil {
+		t.Fatalf("CreateInvite: %v", err)
+	}
+
+	// A second device redeems it with a real join MAC computed under the code.
+	joinerEnc, _ := crypto.GenerateKeyPair()
+	joinerSign, _ := crypto.GenerateSigningKey()
+	_, _, err = remote.New(srv.URL).Join(
+		context.Background(), trust.HashCode(inv.Code), "phone",
+		joinerEnc.Public, joinerSign.Public, trust.JoinMAC(inv.Code, joinerEnc.Public, joinerSign.Public),
+	)
+	if err != nil {
+		t.Fatalf("joiner Join: %v", err)
+	}
+
+	// The inviter syncs: it should vouch for the joiner and reseal the secret to it.
+	if _, err := sess.Sync(context.Background(), ""); err != nil {
+		t.Fatalf("Sync: %v", err)
+	}
+
+	// A vouch cert for the joiner was published...
+	if len(be.certs) != 1 || be.certs[0].Kind != trust.KindVouch || be.certs[0].SubjectID != "dev-2" {
+		t.Fatalf("trust log = %+v, want one vouch for dev-2", be.certs)
+	}
+	// ...and the pushed ciphertext is now decryptable by the joiner.
+	var ct []byte
+	for _, s := range be.secrets {
+		ct = s.ct
+	}
+	if _, err := (crypto.Engine{}).Open(ct, joinerEnc.Private); err != nil {
+		t.Fatalf("joiner cannot decrypt resealed secret: %v", err)
+	}
+}
+
+// Revoking a joiner publishes a revoke cert; on the next sync reshare rotates the
+// secret to exclude it, so the revoked device can no longer decrypt new ciphertext.
+func TestRevokeDropsDeviceFromReshare(t *testing.T) {
+	setHome(t)
+	be := newSyncBackend()
+	srv := httptest.NewServer(be.handler(t))
+	defer srv.Close()
+
+	res, err := app.Init(app.InitParams{DeviceName: "laptop", Remote: srv.URL})
+	if err != nil {
+		t.Fatalf("Init: %v", err)
+	}
+	be.publicKey = res.PublicKey
+
+	sess, err := app.Open()
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	defer sess.Close()
+
+	mustLink(t, sess)
+	mustSet(t, sess, app.SetParams{Name: "gh", Value: []byte("tok")})
+
+	// A joiner redeems an invite and gets vouched + sealed in. The server also
+	// lists it as dev-2 (so `revoke` can resolve it).
+	inv, _ := sess.CreateInvite(context.Background(), "")
+	joinerEnc, _ := crypto.GenerateKeyPair()
+	joinerSign, _ := crypto.GenerateSigningKey()
+	be.extraDevicePub = joinerEnc.Public
+	if _, _, err := remote.New(srv.URL).Join(
+		context.Background(), trust.HashCode(inv.Code), "phone",
+		joinerEnc.Public, joinerSign.Public, trust.JoinMAC(inv.Code, joinerEnc.Public, joinerSign.Public),
+	); err != nil {
+		t.Fatalf("joiner Join: %v", err)
+	}
+	if _, err := sess.Sync(context.Background(), ""); err != nil {
+		t.Fatalf("first Sync: %v", err)
+	}
+	// Sanity: the joiner can currently decrypt.
+	if _, err := (crypto.Engine{}).Open(currentCiphertext(be), joinerEnc.Private); err != nil {
+		t.Fatalf("joiner should decrypt before revoke: %v", err)
+	}
+
+	// Revoke the joiner (dev-2), then sync to rotate the secret.
+	if err := sess.RevokeDevice(context.Background(), "", "dev-2"); err != nil {
+		t.Fatalf("RevokeDevice: %v", err)
+	}
+	if _, err := sess.Sync(context.Background(), ""); err != nil {
+		t.Fatalf("second Sync: %v", err)
+	}
+
+	// The log now holds a revoke cert, and the rotated ciphertext excludes the joiner.
+	if !hasRevoke(be.certs, "dev-2") {
+		t.Fatalf("no revoke cert for dev-2 in log: %+v", be.certs)
+	}
+	if _, err := (crypto.Engine{}).Open(currentCiphertext(be), joinerEnc.Private); !errors.Is(err, crypto.ErrWrongIdentity) {
+		t.Fatalf("revoked joiner decrypt = %v, want ErrWrongIdentity", err)
+	}
+}
+
+// TestSync_RefusesRolledBackTrustLog: once a device has seen a revoke, a relay
+// that later withholds it (rolling the issuer's chain back) is refused rather than
+// silently re-trusting the revoked device — fail-closed on the security-critical
+// direction.
+func TestSync_RefusesRolledBackTrustLog(t *testing.T) {
+	setHome(t)
+	be := newSyncBackend()
+	srv := httptest.NewServer(be.handler(t))
+	defer srv.Close()
+
+	res, err := app.Init(app.InitParams{DeviceName: "laptop", Remote: srv.URL})
+	if err != nil {
+		t.Fatalf("Init: %v", err)
+	}
+	be.publicKey = res.PublicKey
+	sess, err := app.Open()
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	defer sess.Close()
+	mustLink(t, sess)
+	mustSet(t, sess, app.SetParams{Name: "gh", Value: []byte("tok")})
+
+	// Vouch in a joiner, then revoke it, syncing so this device records root's
+	// chain head at the revoke (seq 1).
+	inv, _ := sess.CreateInvite(context.Background(), "")
+	joinerEnc, _ := crypto.GenerateKeyPair()
+	joinerSign, _ := crypto.GenerateSigningKey()
+	be.extraDevicePub = joinerEnc.Public
+	if _, _, err := remote.New(srv.URL).Join(
+		context.Background(), trust.HashCode(inv.Code), "phone",
+		joinerEnc.Public, joinerSign.Public, trust.JoinMAC(inv.Code, joinerEnc.Public, joinerSign.Public),
+	); err != nil {
+		t.Fatalf("joiner Join: %v", err)
+	}
+	if _, err := sess.Sync(context.Background(), ""); err != nil {
+		t.Fatalf("first Sync: %v", err)
+	}
+	if err := sess.RevokeDevice(context.Background(), "", "dev-2"); err != nil {
+		t.Fatalf("RevokeDevice: %v", err)
+	}
+	if _, err := sess.Sync(context.Background(), ""); err != nil {
+		t.Fatalf("second Sync: %v", err)
+	}
+
+	// A hostile relay now drops the revoke from the log (keeps only the vouch).
+	kept := be.certs[:0:0]
+	for _, c := range be.certs {
+		if c.Kind != trust.KindRevoke {
+			kept = append(kept, c)
+		}
+	}
+	be.certs = kept
+
+	// The next sync must refuse the rolled-back log rather than re-trust dev-2.
+	_, err = sess.Sync(context.Background(), "")
+	if err == nil {
+		t.Fatalf("sync accepted a rolled-back trust log, want refusal")
+	}
+	if !strings.Contains(err.Error(), "rollback") {
+		t.Fatalf("error = %v, want a rollback refusal", err)
+	}
+}
+
+func currentCiphertext(be *syncBackend) []byte {
+	for _, s := range be.secrets {
+		return s.ct
+	}
+	return nil
+}
+
+func hasRevoke(certs []trust.Cert, target string) bool {
+	for _, c := range certs {
+		if c.Kind == trust.KindRevoke && c.TargetID == target {
+			return true
+		}
+	}
+	return false
 }
 
 func TestSync_PullRecoversNameFromPayload(t *testing.T) {

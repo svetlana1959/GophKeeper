@@ -90,12 +90,23 @@ func Init(p InitParams) (InitResult, error) {
 	if err != nil {
 		return InitResult{}, err
 	}
+	// The Ed25519 signing key is this device's trust identity (issues vouch/revoke
+	// certs); always fresh, never imported alongside an age key.
+	skp, err := crypto.GenerateSigningKey()
+	if err != nil {
+		return InitResult{}, err
+	}
 
-	// Private key at rest: PIN-encrypted, or plaintext guarded by 0600.
+	// Private keys at rest: PIN-encrypted, or plaintext guarded by 0600.
 	storedKey := []byte(kp.Private)
+	signStoredKey := []byte(skp.Private)
 	pinProtected := false
 	if p.PIN != "" {
 		storedKey, err = crypto.SealWithPassword([]byte(kp.Private), p.PIN)
+		if err != nil {
+			return InitResult{}, err
+		}
+		signStoredKey, err = crypto.SealWithPassword([]byte(skp.Private), p.PIN)
 		if err != nil {
 			return InitResult{}, err
 		}
@@ -115,12 +126,14 @@ func Init(p InitParams) (InitResult, error) {
 	deviceID := uuid.NewString()
 	now := time.Now().UTC()
 	if err := db.Devices().Save(&device.Device{
-		ID: deviceID, Name: p.DeviceName, PublicKey: kp.Public, Active: true, UpdatedAt: now,
+		ID: deviceID, Name: p.DeviceName, PublicKey: kp.Public, SignPublicKey: skp.Public,
+		Active: true, UpdatedAt: now,
 	}); err != nil {
 		return InitResult{}, err
 	}
 	if err := db.Local().Save(&device.LocalDevice{
-		DeviceID: deviceID, StoredKey: storedKey, PINProtected: pinProtected,
+		DeviceID: deviceID, StoredKey: storedKey, SignStoredKey: signStoredKey,
+		PINProtected: pinProtected,
 	}); err != nil {
 		return InitResult{}, err
 	}
@@ -137,12 +150,13 @@ func newOrImportedKey(privateKey string) (crypto.KeyPair, error) {
 
 // Session is an opened GophKeeper environment: config + vault + local identity.
 type Session struct {
-	cfg      *config.Config
-	db       *vault.DB
-	secrets  secret.Repository
-	local    *device.LocalDevice
-	localPub string
-	cipher   secret.Cipher
+	cfg          *config.Config
+	db           *vault.DB
+	secrets      secret.Repository
+	local        *device.LocalDevice
+	localPub     string
+	localSignPub string
+	cipher       secret.Cipher
 }
 
 // Open loads the config, opens the vault, and resolves the local identity. It
@@ -187,7 +201,7 @@ func Open() (*Session, error) {
 	return &Session{
 		cfg: cfg, db: db,
 		secrets: db.Secrets(),
-		local:   local, localPub: dev.PublicKey,
+		local:   local, localPub: dev.PublicKey, localSignPub: dev.SignPublicKey,
 		cipher: crypto.Engine{},
 	}, nil
 }
@@ -326,13 +340,27 @@ func (s *Session) List(folder string, includeDeleted bool) ([]SecretInfo, error)
 
 // unlock returns the decrypted private key, decrypting with pin when protected.
 func (s *Session) unlock(pin string) (string, error) {
+	return s.unlockKey(s.local.StoredKey, pin)
+}
+
+// unlockSigning returns the decrypted Ed25519 signing key (empty for a device
+// that predates signing keys), decrypting with pin when protected. Used to sign
+// trust certs (vouch/revoke).
+func (s *Session) unlockSigning(pin string) (string, error) {
+	if len(s.local.SignStoredKey) == 0 {
+		return "", nil
+	}
+	return s.unlockKey(s.local.SignStoredKey, pin)
+}
+
+func (s *Session) unlockKey(stored []byte, pin string) (string, error) {
 	if !s.local.PINProtected {
-		return string(s.local.StoredKey), nil
+		return string(stored), nil
 	}
 	if pin == "" {
 		return "", ErrPINRequired
 	}
-	plain, err := crypto.OpenWithPassword(s.local.StoredKey, pin)
+	plain, err := crypto.OpenWithPassword(stored, pin)
 	if errors.Is(err, crypto.ErrWrongPassword) {
 		return "", ErrWrongPIN
 	}

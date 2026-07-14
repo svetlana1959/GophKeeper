@@ -20,6 +20,12 @@ class InvalidInvite(DomainError):
     """The pairing code is unknown, already used, or expired. Maps to 400."""
 
 
+class InviteNotFound(DomainError):
+    def __init__(self, invite_id: UUID) -> None:
+        super().__init__(f"invite {invite_id} not found")
+        self.invite_id = invite_id
+
+
 class EmailAlreadyRegistered(DomainError):
     """An account identity with this provider + identifier already exists.
     Maps to 409."""
@@ -51,6 +57,20 @@ class DeviceAlreadyExists(DomainError):
     def __init__(self, device_id: UUID) -> None:
         super().__init__(f"device {device_id} already exists")
         self.device_id = device_id
+
+
+class TrustCertConflict(DomainError):
+    """A published trust cert's issuer_seq is not the next in the issuer's chain
+    (a gap, duplicate, or rewind). The client must re-fetch the log and re-issue
+    from the correct seq. Maps to 409."""
+
+    def __init__(self, issuer_device_id: UUID, expected: int, actual: int) -> None:
+        super().__init__(
+            f"device {issuer_device_id}: trust cert expected seq {expected}, got {actual}"
+        )
+        self.issuer_device_id = issuer_device_id
+        self.expected = expected
+        self.actual = actual
 
 
 class VersionConflict(DomainError):

@@ -13,6 +13,7 @@ import (
 	"github.com/svetlana1959/GophKeeper/cli/internal/remote"
 	"github.com/svetlana1959/GophKeeper/cli/internal/secret"
 	"github.com/svetlana1959/GophKeeper/cli/internal/syncstate"
+	"github.com/svetlana1959/GophKeeper/cli/internal/trust"
 )
 
 // ErrNoRemote is returned by Sync when no backend URL is configured.
@@ -45,6 +46,12 @@ func (s *Session) Sync(ctx context.Context, pin string) (SyncResult, error) {
 	}
 	res.Pulled = pulled
 	res.Conflicts = pullConflicts
+
+	// Vouch for devices that redeemed our invites, so they enter the trusted set
+	// before reshare runs and get sealed in on this same sync.
+	if err := s.publishPendingVouches(ctx, client, state, pin); err != nil {
+		return res, err
+	}
 
 	// Reshare secrets to any account devices not yet sealed in (e.g. a newly
 	// linked one). Reshared secrets become dirty and push below.
@@ -227,28 +234,39 @@ func (s *Session) metaFromPayload(ciphertext []byte, priv string) (content, bool
 	return c, true
 }
 
-// applyReshare ensures every secret this device can decrypt is sealed to all of
-// the account's active devices. It mirrors the account's device list into the
-// local trusted set (so recipient keys resolve), then re-encrypts any secret
-// whose recipient set differs, marking it dirty to push. This is how a newly
-// linked device gains access to existing secrets.
+// applyReshare ensures every secret this device can decrypt is sealed to the
+// account's trusted devices. Trust is computed locally from the signed cert log
+// and this device's anchors (never from the server's device list, which a
+// malicious server could pad with a rogue recipient — see docs/sync_design.md
+// §11). Trusted devices are mirrored into the local set so recipient keys
+// resolve; any secret whose recipient set differs is re-encrypted and marked
+// dirty to push.
 func (s *Session) applyReshare(
 	ctx context.Context, client *remote.Client, priv string,
 ) (int, error) {
-	devices, err := client.ListDevices(ctx)
+	trusted, err := s.trustedSet(ctx, client)
 	if err != nil {
-		return 0, fmt.Errorf("app: list devices: %w", err)
+		return 0, err
 	}
 
-	desired := make([]string, 0, len(devices)+1)
-	for _, d := range devices {
-		if d.Status != "active" {
-			continue
+	desired := make([]string, 0, len(trusted)+1)
+	selfTrusted := false
+	for _, d := range trusted {
+		desired = append(desired, d.EncPub)
+		if d.EncPub == s.localPub {
+			selfTrusted = true
 		}
-		desired = append(desired, d.PublicKey)
-		if err := s.rememberDevice(d); err != nil {
+		if err := s.rememberTrusted(d); err != nil {
 			return 0, err
 		}
+	}
+
+	// If this device is not in its own trusted set, it has been revoked. Leave
+	// local secrets untouched — forward secrecy keeps whatever we already hold —
+	// rather than resealing ourselves out (or pushing rotations that only
+	// conflict with the legitimate devices').
+	if !selfTrusted {
+		return 0, nil
 	}
 
 	// The account's recovery key is a standing recipient of every secret, so its
@@ -296,10 +314,175 @@ func (s *Session) applyReshare(
 	return reshared, nil
 }
 
-// rememberDevice adds an account device to the local trusted set if its key is
-// not already known, so secret recipients resolve when saving.
-func (s *Session) rememberDevice(d remote.Device) error {
-	_, err := s.db.Devices().FindByPublicKey(d.PublicKey)
+// publishPendingVouches checks each invite this device minted: once a device has
+// redeemed it, it verifies the joiner's join MAC under the code it kept (proving
+// this exact device redeemed that code), then publishes a signed vouch cert
+// admitting the joiner to the trust graph. A proof whose MAC does not verify is
+// dropped without vouching. Certs from one issuer form a contiguous, hash-chained
+// sequence, so the next seq and prev-hash are read from the current log.
+func (s *Session) publishPendingVouches(
+	ctx context.Context, client *remote.Client, state *syncstate.State, pin string,
+) error {
+	pending, err := s.db.PendingInvites().List()
+	if err != nil {
+		return err
+	}
+	if len(pending) == 0 {
+		return nil
+	}
+	signPriv, err := s.unlockSigning(pin)
+	if err != nil {
+		return err
+	}
+	if signPriv == "" {
+		return nil // no signing key: this device cannot vouch
+	}
+
+	for _, p := range pending {
+		proof, err := client.InviteProof(ctx, p.InviteID)
+		if err != nil {
+			return fmt.Errorf("app: fetch join proof: %w", err)
+		}
+		if !proof.Consumed {
+			continue // not redeemed yet; check again next sync
+		}
+		if !trust.VerifyJoinMAC(p.Code, proof.Device.PublicKey, proof.Device.SignPublicKey, proof.JoinMAC) {
+			// The device that joined does not match the code we minted; do not
+			// vouch, and stop tracking this invite.
+			if err := s.db.PendingInvites().Delete(p.InviteID); err != nil {
+				return err
+			}
+			continue
+		}
+
+		// Each vouch is published against the freshly-pulled chain head, retrying
+		// on a seq conflict if another operation advanced this device's chain.
+		_, err = s.publishChained(ctx, client, state.DeviceID,
+			func(nextSeq int64, prevHash string) (trust.Cert, error) {
+				return trust.Sign(trust.Cert{
+					Kind: trust.KindVouch, AccountID: state.AccountID, IssuerID: state.DeviceID,
+					Seq: nextSeq, PrevHash: prevHash,
+					SubjectID: proof.Device.ID, SubjectEncPub: proof.Device.PublicKey,
+					SubjectSignPub: proof.Device.SignPublicKey, IssuedAt: time.Now().Unix(),
+				}, signPriv)
+			})
+		if err != nil {
+			return err
+		}
+		if err := s.db.PendingInvites().Delete(p.InviteID); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// pullAllCerts drains the account's trust log, following the server's cursor
+// across pages. The trusted set and each issuer's chain head must be computed from
+// the whole log; a single page (the backend caps them) would silently truncate the
+// graph past a few hundred certs.
+func pullAllCerts(ctx context.Context, client *remote.Client) ([]trust.Cert, error) {
+	var all []trust.Cert
+	var since int64
+	for {
+		page, cursor, err := client.TrustChanges(ctx, since)
+		if err != nil {
+			return nil, fmt.Errorf("app: pull trust log: %w", err)
+		}
+		all = append(all, page...)
+		if len(page) == 0 || cursor <= since {
+			return all, nil
+		}
+		since = cursor
+	}
+}
+
+// verifiedTrustLog pulls the whole trust log and refuses it if any issuer's chain
+// has rolled back or vanished since a previous sync — a relay trying to suppress a
+// revoke by withholding its tail. On success it advances the persisted per-issuer
+// heads and returns the certs together with this device's anchors, ready for trust
+// computation.
+func (s *Session) verifiedTrustLog(
+	ctx context.Context, client *remote.Client,
+) ([]trust.Cert, []trust.Anchor, error) {
+	certs, err := pullAllCerts(ctx, client)
+	if err != nil {
+		return nil, nil, err
+	}
+	anchors, err := s.db.Anchors().List()
+	if err != nil {
+		return nil, nil, err
+	}
+	seen, err := s.db.TrustHeads().List()
+	if err != nil {
+		return nil, nil, err
+	}
+	heads, err := trust.CheckProgress(trust.VerifiedChains(certs, anchors), seen)
+	if err != nil {
+		return nil, nil, fmt.Errorf("app: %w", err)
+	}
+	for issuer, h := range heads {
+		if seen[issuer] != h {
+			if err := s.db.TrustHeads().Save(issuer, h); err != nil {
+				return nil, nil, err
+			}
+		}
+	}
+	return certs, anchors, nil
+}
+
+// publishChained signs a cert onto this device's own verified chain head and
+// publishes it. The head is derived from the signature-verified chain (a relay
+// cannot forge our signature, so it cannot inflate our head), never from the raw
+// server log. If a concurrent publish advanced our chain the server rejects the seq
+// (ErrConflict); it re-pulls and retries so a benign race resolves quietly. build
+// is called each attempt so the retry signs against the refreshed head.
+func (s *Session) publishChained(
+	ctx context.Context, client *remote.Client, issuerID string,
+	build func(nextSeq int64, prevHash string) (trust.Cert, error),
+) (trust.Cert, error) {
+	var lastErr error
+	for attempt := 0; attempt < 4; attempt++ {
+		certs, anchors, err := s.verifiedTrustLog(ctx, client)
+		if err != nil {
+			return trust.Cert{}, err
+		}
+		tip := trust.Tip(trust.VerifiedChains(certs, anchors)[issuerID])
+		cert, err := build(tip.Seq+1, tip.Hash)
+		if err != nil {
+			return trust.Cert{}, err
+		}
+		if err := client.PublishCert(ctx, cert); err != nil {
+			if errors.Is(err, remote.ErrConflict) {
+				lastErr = err
+				continue // chain advanced under us; re-pull and retry
+			}
+			return trust.Cert{}, err
+		}
+		return cert, nil
+	}
+	return trust.Cert{}, fmt.Errorf("app: publish trust cert after retries: %w", lastErr)
+}
+
+// trustedSet computes this device's trusted set from the verified trust-cert log
+// and its local anchors — the account's authoritative recipient set, derived
+// without trusting the server's device list, and refusing a rolled-back log.
+func (s *Session) trustedSet(
+	ctx context.Context, client *remote.Client,
+) (map[string]trust.TrustedDevice, error) {
+	certs, anchors, err := s.verifiedTrustLog(ctx, client)
+	if err != nil {
+		return nil, err
+	}
+	return trust.ComputeTrusted(certs, anchors), nil
+}
+
+// rememberTrusted mirrors a trusted device into the local trusted_devices table
+// if its key is not already known, so secret recipients resolve when saving.
+// Names are cosmetic here (the id stands in); `device ls` shows real names from
+// the server. The self row saved at init already carries this device's key, so
+// it is left untouched.
+func (s *Session) rememberTrusted(d trust.TrustedDevice) error {
+	_, err := s.db.Devices().FindByPublicKey(d.EncPub)
 	if err == nil {
 		return nil
 	}
@@ -307,7 +490,8 @@ func (s *Session) rememberDevice(d remote.Device) error {
 		return err
 	}
 	return s.db.Devices().Save(&device.Device{
-		ID: d.ID, Name: d.Name, PublicKey: d.PublicKey, Active: true, UpdatedAt: time.Now().UTC(),
+		ID: d.DeviceID, Name: d.DeviceID, PublicKey: d.EncPub, SignPublicKey: d.SignPub,
+		Active: true, UpdatedAt: time.Now().UTC(),
 	})
 }
 

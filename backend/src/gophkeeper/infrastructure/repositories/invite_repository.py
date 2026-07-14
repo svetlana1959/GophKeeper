@@ -1,13 +1,24 @@
 """SQLAlchemy implementation of the InviteRepository port."""
 
 from typing import Any
+from uuid import UUID
 
 from sqlalchemy import RowMapping, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from gophkeeper.domain.invite import Invite, InviteRepository
 
-_COLUMNS = ("id", "account_id", "code_hash", "expires_at", "consumed_at", "created_at")
+_COLUMNS = (
+    "id",
+    "account_id",
+    "code_hash",
+    "expires_at",
+    "roster_json",
+    "join_mac",
+    "joined_device_id",
+    "consumed_at",
+    "created_at",
+)
 _COLUMN_LIST = ", ".join(_COLUMNS)
 _INSERT_VALUES = ", ".join(f":{c}" for c in _COLUMNS)
 
@@ -18,6 +29,9 @@ def _to_params(invite: Invite) -> dict[str, Any]:
         "account_id": invite.account_id,
         "code_hash": invite.code_hash,
         "expires_at": invite.expires_at,
+        "roster_json": invite.roster_json,
+        "join_mac": invite.join_mac,
+        "joined_device_id": invite.joined_device_id,
         "consumed_at": invite.consumed_at,
         "created_at": invite.created_at,
     }
@@ -29,6 +43,9 @@ def _from_row(row: RowMapping) -> Invite:
         account_id=row["account_id"],
         code_hash=row["code_hash"],
         expires_at=row["expires_at"],
+        roster_json=row["roster_json"],
+        join_mac=row["join_mac"],
+        joined_device_id=row["joined_device_id"],
         consumed_at=row["consumed_at"],
         created_at=row["created_at"],
     )
@@ -52,15 +69,29 @@ class SqlAlchemyInviteRepository(InviteRepository):
         row = result.mappings().first()
         return _from_row(row) if row is not None else None
 
+    async def find_by_id(self, invite_id: UUID) -> Invite | None:
+        result = await self._session.execute(
+            text(f"SELECT {_COLUMN_LIST} FROM invites WHERE id = :id"),
+            {"id": invite_id},
+        )
+        row = result.mappings().first()
+        return _from_row(row) if row is not None else None
+
     async def consume(self, invite: Invite) -> bool:
         # WHERE consumed_at IS NULL makes this a compare-and-set: two concurrent
         # joins racing on the same code serialize on the row, and only the first
         # UPDATE affects a row. rowcount == 0 means we lost the race.
         result = await self._session.execute(
             text(
-                "UPDATE invites SET consumed_at = :consumed_at "
+                "UPDATE invites SET consumed_at = :consumed_at, "
+                "join_mac = :join_mac, joined_device_id = :joined_device_id "
                 "WHERE id = :id AND consumed_at IS NULL"
             ),
-            {"consumed_at": invite.consumed_at, "id": invite.id},
+            {
+                "consumed_at": invite.consumed_at,
+                "join_mac": invite.join_mac,
+                "joined_device_id": invite.joined_device_id,
+                "id": invite.id,
+            },
         )
         return result.rowcount > 0

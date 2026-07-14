@@ -19,6 +19,7 @@ from gophkeeper.domain.device import DeviceRepository
 from gophkeeper.domain.identity import IdentityRepository
 from gophkeeper.domain.invite import InviteRepository
 from gophkeeper.domain.secret import SecretRepository
+from gophkeeper.domain.trust import TrustCertRepository
 
 
 class UnitOfWork(Protocol):
@@ -31,6 +32,7 @@ class UnitOfWork(Protocol):
     devices: DeviceRepository
     invites: InviteRepository
     identities: IdentityRepository
+    trust_certs: TrustCertRepository
 
     async def __aenter__(self) -> Self: ...
 

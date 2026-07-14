@@ -9,7 +9,16 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from gophkeeper.domain.device import Device, DeviceRepository
 from gophkeeper.domain.errors import DeviceNotFound
 
-_COLUMNS = ("id", "account_id", "device_name", "public_key", "status", "last_seen_at", "updated_at")
+_COLUMNS = (
+    "id",
+    "account_id",
+    "device_name",
+    "public_key",
+    "sign_public_key",
+    "status",
+    "last_seen_at",
+    "updated_at",
+)
 _COLUMN_LIST = ", ".join(_COLUMNS)
 _INSERT_VALUES = ", ".join(f":{c}" for c in _COLUMNS)
 
@@ -20,6 +29,7 @@ def _to_params(device: Device) -> dict[str, Any]:
         "account_id": device.account_id,
         "device_name": device.device_name,
         "public_key": device.public_key,
+        "sign_public_key": device.sign_public_key,
         "status": device.status,
         "last_seen_at": device.last_seen_at,
         "updated_at": device.updated_at,
@@ -32,6 +42,7 @@ def _from_row(row: RowMapping) -> Device:
         account_id=row["account_id"],
         device_name=row["device_name"],
         public_key=row["public_key"],
+        sign_public_key=row["sign_public_key"],
         status=row["status"],
         last_seen_at=row["last_seen_at"],
         updated_at=row["updated_at"],
@@ -90,6 +101,7 @@ class SqlAlchemyDeviceRepository(DeviceRepository):
                 "account_id = :account_id, "
                 "device_name = :device_name, "
                 "public_key = :public_key, "
+                "sign_public_key = :sign_public_key, "
                 "status = :status, "
                 "last_seen_at = :last_seen_at, "
                 "updated_at = :updated_at "

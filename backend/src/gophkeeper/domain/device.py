@@ -44,6 +44,7 @@ class Device:
     account_id: UUID
     device_name: str
     public_key: str
+    sign_public_key: str = ""  # Ed25519 (base64); verifies the device's trust certs
     status: str = ACTIVE
     last_seen_at: datetime | None = None
     updated_at: datetime = field(default_factory=_now)

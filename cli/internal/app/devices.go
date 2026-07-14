@@ -8,6 +8,7 @@ import (
 
 	"github.com/svetlana1959/GophKeeper/cli/internal/remote"
 	"github.com/svetlana1959/GophKeeper/cli/internal/syncstate"
+	"github.com/svetlana1959/GophKeeper/cli/internal/trust"
 )
 
 // ErrAlreadyLinked is returned by Link when this device is already bound to an
@@ -28,6 +29,7 @@ type Invite struct {
 
 // DeviceInfo is one device in an account, as shown to the user.
 type DeviceInfo struct {
+	ID        string
 	Name      string
 	PublicKey string
 	Status    string
@@ -35,16 +37,102 @@ type DeviceInfo struct {
 }
 
 // CreateInvite mints a pairing code another device can use to join this account.
+// The code is generated locally and never sent to the server: only its hash and
+// a roster of this device's trusted devices (each MAC'd under the code) are
+// uploaded, so the joiner can verify the roster and adopt those devices as trust
+// anchors. The invite is remembered locally until redeemed, so this device can
+// verify the join proof and vouch for the joiner on a later sync.
 func (s *Session) CreateInvite(ctx context.Context, pin string) (Invite, error) {
 	client, _, _, _, err := s.connect(ctx, pin)
 	if err != nil {
 		return Invite{}, err
 	}
-	inv, err := client.CreateInvite(ctx)
+	code, err := trust.GenerateInviteCode()
 	if err != nil {
 		return Invite{}, err
 	}
-	return Invite{Code: inv.Code, ExpiresAt: inv.ExpiresAt}, nil
+	trusted, err := s.trustedSet(ctx, client)
+	if err != nil {
+		return Invite{}, err
+	}
+	inv, err := client.CreateInvite(ctx, trust.HashCode(code), trust.BuildRoster(code, trustedSlice(trusted)))
+	if err != nil {
+		return Invite{}, err
+	}
+	if err := s.db.PendingInvites().Save(trust.PendingInvite{InviteID: inv.ID, Code: code}); err != nil {
+		return Invite{}, err
+	}
+	return Invite{Code: code, ExpiresAt: inv.ExpiresAt}, nil
+}
+
+// trustedSlice flattens a trusted set into a stable-free slice for roster building.
+func trustedSlice(m map[string]trust.TrustedDevice) []trust.TrustedDevice {
+	out := make([]trust.TrustedDevice, 0, len(m))
+	for _, d := range m {
+		out = append(out, d)
+	}
+	return out
+}
+
+// RevokeDevice publishes a signed revoke cert for targetID. It takes effect only
+// if this device is an ancestor of the target in the vouch graph (it introduced
+// it, directly or transitively) or revokes itself — the trust computation on
+// every device enforces that, and drops the target's subtree along with it. On
+// the next sync, reshare rotates secrets so the revoked device loses access to
+// future ciphertext.
+func (s *Session) RevokeDevice(ctx context.Context, pin, targetID string) error {
+	client, _, state, _, err := s.connect(ctx, pin)
+	if err != nil {
+		return err
+	}
+	signPriv, err := s.unlockSigning(pin)
+	if err != nil {
+		return err
+	}
+	if signPriv == "" {
+		return fmt.Errorf("app: this device has no signing key; re-init to manage trust")
+	}
+	resolvedID, err := s.resolveDeviceID(ctx, client, targetID)
+	if err != nil {
+		return err
+	}
+	_, err = s.publishChained(ctx, client, state.DeviceID,
+		func(nextSeq int64, prevHash string) (trust.Cert, error) {
+			return trust.Sign(trust.Cert{
+				Kind: trust.KindRevoke, AccountID: state.AccountID, IssuerID: state.DeviceID,
+				Seq: nextSeq, PrevHash: prevHash, TargetID: resolvedID, IssuedAt: time.Now().Unix(),
+			}, signPriv)
+		})
+	return err
+}
+
+// resolveDeviceID maps a user-supplied target — a device id or a device name — to
+// a device id, using the account's device list. An exact id match wins; a name is
+// resolved if it is unambiguous.
+func (s *Session) resolveDeviceID(
+	ctx context.Context, client *remote.Client, target string,
+) (string, error) {
+	devices, err := client.ListDevices(ctx)
+	if err != nil {
+		return "", fmt.Errorf("app: list devices: %w", err)
+	}
+	var byName []remote.Device
+	for _, d := range devices {
+		if d.ID == target {
+			return d.ID, nil
+		}
+		if d.Name == target {
+			byName = append(byName, d)
+		}
+	}
+	switch len(byName) {
+	case 0:
+		return "", fmt.Errorf("app: no device with id or name %q", target)
+	case 1:
+		return byName[0].ID, nil
+	default:
+		return "", fmt.Errorf("app: name %q is ambiguous (%d devices); use the id", target, len(byName))
+	}
 }
 
 // ListDevices returns the account's devices, flagging the local one. It never
@@ -67,6 +155,7 @@ func (s *Session) ListDevices(ctx context.Context, pin string) ([]DeviceInfo, er
 	out := make([]DeviceInfo, 0, len(devices))
 	for _, d := range devices {
 		out = append(out, DeviceInfo{
+			ID:        d.ID,
 			Name:      d.Name,
 			PublicKey: d.PublicKey,
 			Status:    d.Status,
@@ -93,9 +182,28 @@ func (s *Session) Link(ctx context.Context, code string) error {
 	}
 
 	client := remote.New(s.cfg.Remote)
-	dev, err := client.Join(ctx, code, s.cfg.DeviceName, s.localPub)
+	joinMAC := trust.JoinMAC(code, s.localPub, s.localSignPub)
+	dev, roster, err := client.Join(
+		ctx, trust.HashCode(code), s.cfg.DeviceName, s.localPub, s.localSignPub, joinMAC,
+	)
 	if err != nil {
 		return fmt.Errorf("app: link: %w", err)
+	}
+	// This device trusts itself: anchor its own keys under the server-assigned id
+	// so the trust graph has a root to grow from.
+	if err := s.db.Anchors().Save(trust.Anchor{
+		DeviceID: dev.ID, EncPub: s.localPub, SignPub: s.localSignPub,
+	}); err != nil {
+		return err
+	}
+	// Adopt the inviter's devices as anchors, but only the roster entries whose
+	// MAC verifies under the code — a server-tampered or injected entry is dropped.
+	// (A web-minted invite carries an empty roster; the first device just
+	// self-anchors.)
+	for _, a := range trust.VerifiedAnchors(code, roster) {
+		if err := s.db.Anchors().Save(a); err != nil {
+			return err
+		}
 	}
 	return st.SaveState(&syncstate.State{AccountID: dev.AccountID, DeviceID: dev.ID})
 }

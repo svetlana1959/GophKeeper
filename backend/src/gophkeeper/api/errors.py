@@ -15,7 +15,9 @@ from gophkeeper.domain.errors import (
     DeviceNotFound,
     EmailAlreadyRegistered,
     InvalidInvite,
+    InviteNotFound,
     SecretNotFound,
+    TrustCertConflict,
     VersionConflict,
 )
 
@@ -33,13 +35,14 @@ async def _bad_request_handler(request: Request, exc: InvalidInvite) -> JSONResp
 
 
 async def _not_found_handler(
-    request: Request, exc: SecretNotFound | DeviceNotFound
+    request: Request, exc: SecretNotFound | DeviceNotFound | InviteNotFound
 ) -> JSONResponse:
     return JSONResponse(status_code=status.HTTP_404_NOT_FOUND, content={"detail": str(exc)})
 
 
 async def _conflict_handler(
-    request: Request, exc: VersionConflict | DeviceAlreadyExists | EmailAlreadyRegistered
+    request: Request,
+    exc: VersionConflict | DeviceAlreadyExists | EmailAlreadyRegistered | TrustCertConflict,
 ) -> JSONResponse:
     body = {"detail": str(exc)}
     if isinstance(exc, VersionConflict):
@@ -67,7 +70,9 @@ def register_exception_handlers(app: FastAPI) -> None:
     app.add_exception_handler(InvalidInvite, _bad_request_handler)  # type: ignore[arg-type]
     app.add_exception_handler(SecretNotFound, _not_found_handler)  # type: ignore[arg-type]
     app.add_exception_handler(DeviceNotFound, _not_found_handler)
+    app.add_exception_handler(InviteNotFound, _not_found_handler)
     app.add_exception_handler(DeviceAlreadyExists, _conflict_handler)
     app.add_exception_handler(EmailAlreadyRegistered, _conflict_handler)
+    app.add_exception_handler(TrustCertConflict, _conflict_handler)
     app.add_exception_handler(VersionConflict, _conflict_handler)  # type: ignore[arg-type]
     app.add_exception_handler(IntegrityError, _integrity_handler)  # type: ignore[arg-type]
