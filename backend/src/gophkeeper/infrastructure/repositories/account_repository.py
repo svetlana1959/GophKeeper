@@ -44,3 +44,11 @@ class SqlAlchemyAccountRepository(AccountRepository):
         if row is None:
             raise AccountNotFound(account_id)
         return _from_row(row)
+
+    async def update(self, account: Account) -> None:
+        result = await self._session.execute(
+            text("UPDATE accounts SET recovery_pubkey = :recovery_pubkey WHERE id = :id"),
+            {"id": account.id, "recovery_pubkey": account.recovery_pubkey},
+        )
+        if result.rowcount == 0:
+            raise AccountNotFound(account.id)

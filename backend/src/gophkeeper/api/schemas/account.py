@@ -26,6 +26,14 @@ class AccountSessionResponse(BaseModel):
     expires_in: int = Field(description="Token lifetime in seconds.")
 
 
+class SetRecoveryKeyRequest(BaseModel):
+    recovery_pubkey: str = Field(
+        min_length=1,
+        description="Recovery age public key, minted in the browser. The private "
+        "half is shown to the user once and never sent. Write-once per account.",
+    )
+
+
 class AccountResponse(BaseModel):
     id: UUID
     recovery_pubkey: str | None = Field(

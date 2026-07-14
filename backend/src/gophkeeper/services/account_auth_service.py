@@ -14,7 +14,11 @@ one place that hashes/verifies a secret.
 from uuid import UUID, uuid4
 
 from gophkeeper.domain.account import Account
-from gophkeeper.domain.errors import AuthenticationError, EmailAlreadyRegistered
+from gophkeeper.domain.errors import (
+    AuthenticationError,
+    EmailAlreadyRegistered,
+    RecoveryKeyAlreadySet,
+)
 from gophkeeper.domain.identity import PASSWORD, AccountIdentity
 from gophkeeper.domain.unit_of_work import UnitOfWork
 from gophkeeper.security import passwords, tokens
@@ -78,6 +82,22 @@ class AccountAuthService:
         """Return the account (e.g. to read its recovery public key)."""
         async with self._uow as uow:
             return await uow.accounts.get(account_id)
+
+    async def set_recovery_key(self, account_id: UUID, recovery_pubkey: str) -> Account:
+        """Set the account's recovery public key, once.
+
+        The recovery key is write-once: its private half only ever lived in the
+        user's browser, so overwriting the public half would strand every secret
+        already sealed to the old key. If one is set, this refuses (409).
+        """
+        async with self._uow as uow:
+            account = await uow.accounts.get(account_id)
+            if account.recovery_pubkey is not None:
+                raise RecoveryKeyAlreadySet(account_id)
+            account.recovery_pubkey = recovery_pubkey
+            await uow.accounts.update(account)
+            await uow.commit()
+        return account
 
     def principal(self, token: str) -> AccountPrincipal:
         """Resolve a web session token to its account principal."""

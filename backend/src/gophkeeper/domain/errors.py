@@ -41,6 +41,16 @@ class AccountNotFound(DomainError):
         self.account_id = account_id
 
 
+class RecoveryKeyAlreadySet(DomainError):
+    """The account already has a recovery public key. It is write-once: the
+    private half only ever existed in the user's browser, so overwriting it
+    would strand every secret sealed to the old key. Maps to 409."""
+
+    def __init__(self, account_id: UUID) -> None:
+        super().__init__(f"account {account_id} already has a recovery key")
+        self.account_id = account_id
+
+
 class SecretNotFound(DomainError):
     def __init__(self, secret_id: UUID) -> None:
         super().__init__(f"secret {secret_id} not found")
