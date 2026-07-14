@@ -1,0 +1,163 @@
+.container {
+    position: relative;
+    display: flex;
+    height: 100vh;
+    width: 100%;
+    padding: 0;
+}
+
+.sidebar {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    /* align-items: center; */
+    background: #141418;
+    height: 100%;
+    width: 25%;
+    min-width: 335px;
+    top: 0;
+    left: 0;
+    padding: 4% 32px;
+    box-sizing: border-box;
+}
+
+.sidebarTitle {
+    display: flex;
+    gap: 5px;
+    align-items: start;
+    height: max-content;
+
+    img {
+        width: 55px;
+        height: 55px;
+    }
+}
+
+.sidebarTitleText {
+    margin-top: 5px;
+    font-size: 38px;
+    font-weight: 600;
+}
+
+.navbar {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-top: 98px;
+    padding-left: 24px;
+}
+
+.navItem {
+    display: flex;
+    align-items: center;
+    gap: 24px;
+    color: #F4F5F5;
+    font-size: 18px;
+    font-weight: 400;
+    margin-bottom: 24px;
+    cursor: pointer;
+
+    img {
+        width: 24px;
+        height: 24px;
+    }
+}
+
+.active {
+    color: #008645;
+}
+
+.account {
+    position: absolute;
+    bottom: 4%;
+    width: 70%;
+    display: flex;
+    align-items: center;
+    gap: 24px;
+    padding-right: 48px;
+}
+
+.accountIcon {
+    width: 52px;
+    height: 52px;
+    background: #1B252F;
+    border-radius: 50%;
+    color: #008645;
+    font-size: 24px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.accountInfo {
+    display: flex;
+    flex-direction: column;
+    flex: 1 0 0;
+    gap: 4px;
+}
+
+.accountName {
+    font-size: 18px;
+    font-weight: 600;
+    color: #FFFFFF;
+}
+
+.accountType {
+    font-size: 14px;
+    color: #969696;
+}
+
+.accountSettings {
+    color: #FB2D34;
+}
+
+.content {
+    position: relative;
+    display: flex;
+    width: 85%;
+    flex-direction: column;
+    padding: 24px 2%;
+    margin: 0;
+}
+
+.contentHeader {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    width: 100%;
+    gap: 32px;
+    height: max-content;
+    padding-top: auto;
+    padding-bottom: auto;
+}
+
+.notifications {
+    background: none;
+    border: none;
+    cursor: pointer;
+    margin-top: auto;
+    margin-bottom: auto;
+}
+
+.userIcon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 40px;
+    width: 40px;
+    border-radius: 50%;
+    color: #fff;
+    font-size: 20px;
+    font-weight: 600;
+    background: #008645;
+}
+
+.placeholder {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: rgba(255, 255, 255, 0.5);
+    font-size: 24px;
+}

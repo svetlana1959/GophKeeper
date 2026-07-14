@@ -198,3 +198,14 @@
     top: 50%;
     transform: translateY(-40%);
 }
+
+.error {
+    margin-top: 16px;
+    color: #ff8d8d;
+    font-size: 14px;
+}
+
+.submitButton:disabled {
+    opacity: 0.7;
+    cursor: wait;
+}
