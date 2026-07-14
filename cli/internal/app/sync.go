@@ -250,11 +250,23 @@ func (s *Session) applyReshare(
 	}
 
 	desired := make([]string, 0, len(trusted)+1)
+	selfTrusted := false
 	for _, d := range trusted {
 		desired = append(desired, d.EncPub)
+		if d.EncPub == s.localPub {
+			selfTrusted = true
+		}
 		if err := s.rememberTrusted(d); err != nil {
 			return 0, err
 		}
+	}
+
+	// If this device is not in its own trusted set, it has been revoked. Leave
+	// local secrets untouched — forward secrecy keeps whatever we already hold —
+	// rather than resealing ourselves out (or pushing rotations that only
+	// conflict with the legitimate devices').
+	if !selfTrusted {
+		return 0, nil
 	}
 
 	// The account's recovery key is a standing recipient of every secret, so its

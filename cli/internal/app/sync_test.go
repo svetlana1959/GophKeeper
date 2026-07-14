@@ -721,10 +721,12 @@ func TestRevokeDropsDeviceFromReshare(t *testing.T) {
 	mustLink(t, sess)
 	mustSet(t, sess, app.SetParams{Name: "gh", Value: []byte("tok")})
 
-	// A joiner redeems an invite and gets vouched + sealed in.
+	// A joiner redeems an invite and gets vouched + sealed in. The server also
+	// lists it as dev-2 (so `revoke` can resolve it).
 	inv, _ := sess.CreateInvite(context.Background(), "")
 	joinerEnc, _ := crypto.GenerateKeyPair()
 	joinerSign, _ := crypto.GenerateSigningKey()
+	be.extraDevicePub = joinerEnc.Public
 	if _, _, err := remote.New(srv.URL).Join(
 		context.Background(), trust.HashCode(inv.Code), "phone",
 		joinerEnc.Public, joinerSign.Public, trust.JoinMAC(inv.Code, joinerEnc.Public, joinerSign.Public),

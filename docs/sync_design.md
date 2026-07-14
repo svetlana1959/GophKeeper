@@ -493,3 +493,31 @@ a decision.
 format + sign/verify (crypto) → `/trust/certs` transport (backend + CLI client) →
 trusted-set computation → reshare seals to it → vouch-on-enroll → revoke +
 self-revoke + cascade → recovery-as-bearer (when the browser signing key lands).
+
+**Delivered vs. deferred.** Landed and validated end-to-end (two-device drill):
+signing identities, the cert log, trusted-set computation, code-bound
+invite/link, inviter-vouches-joiner, reshare-to-trusted-set (ZK gap closed),
+and `goph device revoke` with cascade + rotation. Deferred:
+
+- **Server-side revocation enforcement.** A trust-revoked device still passes the
+  server's device-status check, so it can still authenticate and push (its writes
+  only conflict; they leak nothing). Flipping the server `devices.status` on a
+  revoke — so a revoked device is denied at the auth layer — is the remaining
+  half of §9 "revocation not enforceable end-to-end."
+- **Relinking a cascade-dropped device.** Revoking a middle device drops its whole
+  subtree (by design). A device in that subtree that is still legitimate must be
+  **re-linked** to rejoin: an existing trusted device re-invites it, and it
+  redeems the code again. Because its age key already exists on the account,
+  `/enroll/join` must gain a re-link mode (match the existing device by key,
+  record a fresh join proof) rather than rejecting the duplicate; the inviter
+  then issues a new vouch. **Every device the re-linked one had itself vouched
+  must re-link too** — the cascade distrusts the subtree deliberately, and trust
+  is re-established one code-verified hop at a time rather than auto-restored, so
+  a compromised intermediary cannot silently readmit an attacker it had vouched.
+- **Recovery-as-authority** (bearer key), gated on the browser Ed25519 recovery
+  key.
+- **Signed log head** for truncation defense (integrity hardening, above).
+
+**Reshare self-guard.** A device that finds itself *outside* its own computed
+trusted set has been revoked; it leaves local secrets untouched (forward secrecy)
+rather than resealing itself out or pushing rotations that only conflict.

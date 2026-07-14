@@ -29,6 +29,7 @@ type Invite struct {
 
 // DeviceInfo is one device in an account, as shown to the user.
 type DeviceInfo struct {
+	ID        string
 	Name      string
 	PublicKey string
 	Status    string
@@ -91,6 +92,10 @@ func (s *Session) RevokeDevice(ctx context.Context, pin, targetID string) error 
 	if signPriv == "" {
 		return fmt.Errorf("app: this device has no signing key; re-init to manage trust")
 	}
+	resolvedID, err := s.resolveDeviceID(ctx, client, targetID)
+	if err != nil {
+		return err
+	}
 	certs, _, err := client.TrustChanges(ctx, 0)
 	if err != nil {
 		return fmt.Errorf("app: pull trust log: %w", err)
@@ -98,12 +103,41 @@ func (s *Session) RevokeDevice(ctx context.Context, pin, targetID string) error 
 	nextSeq, prevHash := chainHead(certs, state.DeviceID)
 	cert, err := trust.Sign(trust.Cert{
 		Kind: trust.KindRevoke, AccountID: state.AccountID, IssuerID: state.DeviceID,
-		Seq: nextSeq, PrevHash: prevHash, TargetID: targetID, IssuedAt: time.Now().Unix(),
+		Seq: nextSeq, PrevHash: prevHash, TargetID: resolvedID, IssuedAt: time.Now().Unix(),
 	}, signPriv)
 	if err != nil {
 		return err
 	}
 	return client.PublishCert(ctx, cert)
+}
+
+// resolveDeviceID maps a user-supplied target — a device id or a device name — to
+// a device id, using the account's device list. An exact id match wins; a name is
+// resolved if it is unambiguous.
+func (s *Session) resolveDeviceID(
+	ctx context.Context, client *remote.Client, target string,
+) (string, error) {
+	devices, err := client.ListDevices(ctx)
+	if err != nil {
+		return "", fmt.Errorf("app: list devices: %w", err)
+	}
+	var byName []remote.Device
+	for _, d := range devices {
+		if d.ID == target {
+			return d.ID, nil
+		}
+		if d.Name == target {
+			byName = append(byName, d)
+		}
+	}
+	switch len(byName) {
+	case 0:
+		return "", fmt.Errorf("app: no device with id or name %q", target)
+	case 1:
+		return byName[0].ID, nil
+	default:
+		return "", fmt.Errorf("app: name %q is ambiguous (%d devices); use the id", target, len(byName))
+	}
 }
 
 // ListDevices returns the account's devices, flagging the local one. It never
@@ -126,6 +160,7 @@ func (s *Session) ListDevices(ctx context.Context, pin string) ([]DeviceInfo, er
 	out := make([]DeviceInfo, 0, len(devices))
 	for _, d := range devices {
 		out = append(out, DeviceInfo{
+			ID:        d.ID,
 			Name:      d.Name,
 			PublicKey: d.PublicKey,
 			Status:    d.Status,

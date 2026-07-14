@@ -21,7 +21,7 @@ func newDeviceCmd() *cobra.Command {
 
 func newDeviceRevokeCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:   "revoke <device-id>",
+		Use:   "revoke <device-id|name>",
 		Short: "Revoke a device you introduced (and everything it introduced)",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -83,13 +83,13 @@ func newDeviceLsCmd() *cobra.Command {
 				}
 
 				tw := tabwriter.NewWriter(cmd.OutOrStdout(), 0, 0, 2, ' ', 0)
-				fmt.Fprintln(tw, "NAME\tSTATUS\tKEY")
+				fmt.Fprintln(tw, "ID\tNAME\tSTATUS\tKEY")
 				for _, d := range devices {
 					name := d.Name
 					if d.This {
 						name += " (this device)"
 					}
-					fmt.Fprintf(tw, "%s\t%s\t%s\n", name, d.Status, shortKey(d.PublicKey))
+					fmt.Fprintf(tw, "%s\t%s\t%s\t%s\n", d.ID, name, d.Status, shortKey(d.PublicKey))
 				}
 				return tw.Flush()
 			})
