@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
@@ -14,6 +15,7 @@ import (
 
 	"github.com/svetlana1959/GophKeeper/cli/internal/app"
 	"github.com/svetlana1959/GophKeeper/cli/internal/crypto"
+	"github.com/svetlana1959/GophKeeper/cli/internal/remote"
 	"github.com/svetlana1959/GophKeeper/cli/internal/trust"
 )
 
@@ -29,6 +31,12 @@ type syncBackend struct {
 	seq            int64
 	certs          []trust.Cert        // trust log
 	roster         []trust.RosterEntry // roster returned on join
+	// join proof recorded on POST /enroll/join, served on GET /enroll/invite/{id}
+	joinCount  int
+	joinedID   string
+	joinMac    string
+	joinedPub  string
+	joinedSign string
 }
 
 type storedSecret struct {
@@ -141,14 +149,36 @@ func (b *syncBackend) handler(t *testing.T) http.Handler {
 			DeviceName string `json:"device_name"`
 			PublicKey  string `json:"public_key"`
 			SignPubKey string `json:"sign_public_key"`
+			JoinMac    string `json:"join_mac"`
 		}
 		_ = json.NewDecoder(r.Body).Decode(&body)
+		b.joinCount++
+		id := fmt.Sprintf("dev-%d", b.joinCount) // each device gets a distinct id
+		b.joinedID = id
+		b.joinMac = body.JoinMac
+		b.joinedPub = body.PublicKey
+		b.joinedSign = body.SignPubKey
 		respond(w, http.StatusCreated, map[string]any{
 			"device": map[string]any{
-				"id": "dev-joined", "account_id": "acc-1", "device_name": body.DeviceName,
+				"id": id, "account_id": "acc-1", "device_name": body.DeviceName,
 				"public_key": body.PublicKey, "sign_public_key": body.SignPubKey, "status": "active",
 			},
 			"roster": b.roster,
+		})
+	})
+
+	mux.HandleFunc("GET /enroll/invite/{id}", func(w http.ResponseWriter, r *http.Request) {
+		if !b.authed(r) {
+			respond(w, http.StatusUnauthorized, map[string]any{"detail": "unauthorized"})
+			return
+		}
+		respond(w, http.StatusOK, map[string]any{
+			"consumed": b.joinedID != "",
+			"join_mac": b.joinMac,
+			"device": map[string]any{
+				"id": b.joinedID, "account_id": "acc-1", "device_name": "phone",
+				"public_key": b.joinedPub, "sign_public_key": b.joinedSign, "status": "active",
+			},
 		})
 	})
 
@@ -604,6 +634,67 @@ func TestSync_DoesNotSealToUntrustedDevice(t *testing.T) {
 	}
 	if stable.Reshared != 0 || stable.Pushed != 0 {
 		t.Fatalf("second sync = %+v, want 0 reshared / 0 pushed (stable)", stable)
+	}
+}
+
+// The full mesh-forming path: an inviter mints a code-bound invite, a device
+// redeems it (real join MAC under the code), and on the inviter's next sync it
+// verifies the proof, publishes a vouch cert, and reshares the secret to the
+// newly-trusted device — which can then decrypt it.
+func TestSync_VouchesForJoinerThenSeals(t *testing.T) {
+	setHome(t)
+	be := newSyncBackend()
+	srv := httptest.NewServer(be.handler(t))
+	defer srv.Close()
+
+	res, err := app.Init(app.InitParams{DeviceName: "laptop", Remote: srv.URL})
+	if err != nil {
+		t.Fatalf("Init: %v", err)
+	}
+	be.publicKey = res.PublicKey
+
+	sess, err := app.Open()
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	defer sess.Close()
+
+	mustLink(t, sess)
+	mustSet(t, sess, app.SetParams{Name: "gh", Value: []byte("tok")})
+
+	// The inviter mints a code-bound invite (pending until redeemed).
+	inv, err := sess.CreateInvite(context.Background(), "")
+	if err != nil {
+		t.Fatalf("CreateInvite: %v", err)
+	}
+
+	// A second device redeems it with a real join MAC computed under the code.
+	joinerEnc, _ := crypto.GenerateKeyPair()
+	joinerSign, _ := crypto.GenerateSigningKey()
+	_, _, err = remote.New(srv.URL).Join(
+		context.Background(), trust.HashCode(inv.Code), "phone",
+		joinerEnc.Public, joinerSign.Public, trust.JoinMAC(inv.Code, joinerEnc.Public, joinerSign.Public),
+	)
+	if err != nil {
+		t.Fatalf("joiner Join: %v", err)
+	}
+
+	// The inviter syncs: it should vouch for the joiner and reseal the secret to it.
+	if _, err := sess.Sync(context.Background(), ""); err != nil {
+		t.Fatalf("Sync: %v", err)
+	}
+
+	// A vouch cert for the joiner was published...
+	if len(be.certs) != 1 || be.certs[0].Kind != trust.KindVouch || be.certs[0].SubjectID != "dev-2" {
+		t.Fatalf("trust log = %+v, want one vouch for dev-2", be.certs)
+	}
+	// ...and the pushed ciphertext is now decryptable by the joiner.
+	var ct []byte
+	for _, s := range be.secrets {
+		ct = s.ct
+	}
+	if _, err := (crypto.Engine{}).Open(ct, joinerEnc.Private); err != nil {
+		t.Fatalf("joiner cannot decrypt resealed secret: %v", err)
 	}
 }
 

@@ -47,6 +47,12 @@ func (s *Session) Sync(ctx context.Context, pin string) (SyncResult, error) {
 	res.Pulled = pulled
 	res.Conflicts = pullConflicts
 
+	// Vouch for devices that redeemed our invites, so they enter the trusted set
+	// before reshare runs and get sealed in on this same sync.
+	if err := s.publishPendingVouches(ctx, client, state, pin); err != nil {
+		return res, err
+	}
+
 	// Reshare secrets to any account devices not yet sealed in (e.g. a newly
 	// linked one). Reshared secrets become dirty and push below.
 	reshared, err := s.applyReshare(ctx, client, priv)
@@ -294,6 +300,88 @@ func (s *Session) applyReshare(
 		reshared++
 	}
 	return reshared, nil
+}
+
+// publishPendingVouches checks each invite this device minted: once a device has
+// redeemed it, it verifies the joiner's join MAC under the code it kept (proving
+// this exact device redeemed that code), then publishes a signed vouch cert
+// admitting the joiner to the trust graph. A proof whose MAC does not verify is
+// dropped without vouching. Certs from one issuer form a contiguous, hash-chained
+// sequence, so the next seq and prev-hash are read from the current log.
+func (s *Session) publishPendingVouches(
+	ctx context.Context, client *remote.Client, state *syncstate.State, pin string,
+) error {
+	pending, err := s.db.PendingInvites().List()
+	if err != nil {
+		return err
+	}
+	if len(pending) == 0 {
+		return nil
+	}
+	signPriv, err := s.unlockSigning(pin)
+	if err != nil {
+		return err
+	}
+	if signPriv == "" {
+		return nil // no signing key: this device cannot vouch
+	}
+
+	certs, _, err := client.TrustChanges(ctx, 0)
+	if err != nil {
+		return fmt.Errorf("app: pull trust log: %w", err)
+	}
+	nextSeq, prevHash := chainHead(certs, state.DeviceID)
+
+	for _, p := range pending {
+		proof, err := client.InviteProof(ctx, p.InviteID)
+		if err != nil {
+			return fmt.Errorf("app: fetch join proof: %w", err)
+		}
+		if !proof.Consumed {
+			continue // not redeemed yet; check again next sync
+		}
+		if !trust.VerifyJoinMAC(p.Code, proof.Device.PublicKey, proof.Device.SignPublicKey, proof.JoinMAC) {
+			// The device that joined does not match the code we minted; do not
+			// vouch, and stop tracking this invite.
+			if err := s.db.PendingInvites().Delete(p.InviteID); err != nil {
+				return err
+			}
+			continue
+		}
+
+		cert, err := trust.Sign(trust.Cert{
+			Kind: trust.KindVouch, AccountID: state.AccountID, IssuerID: state.DeviceID,
+			Seq: nextSeq, PrevHash: prevHash,
+			SubjectID: proof.Device.ID, SubjectEncPub: proof.Device.PublicKey,
+			SubjectSignPub: proof.Device.SignPublicKey, IssuedAt: time.Now().Unix(),
+		}, signPriv)
+		if err != nil {
+			return err
+		}
+		if err := client.PublishCert(ctx, cert); err != nil {
+			return fmt.Errorf("app: publish vouch: %w", err)
+		}
+		nextSeq++
+		prevHash = cert.Hash()
+		if err := s.db.PendingInvites().Delete(p.InviteID); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// chainHead returns the next seq and prev-hash for this device's next cert, read
+// from its existing certs in the log (seq 0 / empty prev-hash if it has none).
+func chainHead(certs []trust.Cert, issuerID string) (int64, string) {
+	var nextSeq int64
+	var prevHash string
+	for _, c := range certs {
+		if c.IssuerID == issuerID && c.Seq >= nextSeq {
+			nextSeq = c.Seq + 1
+			prevHash = c.Hash()
+		}
+	}
+	return nextSeq, prevHash
 }
 
 // trustedSet computes this device's trusted set from the signed trust-cert log

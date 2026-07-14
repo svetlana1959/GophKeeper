@@ -340,13 +340,27 @@ func (s *Session) List(folder string, includeDeleted bool) ([]SecretInfo, error)
 
 // unlock returns the decrypted private key, decrypting with pin when protected.
 func (s *Session) unlock(pin string) (string, error) {
+	return s.unlockKey(s.local.StoredKey, pin)
+}
+
+// unlockSigning returns the decrypted Ed25519 signing key (empty for a device
+// that predates signing keys), decrypting with pin when protected. Used to sign
+// trust certs (vouch/revoke).
+func (s *Session) unlockSigning(pin string) (string, error) {
+	if len(s.local.SignStoredKey) == 0 {
+		return "", nil
+	}
+	return s.unlockKey(s.local.SignStoredKey, pin)
+}
+
+func (s *Session) unlockKey(stored []byte, pin string) (string, error) {
 	if !s.local.PINProtected {
-		return string(s.local.StoredKey), nil
+		return string(stored), nil
 	}
 	if pin == "" {
 		return "", ErrPINRequired
 	}
-	plain, err := crypto.OpenWithPassword(s.local.StoredKey, pin)
+	plain, err := crypto.OpenWithPassword(stored, pin)
 	if errors.Is(err, crypto.ErrWrongPassword) {
 		return "", ErrWrongPIN
 	}
