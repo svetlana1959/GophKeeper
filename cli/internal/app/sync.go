@@ -396,23 +396,58 @@ func pullAllCerts(ctx context.Context, client *remote.Client) ([]trust.Cert, err
 	}
 }
 
-// publishChained pulls the issuer's current chain head, has build sign a cert
-// against it, and publishes it. If another device advanced the issuer's chain
-// concurrently the server rejects the seq (ErrConflict); it re-pulls and retries a
-// few times so a benign race resolves without surfacing an error. build is called
-// on each attempt so the retry signs against the refreshed head.
+// verifiedTrustLog pulls the whole trust log and refuses it if any issuer's chain
+// has rolled back or vanished since a previous sync — a relay trying to suppress a
+// revoke by withholding its tail. On success it advances the persisted per-issuer
+// heads and returns the certs together with this device's anchors, ready for trust
+// computation.
+func (s *Session) verifiedTrustLog(
+	ctx context.Context, client *remote.Client,
+) ([]trust.Cert, []trust.Anchor, error) {
+	certs, err := pullAllCerts(ctx, client)
+	if err != nil {
+		return nil, nil, err
+	}
+	anchors, err := s.db.Anchors().List()
+	if err != nil {
+		return nil, nil, err
+	}
+	seen, err := s.db.TrustHeads().List()
+	if err != nil {
+		return nil, nil, err
+	}
+	heads, err := trust.CheckProgress(trust.VerifiedChains(certs, anchors), seen)
+	if err != nil {
+		return nil, nil, fmt.Errorf("app: %w", err)
+	}
+	for issuer, h := range heads {
+		if seen[issuer] != h {
+			if err := s.db.TrustHeads().Save(issuer, h); err != nil {
+				return nil, nil, err
+			}
+		}
+	}
+	return certs, anchors, nil
+}
+
+// publishChained signs a cert onto this device's own verified chain head and
+// publishes it. The head is derived from the signature-verified chain (a relay
+// cannot forge our signature, so it cannot inflate our head), never from the raw
+// server log. If a concurrent publish advanced our chain the server rejects the seq
+// (ErrConflict); it re-pulls and retries so a benign race resolves quietly. build
+// is called each attempt so the retry signs against the refreshed head.
 func (s *Session) publishChained(
 	ctx context.Context, client *remote.Client, issuerID string,
 	build func(nextSeq int64, prevHash string) (trust.Cert, error),
 ) (trust.Cert, error) {
 	var lastErr error
 	for attempt := 0; attempt < 4; attempt++ {
-		certs, err := pullAllCerts(ctx, client)
+		certs, anchors, err := s.verifiedTrustLog(ctx, client)
 		if err != nil {
 			return trust.Cert{}, err
 		}
-		nextSeq, prevHash := chainHead(certs, issuerID)
-		cert, err := build(nextSeq, prevHash)
+		tip := trust.Tip(trust.VerifiedChains(certs, anchors)[issuerID])
+		cert, err := build(tip.Seq+1, tip.Hash)
 		if err != nil {
 			return trust.Cert{}, err
 		}
@@ -428,31 +463,13 @@ func (s *Session) publishChained(
 	return trust.Cert{}, fmt.Errorf("app: publish trust cert after retries: %w", lastErr)
 }
 
-// chainHead returns the next seq and prev-hash for this device's next cert, read
-// from its existing certs in the log (seq 0 / empty prev-hash if it has none).
-func chainHead(certs []trust.Cert, issuerID string) (int64, string) {
-	var nextSeq int64
-	var prevHash string
-	for _, c := range certs {
-		if c.IssuerID == issuerID && c.Seq >= nextSeq {
-			nextSeq = c.Seq + 1
-			prevHash = c.Hash()
-		}
-	}
-	return nextSeq, prevHash
-}
-
-// trustedSet computes this device's trusted set from the signed trust-cert log
+// trustedSet computes this device's trusted set from the verified trust-cert log
 // and its local anchors — the account's authoritative recipient set, derived
-// without trusting the server's device list.
+// without trusting the server's device list, and refusing a rolled-back log.
 func (s *Session) trustedSet(
 	ctx context.Context, client *remote.Client,
 ) (map[string]trust.TrustedDevice, error) {
-	certs, err := pullAllCerts(ctx, client)
-	if err != nil {
-		return nil, err
-	}
-	anchors, err := s.db.Anchors().List()
+	certs, anchors, err := s.verifiedTrustLog(ctx, client)
 	if err != nil {
 		return nil, err
 	}

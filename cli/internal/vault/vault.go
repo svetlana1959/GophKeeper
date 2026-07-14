@@ -135,3 +135,6 @@ func (db *DB) Anchors() trust.AnchorRepository { return &anchorRepo{db: db.sql} 
 func (db *DB) PendingInvites() trust.PendingInviteRepository {
 	return &pendingInviteRepo{db: db.sql}
 }
+
+// TrustHeads returns the per-issuer verified-head repository (rollback detection).
+func (db *DB) TrustHeads() trust.TrustHeadRepository { return &trustHeadRepo{db: db.sql} }

@@ -771,6 +771,70 @@ func TestRevokeDropsDeviceFromReshare(t *testing.T) {
 	}
 }
 
+// TestSync_RefusesRolledBackTrustLog: once a device has seen a revoke, a relay
+// that later withholds it (rolling the issuer's chain back) is refused rather than
+// silently re-trusting the revoked device — fail-closed on the security-critical
+// direction.
+func TestSync_RefusesRolledBackTrustLog(t *testing.T) {
+	setHome(t)
+	be := newSyncBackend()
+	srv := httptest.NewServer(be.handler(t))
+	defer srv.Close()
+
+	res, err := app.Init(app.InitParams{DeviceName: "laptop", Remote: srv.URL})
+	if err != nil {
+		t.Fatalf("Init: %v", err)
+	}
+	be.publicKey = res.PublicKey
+	sess, err := app.Open()
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	defer sess.Close()
+	mustLink(t, sess)
+	mustSet(t, sess, app.SetParams{Name: "gh", Value: []byte("tok")})
+
+	// Vouch in a joiner, then revoke it, syncing so this device records root's
+	// chain head at the revoke (seq 1).
+	inv, _ := sess.CreateInvite(context.Background(), "")
+	joinerEnc, _ := crypto.GenerateKeyPair()
+	joinerSign, _ := crypto.GenerateSigningKey()
+	be.extraDevicePub = joinerEnc.Public
+	if _, _, err := remote.New(srv.URL).Join(
+		context.Background(), trust.HashCode(inv.Code), "phone",
+		joinerEnc.Public, joinerSign.Public, trust.JoinMAC(inv.Code, joinerEnc.Public, joinerSign.Public),
+	); err != nil {
+		t.Fatalf("joiner Join: %v", err)
+	}
+	if _, err := sess.Sync(context.Background(), ""); err != nil {
+		t.Fatalf("first Sync: %v", err)
+	}
+	if err := sess.RevokeDevice(context.Background(), "", "dev-2"); err != nil {
+		t.Fatalf("RevokeDevice: %v", err)
+	}
+	if _, err := sess.Sync(context.Background(), ""); err != nil {
+		t.Fatalf("second Sync: %v", err)
+	}
+
+	// A hostile relay now drops the revoke from the log (keeps only the vouch).
+	kept := be.certs[:0:0]
+	for _, c := range be.certs {
+		if c.Kind != trust.KindRevoke {
+			kept = append(kept, c)
+		}
+	}
+	be.certs = kept
+
+	// The next sync must refuse the rolled-back log rather than re-trust dev-2.
+	_, err = sess.Sync(context.Background(), "")
+	if err == nil {
+		t.Fatalf("sync accepted a rolled-back trust log, want refusal")
+	}
+	if !strings.Contains(err.Error(), "rollback") {
+		t.Fatalf("error = %v, want a rollback refusal", err)
+	}
+}
+
 func currentCiphertext(be *syncBackend) []byte {
 	for _, s := range be.secrets {
 		return s.ct

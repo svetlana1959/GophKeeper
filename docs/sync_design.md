@@ -500,10 +500,22 @@ cert; `GET /trust/certs?since=<cursor>` returns new certs in order (same cursor
 pattern as `/sync/changes`). Kept separate from `/devices` and `/sync` on
 purpose: trust is a first-class, client-verified artifact, and re-entangling it
 with the server's device list is the very bug being fixed. The server relays but
-cannot forge (all certs signed). Integrity: per-issuer monotonic `seq` +
-`prev_hash` chain detect drops/reorders *within* an issuer; a signed **log head**
-(`issuer, latest_seq, latest_hash`) that peers refuse to roll back detects the
-server hiding an issuer's *latest* certs (hardening, after the core).
+cannot forge (all certs signed). Integrity, in layers:
+
+- Per-issuer monotonic `seq` + `prev_hash` chain detect drops/reorders *within* an
+  issuer: `validChainsByIssuer` keeps only the intact prefix, deterministically
+  even under a hostile duplicate `seq` (hash tiebreak).
+- A device signs its own next cert onto its **signature-verified** head
+  (`VerifiedChains` / `Tip`), never the raw server log — a relay cannot forge the
+  device's signature, so it cannot inflate the head and trick the device into
+  signing over a gap.
+- The client **persists the highest verified head it has seen per issuer**
+  (`trust_heads`) and refuses a later log whose chain regressed or vanished
+  (`CheckProgress`) — so a relay cannot withhold an issuer's *tail* it once
+  revealed (e.g. suppress a revoke) without the rollback being detected.
+- **Residual:** a relay that withholds a cert it *never* revealed leaves no
+  baseline to compare against; catching that needs a server-signed **log head**
+  (`issuer, latest_seq, latest_hash`) — deferred.
 
 **Forward secrecy only.** Rotation protects future ciphertext; a revoked device
 keeps any plaintext it already pulled. Standard for key rotation, stated so it is
@@ -536,7 +548,10 @@ and `goph device revoke` with cascade + rotation. Deferred:
   a compromised intermediary cannot silently readmit an attacker it had vouched.
 - **Recovery-as-authority** (bearer key), gated on the browser Ed25519 recovery
   key.
-- **Signed log head** for truncation defense (integrity hardening, above).
+- **Signed log head** for the residual truncation case (a relay withholding certs
+  it never revealed). Per-issuer head persistence + rollback refusal already catch
+  a relay retracting a tail it once showed; the server-signed head closes the
+  never-revealed gap (integrity hardening, above).
 
 **Reshare self-guard.** A device that finds itself *outside* its own computed
 trusted set has been revoked; it leaves local secrets untouched (forward secrecy)

@@ -55,6 +55,16 @@ CREATE TABLE IF NOT EXISTS pending_invites (
     code       TEXT NOT NULL
 );
 
+-- The highest verified cert we have seen from each issuer's chain: its seq and the
+-- hash committing the whole prefix below it. Persisted so a hostile relay cannot
+-- roll back or withhold an issuer's tail (e.g. suppress a revoke) without the head
+-- appearing to regress — which the client then refuses.
+CREATE TABLE IF NOT EXISTS trust_heads (
+    issuer_id TEXT PRIMARY KEY,
+    seq       INTEGER NOT NULL,
+    hash      TEXT NOT NULL
+);
+
 -- This device's binding to the server account and the pull cursor (single row).
 CREATE TABLE IF NOT EXISTS sync_state (
     id         INTEGER PRIMARY KEY CHECK (id = 1),
