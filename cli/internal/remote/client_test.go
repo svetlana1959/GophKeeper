@@ -14,6 +14,7 @@ import (
 
 	"github.com/svetlana1959/GophKeeper/cli/internal/crypto"
 	"github.com/svetlana1959/GophKeeper/cli/internal/remote"
+	"github.com/svetlana1959/GophKeeper/cli/internal/trust"
 )
 
 // fakeBackend stands in for the server: it seals a real age challenge to the
@@ -26,6 +27,8 @@ type fakeBackend struct {
 	issuedToken   string
 	secrets       map[string]remote.ChangedSecret
 	seq           int64
+	certs         []trust.Cert
+	certSeq       int64
 }
 
 func newFakeBackend(publicKey string) *fakeBackend {
@@ -181,6 +184,28 @@ func (f *fakeBackend) handler(t *testing.T) http.Handler {
 		})
 	})
 
+	mux.HandleFunc("POST /trust/certs", func(w http.ResponseWriter, r *http.Request) {
+		if !f.authed(r) {
+			writeJSON(w, http.StatusUnauthorized, map[string]string{"detail": "unauthorized"})
+			return
+		}
+		var cert trust.Cert
+		_ = json.NewDecoder(r.Body).Decode(&cert)
+		f.certSeq++
+		f.certs = append(f.certs, cert)
+		writeJSON(w, http.StatusCreated, cert)
+	})
+
+	mux.HandleFunc("GET /trust/certs", func(w http.ResponseWriter, r *http.Request) {
+		if !f.authed(r) {
+			writeJSON(w, http.StatusUnauthorized, map[string]string{"detail": "unauthorized"})
+			return
+		}
+		since, _ := strconv.ParseInt(r.URL.Query().Get("since"), 10, 64)
+		out := f.certs[since:] // fake log cursor is a slice index
+		writeJSON(w, http.StatusOK, map[string]any{"certs": out, "cursor": f.certSeq})
+	})
+
 	return mux
 }
 
@@ -329,6 +354,56 @@ func TestJoin(t *testing.T) {
 	}
 	if dev.ID != "dev-new" || dev.PublicKey != kp.Public {
 		t.Fatalf("unexpected device: %+v", dev)
+	}
+}
+
+func TestPublishAndPullTrustCerts(t *testing.T) {
+	kp, _ := crypto.GenerateKeyPair()
+	be := newFakeBackend(kp.Public)
+	srv := httptest.NewServer(be.handler(t))
+	defer srv.Close()
+
+	c := remote.New(srv.URL)
+	if err := c.Authenticate(context.Background(), kp.Public, decryptWith(kp.Private)); err != nil {
+		t.Fatalf("authenticate: %v", err)
+	}
+
+	sk, _ := crypto.GenerateSigningKey()
+	cert, _ := trust.Sign(trust.Cert{
+		Kind: trust.KindVouch, AccountID: "acc-1", IssuerID: "dev-1", Seq: 0,
+		SubjectID: "dev-2", SubjectEncPub: "age1other", SubjectSignPub: sk.Public,
+		IssuedAt: 1_700_000_000,
+	}, sk.Private)
+
+	if err := c.PublishCert(context.Background(), cert); err != nil {
+		t.Fatalf("publish cert: %v", err)
+	}
+
+	certs, cursor, err := c.TrustChanges(context.Background(), 0)
+	if err != nil {
+		t.Fatalf("trust changes: %v", err)
+	}
+	if len(certs) != 1 || cursor != 1 {
+		t.Fatalf("got %d certs, cursor %d; want 1, 1", len(certs), cursor)
+	}
+	// The cert survives the round trip and still verifies under the issuer's key.
+	if err := certs[0].Verify(sk.Public); err != nil {
+		t.Fatalf("pulled cert does not verify: %v", err)
+	}
+
+	// A cursor at the head returns nothing.
+	tail, _, err := c.TrustChanges(context.Background(), cursor)
+	if err != nil || len(tail) != 0 {
+		t.Fatalf("tail = %v, %v; want empty", tail, err)
+	}
+}
+
+func TestTrustCallsRequireAuth(t *testing.T) {
+	if err := remote.New("http://unused").PublishCert(context.Background(), trust.Cert{}); !errors.Is(err, remote.ErrNotAuthed) {
+		t.Fatalf("PublishCert unauthed = %v, want ErrNotAuthed", err)
+	}
+	if _, _, err := remote.New("http://unused").TrustChanges(context.Background(), 0); !errors.Is(err, remote.ErrNotAuthed) {
+		t.Fatalf("TrustChanges unauthed = %v, want ErrNotAuthed", err)
 	}
 }
 

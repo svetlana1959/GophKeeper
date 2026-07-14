@@ -11,6 +11,8 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/svetlana1959/GophKeeper/cli/internal/trust"
 )
 
 // DecryptFunc decrypts a challenge ciphertext with the device's private key,
@@ -263,6 +265,35 @@ func (c *Client) Account(ctx context.Context) (Account, error) {
 		return Account{}, err
 	}
 	return acc, nil
+}
+
+// PublishCert appends one signed trust cert to the account's trust log. The
+// server relays it without verifying the signature. ErrConflict means the cert's
+// seq is not the next in this device's chain (re-pull the log and re-issue).
+// Requires a prior Authenticate.
+func (c *Client) PublishCert(ctx context.Context, cert trust.Cert) error {
+	if c.token == "" {
+		return ErrNotAuthed
+	}
+	return c.do(ctx, http.MethodPost, "/trust/certs", cert, nil)
+}
+
+// TrustChanges pulls the account's trust certs with log cursor greater than
+// since, in order, along with the new cursor. The caller verifies each cert's
+// signature and chain. Requires a prior Authenticate.
+func (c *Client) TrustChanges(ctx context.Context, since int64) ([]trust.Cert, int64, error) {
+	if c.token == "" {
+		return nil, 0, ErrNotAuthed
+	}
+	var resp struct {
+		Certs  []trust.Cert `json:"certs"`
+		Cursor int64        `json:"cursor"`
+	}
+	path := fmt.Sprintf("/trust/certs?since=%d", since)
+	if err := c.do(ctx, http.MethodGet, path, nil, &resp); err != nil {
+		return nil, 0, err
+	}
+	return resp.Certs, resp.Cursor, nil
 }
 
 // Invite is a single-use pairing code for linking a new device.
