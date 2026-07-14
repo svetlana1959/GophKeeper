@@ -210,7 +210,20 @@ func (b *syncBackend) handler(t *testing.T) http.Handler {
 			respond(w, http.StatusUnauthorized, map[string]any{"detail": "unauthorized"})
 			return
 		}
-		respond(w, http.StatusOK, map[string]any{"certs": b.certs, "cursor": len(b.certs)})
+		// Honor the since cursor like the real backend: certs are 1-indexed by
+		// position, so since=N returns everything after the Nth. (A cursor-ignoring
+		// stub would make paginated pulls duplicate the log.)
+		since := 0
+		if v := r.URL.Query().Get("since"); v != "" {
+			since, _ = strconv.Atoi(v)
+		}
+		if since < 0 {
+			since = 0
+		}
+		if since > len(b.certs) {
+			since = len(b.certs)
+		}
+		respond(w, http.StatusOK, map[string]any{"certs": b.certs[since:], "cursor": len(b.certs)})
 	})
 
 	mux.HandleFunc("POST /trust/certs", func(w http.ResponseWriter, r *http.Request) {

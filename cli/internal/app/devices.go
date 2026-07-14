@@ -96,19 +96,14 @@ func (s *Session) RevokeDevice(ctx context.Context, pin, targetID string) error 
 	if err != nil {
 		return err
 	}
-	certs, _, err := client.TrustChanges(ctx, 0)
-	if err != nil {
-		return fmt.Errorf("app: pull trust log: %w", err)
-	}
-	nextSeq, prevHash := chainHead(certs, state.DeviceID)
-	cert, err := trust.Sign(trust.Cert{
-		Kind: trust.KindRevoke, AccountID: state.AccountID, IssuerID: state.DeviceID,
-		Seq: nextSeq, PrevHash: prevHash, TargetID: resolvedID, IssuedAt: time.Now().Unix(),
-	}, signPriv)
-	if err != nil {
-		return err
-	}
-	return client.PublishCert(ctx, cert)
+	_, err = s.publishChained(ctx, client, state.DeviceID,
+		func(nextSeq int64, prevHash string) (trust.Cert, error) {
+			return trust.Sign(trust.Cert{
+				Kind: trust.KindRevoke, AccountID: state.AccountID, IssuerID: state.DeviceID,
+				Seq: nextSeq, PrevHash: prevHash, TargetID: resolvedID, IssuedAt: time.Now().Unix(),
+			}, signPriv)
+		})
+	return err
 }
 
 // resolveDeviceID maps a user-supplied target — a device id or a device name — to

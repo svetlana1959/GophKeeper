@@ -338,12 +338,6 @@ func (s *Session) publishPendingVouches(
 		return nil // no signing key: this device cannot vouch
 	}
 
-	certs, _, err := client.TrustChanges(ctx, 0)
-	if err != nil {
-		return fmt.Errorf("app: pull trust log: %w", err)
-	}
-	nextSeq, prevHash := chainHead(certs, state.DeviceID)
-
 	for _, p := range pending {
 		proof, err := client.InviteProof(ctx, p.InviteID)
 		if err != nil {
@@ -361,25 +355,77 @@ func (s *Session) publishPendingVouches(
 			continue
 		}
 
-		cert, err := trust.Sign(trust.Cert{
-			Kind: trust.KindVouch, AccountID: state.AccountID, IssuerID: state.DeviceID,
-			Seq: nextSeq, PrevHash: prevHash,
-			SubjectID: proof.Device.ID, SubjectEncPub: proof.Device.PublicKey,
-			SubjectSignPub: proof.Device.SignPublicKey, IssuedAt: time.Now().Unix(),
-		}, signPriv)
+		// Each vouch is published against the freshly-pulled chain head, retrying
+		// on a seq conflict if another operation advanced this device's chain.
+		_, err = s.publishChained(ctx, client, state.DeviceID,
+			func(nextSeq int64, prevHash string) (trust.Cert, error) {
+				return trust.Sign(trust.Cert{
+					Kind: trust.KindVouch, AccountID: state.AccountID, IssuerID: state.DeviceID,
+					Seq: nextSeq, PrevHash: prevHash,
+					SubjectID: proof.Device.ID, SubjectEncPub: proof.Device.PublicKey,
+					SubjectSignPub: proof.Device.SignPublicKey, IssuedAt: time.Now().Unix(),
+				}, signPriv)
+			})
 		if err != nil {
 			return err
 		}
-		if err := client.PublishCert(ctx, cert); err != nil {
-			return fmt.Errorf("app: publish vouch: %w", err)
-		}
-		nextSeq++
-		prevHash = cert.Hash()
 		if err := s.db.PendingInvites().Delete(p.InviteID); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+// pullAllCerts drains the account's trust log, following the server's cursor
+// across pages. The trusted set and each issuer's chain head must be computed from
+// the whole log; a single page (the backend caps them) would silently truncate the
+// graph past a few hundred certs.
+func pullAllCerts(ctx context.Context, client *remote.Client) ([]trust.Cert, error) {
+	var all []trust.Cert
+	var since int64
+	for {
+		page, cursor, err := client.TrustChanges(ctx, since)
+		if err != nil {
+			return nil, fmt.Errorf("app: pull trust log: %w", err)
+		}
+		all = append(all, page...)
+		if len(page) == 0 || cursor <= since {
+			return all, nil
+		}
+		since = cursor
+	}
+}
+
+// publishChained pulls the issuer's current chain head, has build sign a cert
+// against it, and publishes it. If another device advanced the issuer's chain
+// concurrently the server rejects the seq (ErrConflict); it re-pulls and retries a
+// few times so a benign race resolves without surfacing an error. build is called
+// on each attempt so the retry signs against the refreshed head.
+func (s *Session) publishChained(
+	ctx context.Context, client *remote.Client, issuerID string,
+	build func(nextSeq int64, prevHash string) (trust.Cert, error),
+) (trust.Cert, error) {
+	var lastErr error
+	for attempt := 0; attempt < 4; attempt++ {
+		certs, err := pullAllCerts(ctx, client)
+		if err != nil {
+			return trust.Cert{}, err
+		}
+		nextSeq, prevHash := chainHead(certs, issuerID)
+		cert, err := build(nextSeq, prevHash)
+		if err != nil {
+			return trust.Cert{}, err
+		}
+		if err := client.PublishCert(ctx, cert); err != nil {
+			if errors.Is(err, remote.ErrConflict) {
+				lastErr = err
+				continue // chain advanced under us; re-pull and retry
+			}
+			return trust.Cert{}, err
+		}
+		return cert, nil
+	}
+	return trust.Cert{}, fmt.Errorf("app: publish trust cert after retries: %w", lastErr)
 }
 
 // chainHead returns the next seq and prev-hash for this device's next cert, read
@@ -402,9 +448,9 @@ func chainHead(certs []trust.Cert, issuerID string) (int64, string) {
 func (s *Session) trustedSet(
 	ctx context.Context, client *remote.Client,
 ) (map[string]trust.TrustedDevice, error) {
-	certs, _, err := client.TrustChanges(ctx, 0)
+	certs, err := pullAllCerts(ctx, client)
 	if err != nil {
-		return nil, fmt.Errorf("app: pull trust log: %w", err)
+		return nil, err
 	}
 	anchors, err := s.db.Anchors().List()
 	if err != nil {
