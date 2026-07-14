@@ -13,6 +13,7 @@ import (
 	"github.com/svetlana1959/GophKeeper/cli/internal/remote"
 	"github.com/svetlana1959/GophKeeper/cli/internal/secret"
 	"github.com/svetlana1959/GophKeeper/cli/internal/syncstate"
+	"github.com/svetlana1959/GophKeeper/cli/internal/trust"
 )
 
 // ErrNoRemote is returned by Sync when no backend URL is configured.
@@ -227,26 +228,30 @@ func (s *Session) metaFromPayload(ciphertext []byte, priv string) (content, bool
 	return c, true
 }
 
-// applyReshare ensures every secret this device can decrypt is sealed to all of
-// the account's active devices. It mirrors the account's device list into the
-// local trusted set (so recipient keys resolve), then re-encrypts any secret
-// whose recipient set differs, marking it dirty to push. This is how a newly
-// linked device gains access to existing secrets.
+// applyReshare ensures every secret this device can decrypt is sealed to the
+// account's trusted devices. Trust is computed locally from the signed cert log
+// and this device's anchors (never from the server's device list, which a
+// malicious server could pad with a rogue recipient — see docs/sync_design.md
+// §11). Trusted devices are mirrored into the local set so recipient keys
+// resolve; any secret whose recipient set differs is re-encrypted and marked
+// dirty to push.
 func (s *Session) applyReshare(
 	ctx context.Context, client *remote.Client, priv string,
 ) (int, error) {
-	devices, err := client.ListDevices(ctx)
+	certs, _, err := client.TrustChanges(ctx, 0)
 	if err != nil {
-		return 0, fmt.Errorf("app: list devices: %w", err)
+		return 0, fmt.Errorf("app: pull trust log: %w", err)
 	}
+	anchors, err := s.db.Anchors().List()
+	if err != nil {
+		return 0, err
+	}
+	trusted := trust.ComputeTrusted(certs, anchors)
 
-	desired := make([]string, 0, len(devices)+1)
-	for _, d := range devices {
-		if d.Status != "active" {
-			continue
-		}
-		desired = append(desired, d.PublicKey)
-		if err := s.rememberDevice(d); err != nil {
+	desired := make([]string, 0, len(trusted)+1)
+	for _, d := range trusted {
+		desired = append(desired, d.EncPub)
+		if err := s.rememberTrusted(d); err != nil {
 			return 0, err
 		}
 	}
@@ -296,10 +301,13 @@ func (s *Session) applyReshare(
 	return reshared, nil
 }
 
-// rememberDevice adds an account device to the local trusted set if its key is
-// not already known, so secret recipients resolve when saving.
-func (s *Session) rememberDevice(d remote.Device) error {
-	_, err := s.db.Devices().FindByPublicKey(d.PublicKey)
+// rememberTrusted mirrors a trusted device into the local trusted_devices table
+// if its key is not already known, so secret recipients resolve when saving.
+// Names are cosmetic here (the id stands in); `device ls` shows real names from
+// the server. The self row saved at init already carries this device's key, so
+// it is left untouched.
+func (s *Session) rememberTrusted(d trust.TrustedDevice) error {
+	_, err := s.db.Devices().FindByPublicKey(d.EncPub)
 	if err == nil {
 		return nil
 	}
@@ -307,7 +315,8 @@ func (s *Session) rememberDevice(d remote.Device) error {
 		return err
 	}
 	return s.db.Devices().Save(&device.Device{
-		ID: d.ID, Name: d.Name, PublicKey: d.PublicKey, Active: true, UpdatedAt: time.Now().UTC(),
+		ID: d.DeviceID, Name: d.DeviceID, PublicKey: d.EncPub, SignPublicKey: d.SignPub,
+		Active: true, UpdatedAt: time.Now().UTC(),
 	})
 }
 

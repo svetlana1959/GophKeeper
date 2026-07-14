@@ -14,6 +14,7 @@ import (
 
 	"github.com/svetlana1959/GophKeeper/cli/internal/app"
 	"github.com/svetlana1959/GophKeeper/cli/internal/crypto"
+	"github.com/svetlana1959/GophKeeper/cli/internal/trust"
 )
 
 // syncBackend is a minimal stand-in for the server: it runs the age challenge
@@ -26,6 +27,7 @@ type syncBackend struct {
 	nonce          []byte
 	secrets        map[string]storedSecret
 	seq            int64
+	certs          []trust.Cert // trust log
 }
 
 type storedSecret struct {
@@ -166,6 +168,25 @@ func (b *syncBackend) handler(t *testing.T) http.Handler {
 			}
 		}
 		respond(w, http.StatusOK, map[string]any{"secrets": out, "cursor": cursor})
+	})
+
+	mux.HandleFunc("GET /trust/certs", func(w http.ResponseWriter, r *http.Request) {
+		if !b.authed(r) {
+			respond(w, http.StatusUnauthorized, map[string]any{"detail": "unauthorized"})
+			return
+		}
+		respond(w, http.StatusOK, map[string]any{"certs": b.certs, "cursor": len(b.certs)})
+	})
+
+	mux.HandleFunc("POST /trust/certs", func(w http.ResponseWriter, r *http.Request) {
+		if !b.authed(r) {
+			respond(w, http.StatusUnauthorized, map[string]any{"detail": "unauthorized"})
+			return
+		}
+		var c trust.Cert
+		_ = json.NewDecoder(r.Body).Decode(&c)
+		b.certs = append(b.certs, c)
+		respond(w, http.StatusCreated, c)
 	})
 
 	return mux
@@ -518,7 +539,11 @@ func TestLink(t *testing.T) {
 	}
 }
 
-func TestSync_ResharesToAccountDevices(t *testing.T) {
+// A device the server merely *reports* (GET /devices) but that no trust cert
+// vouches for must never receive plaintext — reshare seals only to the
+// cert-derived trusted set. This is the §11 zero-knowledge guarantee: a malicious
+// server cannot inject a rogue recipient.
+func TestSync_DoesNotSealToUntrustedDevice(t *testing.T) {
 	setHome(t)
 	be := newSyncBackend()
 	srv := httptest.NewServer(be.handler(t))
@@ -529,12 +554,13 @@ func TestSync_ResharesToAccountDevices(t *testing.T) {
 		t.Fatalf("Init: %v", err)
 	}
 	be.publicKey = res.PublicKey
-	// A second device in the account (as if freshly linked).
-	other, err := crypto.GenerateKeyPair()
+	// The server reports a second device, but no vouch cert admits it: it is a
+	// stand-in for a server-injected rogue recipient.
+	rogue, err := crypto.GenerateKeyPair()
 	if err != nil {
 		t.Fatalf("keypair: %v", err)
 	}
-	be.extraDevicePub = other.Public
+	be.extraDevicePub = rogue.Public
 
 	sess, err := app.Open()
 	if err != nil {
@@ -543,18 +569,11 @@ func TestSync_ResharesToAccountDevices(t *testing.T) {
 	defer sess.Close()
 
 	mustLink(t, sess)
-
 	mustSet(t, sess, app.SetParams{Name: "gh", Value: []byte("tok")})
 
-	out, err := sess.Sync(context.Background(), "")
-	if err != nil {
+	if _, err := sess.Sync(context.Background(), ""); err != nil {
 		t.Fatalf("Sync: %v", err)
 	}
-	if out.Reshared < 1 {
-		t.Fatalf("sync = %+v, want at least 1 reshared", out)
-	}
-
-	// The pushed ciphertext must now be decryptable by the OTHER device.
 	if len(be.secrets) != 1 {
 		t.Fatalf("server has %d secrets, want 1", len(be.secrets))
 	}
@@ -562,16 +581,17 @@ func TestSync_ResharesToAccountDevices(t *testing.T) {
 	for _, s := range be.secrets {
 		ct = s.ct
 	}
-	plain, err := crypto.Engine{}.Open(ct, other.Private)
-	if err != nil {
-		t.Fatalf("other device cannot decrypt reshared secret: %v", err)
+	// The trusted device (self) can still read it...
+	if got, err := sess.Get("gh", "", "value"); err != nil || string(got) != "tok" {
+		t.Fatalf("self cannot read own secret: %q, %v", got, err)
 	}
-	if !bytes.Contains(plain, []byte("gh")) {
-		t.Fatalf("decrypted payload missing name: %s", plain)
+	// ...but the untrusted, server-reported device cannot decrypt the pushed ciphertext.
+	_, rogueErr := crypto.Engine{}.Open(ct, rogue.Private)
+	if !errors.Is(rogueErr, crypto.ErrWrongIdentity) {
+		t.Fatalf("rogue device decrypt = %v, want ErrWrongIdentity (not a recipient)", rogueErr)
 	}
 
-	// Once sealed to the full device set, a further sync must not reshare again
-	// (guards against the pull-clobbers-recipients ping-pong).
+	// Reshare is stable: with no trust change, a second sync reseals nothing.
 	stable, err := sess.Sync(context.Background(), "")
 	if err != nil {
 		t.Fatalf("second Sync: %v", err)
