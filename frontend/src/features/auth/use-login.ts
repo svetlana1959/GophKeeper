@@ -1,0 +1,13 @@
+import { useMutation } from '@tanstack/react-query'
+import { accountsApi } from '@/api/accounts'
+import { useAuth } from '@/app/auth-context'
+import type { LoginValues } from './login-schema'
+
+/** Logs in against `/accounts/login` and stores the session token on success. */
+export function useLogin() {
+  const { login } = useAuth()
+  return useMutation({
+    mutationFn: ({ username, password }: LoginValues) => accountsApi.login(username, password),
+    onSuccess: (session, { username }) => login(session.access_token, username),
+  })
+}
