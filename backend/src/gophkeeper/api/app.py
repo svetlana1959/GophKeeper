@@ -14,7 +14,7 @@ from fastapi import FastAPI
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from gophkeeper.api.errors import register_exception_handlers
-from gophkeeper.api.routers import account, auth, device, enroll, stats, sync
+from gophkeeper.api.routers import account, auth, device, enroll, stats, sync, trust
 from gophkeeper.infrastructure.adapters.database import SqlAlchemyAdapter
 from gophkeeper.settings.settings import settings
 
@@ -48,6 +48,14 @@ _TAGS_METADATA = [
         "description": "Link new devices into an account with single-use, expiring invite codes.",
     },
     {"name": "devices", "description": "Account device registry."},
+    {
+        "name": "trust",
+        "description": (
+            "Device trust graph. An append-only log of signed vouch/revoke certs the "
+            "server relays but never verifies; each device recomputes the trusted set "
+            "locally and reshares secrets only to it."
+        ),
+    },
     {
         "name": "stats",
         "description": "Temporary static Dashboard statistics for frontend integration.",
@@ -96,6 +104,7 @@ def create_app() -> FastAPI:
     app.include_router(sync.router)
     app.include_router(enroll.router)
     app.include_router(device.router)
+    app.include_router(trust.router)
     app.include_router(stats.router)
 
     return app
