@@ -2,7 +2,9 @@ import { createContext, useContext } from 'react'
 
 export interface AuthContextValue {
   isAuthed: boolean
-  login: (token: string) => void
+  /** Login identifier (email) for display; null when unknown. */
+  identity: string | null
+  login: (token: string, identity?: string) => void
   logout: () => void
 }
 

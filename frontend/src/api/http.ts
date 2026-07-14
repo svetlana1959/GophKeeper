@@ -1,17 +1,34 @@
 import axios, { AxiosError, type InternalAxiosRequestConfig } from 'axios'
 
+declare module 'axios' {
+  interface AxiosRequestConfig {
+    /** Skip the global 401→logout for endpoints that legitimately 401 without
+     *  the account session being invalid (e.g. device-token-only routes). */
+    skipAuthLogout?: boolean
+  }
+}
+
 // Single axios instance for the whole app. Paths are relative so the browser
 // talks same-origin: the Vite dev proxy forwards them to the API in dev, nginx
 // in production. The web session token authorizes the account; it holds no key
 // and cannot decrypt anything (the web is metadata/management only).
 
 const TOKEN_KEY = 'gophkeeper.token'
+const IDENTITY_KEY = 'gophkeeper.identity'
 
 /** Session-token storage. localStorage for now — revisit vs httpOnly cookie. */
 export const tokenStore = {
   get: () => localStorage.getItem(TOKEN_KEY),
   set: (token: string) => localStorage.setItem(TOKEN_KEY, token),
   clear: () => localStorage.removeItem(TOKEN_KEY),
+}
+
+/** The login identifier (email), kept only to greet the user in the shell — the
+ *  backend `/accounts/me` doesn't return it. Not a security boundary. */
+export const identityStore = {
+  get: () => localStorage.getItem(IDENTITY_KEY),
+  set: (identity: string) => localStorage.setItem(IDENTITY_KEY, identity),
+  clear: () => localStorage.removeItem(IDENTITY_KEY),
 }
 
 // The auth layer registers a callback so a 401 anywhere logs the user out and
@@ -35,7 +52,11 @@ http.interceptors.request.use((config: InternalAxiosRequestConfig) => {
 http.interceptors.response.use(
   (response) => response,
   (error: unknown) => {
-    if (error instanceof AxiosError && error.response?.status === 401) {
+    if (
+      error instanceof AxiosError &&
+      error.response?.status === 401 &&
+      !error.config?.skipAuthLogout
+    ) {
       tokenStore.clear()
       onUnauthorized?.()
     }

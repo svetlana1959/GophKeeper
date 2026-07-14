@@ -8,6 +8,6 @@ export function useLogin() {
   const { login } = useAuth()
   return useMutation({
     mutationFn: ({ username, password }: LoginValues) => accountsApi.login(username, password),
-    onSuccess: (session) => login(session.access_token),
+    onSuccess: (session, { username }) => login(session.access_token, username),
   })
 }

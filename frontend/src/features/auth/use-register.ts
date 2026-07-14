@@ -9,6 +9,6 @@ export function useRegister() {
   const { login } = useAuth()
   return useMutation({
     mutationFn: ({ email, password }: RegisterValues) => accountsApi.register(email, password),
-    onSuccess: (session) => login(session.access_token),
+    onSuccess: (session, { email }) => login(session.access_token, email),
   })
 }
