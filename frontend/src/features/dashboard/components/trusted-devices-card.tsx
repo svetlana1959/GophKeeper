@@ -1,7 +1,7 @@
 import { Plus } from 'lucide-react'
-import { Link } from 'react-router-dom'
 import type { UseQueryResult } from '@tanstack/react-query'
 import type { Device } from '@/api/devices'
+import { useEnrollment } from '@/features/enrollment/enrollment-context'
 import { DeviceIcon } from './device-icon'
 import { SectionCard } from './section-card'
 import { EmptyState, ViewAllLink } from './atoms'
@@ -37,6 +37,7 @@ function cnStatus(online: boolean): string {
 
 export function TrustedDevicesCard({ query }: { query: UseQueryResult<Device[]> }) {
   const devices = (query.data ?? []).filter((d) => d.status !== 'revoked')
+  const { openAddDevice } = useEnrollment()
 
   return (
     <SectionCard title="Trusted Devices" action={<ViewAllLink to="/devices" />}>
@@ -49,13 +50,14 @@ export function TrustedDevicesCard({ query }: { query: UseQueryResult<Device[]> 
       ) : (
         <EmptyState>No trusted devices to show yet.</EmptyState>
       )}
-      <Link
-        to="/devices"
+      <button
+        type="button"
+        onClick={openAddDevice}
         className="text-primary mt-2 flex items-center gap-2 py-2 text-sm font-semibold hover:underline"
       >
         <Plus className="size-4" strokeWidth={2.5} />
         Add new device
-      </Link>
+      </button>
     </SectionCard>
   )
 }
