@@ -698,6 +698,80 @@ func TestSync_VouchesForJoinerThenSeals(t *testing.T) {
 	}
 }
 
+// Revoking a joiner publishes a revoke cert; on the next sync reshare rotates the
+// secret to exclude it, so the revoked device can no longer decrypt new ciphertext.
+func TestRevokeDropsDeviceFromReshare(t *testing.T) {
+	setHome(t)
+	be := newSyncBackend()
+	srv := httptest.NewServer(be.handler(t))
+	defer srv.Close()
+
+	res, err := app.Init(app.InitParams{DeviceName: "laptop", Remote: srv.URL})
+	if err != nil {
+		t.Fatalf("Init: %v", err)
+	}
+	be.publicKey = res.PublicKey
+
+	sess, err := app.Open()
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	defer sess.Close()
+
+	mustLink(t, sess)
+	mustSet(t, sess, app.SetParams{Name: "gh", Value: []byte("tok")})
+
+	// A joiner redeems an invite and gets vouched + sealed in.
+	inv, _ := sess.CreateInvite(context.Background(), "")
+	joinerEnc, _ := crypto.GenerateKeyPair()
+	joinerSign, _ := crypto.GenerateSigningKey()
+	if _, _, err := remote.New(srv.URL).Join(
+		context.Background(), trust.HashCode(inv.Code), "phone",
+		joinerEnc.Public, joinerSign.Public, trust.JoinMAC(inv.Code, joinerEnc.Public, joinerSign.Public),
+	); err != nil {
+		t.Fatalf("joiner Join: %v", err)
+	}
+	if _, err := sess.Sync(context.Background(), ""); err != nil {
+		t.Fatalf("first Sync: %v", err)
+	}
+	// Sanity: the joiner can currently decrypt.
+	if _, err := (crypto.Engine{}).Open(currentCiphertext(be), joinerEnc.Private); err != nil {
+		t.Fatalf("joiner should decrypt before revoke: %v", err)
+	}
+
+	// Revoke the joiner (dev-2), then sync to rotate the secret.
+	if err := sess.RevokeDevice(context.Background(), "", "dev-2"); err != nil {
+		t.Fatalf("RevokeDevice: %v", err)
+	}
+	if _, err := sess.Sync(context.Background(), ""); err != nil {
+		t.Fatalf("second Sync: %v", err)
+	}
+
+	// The log now holds a revoke cert, and the rotated ciphertext excludes the joiner.
+	if !hasRevoke(be.certs, "dev-2") {
+		t.Fatalf("no revoke cert for dev-2 in log: %+v", be.certs)
+	}
+	if _, err := (crypto.Engine{}).Open(currentCiphertext(be), joinerEnc.Private); !errors.Is(err, crypto.ErrWrongIdentity) {
+		t.Fatalf("revoked joiner decrypt = %v, want ErrWrongIdentity", err)
+	}
+}
+
+func currentCiphertext(be *syncBackend) []byte {
+	for _, s := range be.secrets {
+		return s.ct
+	}
+	return nil
+}
+
+func hasRevoke(certs []trust.Cert, target string) bool {
+	for _, c := range certs {
+		if c.Kind == trust.KindRevoke && c.TargetID == target {
+			return true
+		}
+	}
+	return false
+}
+
 func TestSync_PullRecoversNameFromPayload(t *testing.T) {
 	setHome(t)
 	be := newSyncBackend()

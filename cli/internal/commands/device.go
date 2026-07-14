@@ -15,8 +15,30 @@ func newDeviceCmd() *cobra.Command {
 		Use:   "device",
 		Short: "Manage the devices linked to your account",
 	}
-	cmd.AddCommand(newDeviceInviteCmd(), newDeviceLsCmd())
+	cmd.AddCommand(newDeviceInviteCmd(), newDeviceLsCmd(), newDeviceRevokeCmd())
 	return cmd
+}
+
+func newDeviceRevokeCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "revoke <device-id>",
+		Short: "Revoke a device you introduced (and everything it introduced)",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return withSession(func(sess *app.Session) error {
+				pin, err := pinIfNeeded(cmd, sess)
+				if err != nil {
+					return err
+				}
+				if err := sess.RevokeDevice(cmd.Context(), pin, args[0]); err != nil {
+					return err
+				}
+				fmt.Fprintln(cmd.OutOrStdout(),
+					"Revoked. Run 'goph sync' to rotate secrets so the device loses access.")
+				return nil
+			})
+		},
+	}
 }
 
 func newDeviceInviteCmd() *cobra.Command {

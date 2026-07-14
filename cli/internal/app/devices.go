@@ -73,6 +73,39 @@ func trustedSlice(m map[string]trust.TrustedDevice) []trust.TrustedDevice {
 	return out
 }
 
+// RevokeDevice publishes a signed revoke cert for targetID. It takes effect only
+// if this device is an ancestor of the target in the vouch graph (it introduced
+// it, directly or transitively) or revokes itself — the trust computation on
+// every device enforces that, and drops the target's subtree along with it. On
+// the next sync, reshare rotates secrets so the revoked device loses access to
+// future ciphertext.
+func (s *Session) RevokeDevice(ctx context.Context, pin, targetID string) error {
+	client, _, state, _, err := s.connect(ctx, pin)
+	if err != nil {
+		return err
+	}
+	signPriv, err := s.unlockSigning(pin)
+	if err != nil {
+		return err
+	}
+	if signPriv == "" {
+		return fmt.Errorf("app: this device has no signing key; re-init to manage trust")
+	}
+	certs, _, err := client.TrustChanges(ctx, 0)
+	if err != nil {
+		return fmt.Errorf("app: pull trust log: %w", err)
+	}
+	nextSeq, prevHash := chainHead(certs, state.DeviceID)
+	cert, err := trust.Sign(trust.Cert{
+		Kind: trust.KindRevoke, AccountID: state.AccountID, IssuerID: state.DeviceID,
+		Seq: nextSeq, PrevHash: prevHash, TargetID: targetID, IssuedAt: time.Now().Unix(),
+	}, signPriv)
+	if err != nil {
+		return err
+	}
+	return client.PublishCert(ctx, cert)
+}
+
 // ListDevices returns the account's devices, flagging the local one. It never
 // creates an account: a device that has not linked/synced yet gets ErrNotLinked
 // rather than silently registering just to satisfy a read.
