@@ -117,6 +117,30 @@ Link: https://www.figma.com/design/e9yJfGqSkREVk5sjPocKHN/Untitled?node-id=0-1&t
 
 ---
 
+### Login Mobile
+<img width="818" height="868" alt="login_mob" src="https://github.com/user-attachments/assets/51c37e0d-10bf-40a9-914e-b6a4ed1dda59" />
+
+### Registration Mobile
+<img width="832" height="880" alt="reg_mob" src="https://github.com/user-attachments/assets/6486b139-109f-4af8-bd16-fb40f96f2df1" />
+
+### Dashbord Mobile
+<img width="652" height="1200" alt="dash_mob" src="https://github.com/user-attachments/assets/0070704f-238a-47cc-a903-148659275d41" />
+
+### Secret Mobile and Mobile Password
+<img width="1186" height="800" alt="secret_mob_and_mob_passw" src="https://github.com/user-attachments/assets/d92cd13a-588b-4cd6-8c6c-2d94c7d0cc47" />
+
+### Mobile password delete 
+<img width="1218" height="760" alt="mob_passw_delete" src="https://github.com/user-attachments/assets/07538dfd-4a58-4f16-89f8-6ab235b9b457" />
+
+
+### Addition Mobile details design 
+<img width="1280" height="578" alt="addition" src="https://github.com/user-attachments/assets/d87ff3ea-2370-442a-870d-b17e79e9457f" />
+
+
+
+---
+
+
 ## Industrial Track Contribution
 
 ### Before / After Impact
