@@ -39,19 +39,55 @@ A secure, local-first, end-to-end encrypted secret manager utilizing **age (X255
 
 ---
 
-## 💻 CLI Application: Guide & Usage
+## CLI Application: Guide & Usage
 
 ### Installation & Build
 
-Ensure you have **Go 1.22+** installed.
+#### Linux / macOS
+
+You can quickly install the pre-compiled binary using the official shell installer:
 
 ```bash
-# Navigate to the CLI directory
+curl -sSL https://raw.githubusercontent.com/svetlana1959/GophKeeper/main/cli/install.sh | sh
+```
+
+The script installs the binary to `/usr/local/bin` (it will prompt for `sudo` only if write permissions are required). You can override the destination directory by passing `INSTALL_DIR`:
+
+```bash
+curl -sSL https://raw.githubusercontent.com/svetlana1959/GophKeeper/main/cli/install.sh | INSTALL_DIR="$HOME/.local/bin" sh
+```
+
+#### Windows (PowerShell)
+
+For Windows users, use the automated PowerShell installer:
+
+```powershell
+irm https://raw.githubusercontent.com/svetlana1959/GophKeeper/main/cli/install.ps1 | iex
+```
+
+This installs the binary to `%LOCALAPPDATA%\Programs\goph` and automatically appends it to your user `PATH` (make sure to restart your terminal session afterwards). To override the default directory:
+
+```powershell
+$Env:InstallDir = "C:\Custom\Path"
+irm https://raw.githubusercontent.com/svetlana1959/GophKeeper/main/cli/install.ps1 | iex
+```
+
+#### From a Release
+
+1. Navigate to the [Releases Page](https://github.com/svetlana1959/GophKeeper/releases).
+2. Download the packaged archive corresponding to your target operating system and CPU architecture.
+3. Verify the binary integrity against the published `checksums.txt` file.
+4. Extract the archive and move the `goph` executable into a directory listed in your system's `PATH`.
+
+####  Building From Source
+
+If you prefer to compile the CLI client manually, make sure you have **Go 1.26+** installed:
+
+```bash
+# Navigate to the CLI module, compile, and verify
 cd cli
-
-# Build the binary
-go build -o goph ./cmd/goph
-
+go build -o goph .
+./goph --version
 ```
 
 ### Command Reference
