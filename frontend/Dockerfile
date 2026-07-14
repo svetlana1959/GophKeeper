@@ -9,7 +9,8 @@ RUN npm ci
 COPY public public/
 COPY src src/
 COPY index.html .
-COPY vite.config.js .
+COPY vite.config.ts .
+COPY tsconfig.json .
 RUN npm run build
 
 FROM nginx:1.30-alpine@sha256:9f00a7a92624975cdd964ec71fbb86bf91dc117e86436a9a91fa7b5cdb9615d1
