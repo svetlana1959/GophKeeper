@@ -336,7 +336,7 @@ Provides telemetry data for the web UI integration and deployment health probes.
 
 ## Deployment
 
-* **API & Web Dashboard UI:** [http://10.93.27.16/](http://10.93.27.16/) *(Central self-hosted deployment)*t 
+* **API & Web Dashboard UI:** [http://10.93.27.16/](http://10.93.27.16/) *(Central self-hosted deployment)*
 
 ---
 
