@@ -16,7 +16,7 @@ function Dashboard() {
         'windows': windowsIcon
     }
 
-    const [devices, setDevices] = useState([
+    const [devices] = useState([
         {
             type: 'laptop',
             name: 'MacBook Pro',
@@ -37,7 +37,7 @@ function Dashboard() {
         }
     ])
 
-    const [accessRequests, setAccessRequests] = useState([
+    const [accessRequests] = useState([
         {
             type: 'laptop',
             name: 'New MacBook Air',

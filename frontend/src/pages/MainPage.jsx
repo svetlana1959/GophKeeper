@@ -52,6 +52,10 @@ function MainPage({ linkPage }) {
                         <img src={page === 'statistics' ? statisticsActiveIcon : statisticsIcon} alt="Statistics" />
                         Statistics
                     </div>
+                    <div className={`${styles.navItem} ${page === 'settings' ? styles.active : ''}`} onClick={() => setPage('settings')}>
+                        <img src={page === 'settings' ? settingsActiveIcon : settingsIcon} alt="Settings" />
+                        Settings
+                    </div>
                 </div>
                 <div className={styles.account}>
                     <div className={styles.accountIcon}>S</div>
