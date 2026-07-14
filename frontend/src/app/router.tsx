@@ -1,12 +1,16 @@
 import { createBrowserRouter } from 'react-router-dom'
 import { ProtectedRoute } from './protected-route'
 
-// Routes are lazy so each feature is its own chunk. Real screens land per phase;
-// these placeholders exist to prove routing + the auth guard end-to-end.
 export const router = createBrowserRouter([
   {
-    path: '/auth',
+    path: '/login',
     lazy: async () => ({ Component: (await import('@/features/auth/login-page')).LoginPage }),
+  },
+  {
+    path: '/register',
+    lazy: async () => ({
+      Component: (await import('@/features/auth/register-page')).RegisterPage,
+    }),
   },
   {
     element: <ProtectedRoute />,

@@ -1,37 +1,37 @@
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Link, Navigate } from 'react-router-dom'
-import { ArrowRight, LogIn, Lock, Mail } from 'lucide-react'
+import { ArrowRight, Lock, Mail, UserPlus } from 'lucide-react'
 import { apiErrorMessage } from '@/api/http'
 import { useAuth } from '@/app/auth-context'
 import { Button } from '@/components/ui/button'
 import { FormField } from '@/components/ui/form-field'
 import { AuthCard, AuthLayout } from './auth-layout'
-import { loginSchema, type LoginValues } from './login-schema'
-import { useLogin } from './use-login'
+import { registerSchema, type RegisterValues } from './register-schema'
+import { useRegister } from './use-register'
 
-export function LoginPage() {
+export function RegisterPage() {
   const { isAuthed } = useAuth()
-  const login = useLogin()
+  const signup = useRegister()
   const {
     register,
     handleSubmit,
     formState: { errors },
-  } = useForm<LoginValues>({
-    resolver: zodResolver(loginSchema),
-    defaultValues: { email: '', password: '' },
+  } = useForm<RegisterValues>({
+    resolver: zodResolver(registerSchema),
+    defaultValues: { email: '', password: '', confirmPassword: '' },
   })
 
   if (isAuthed) return <Navigate to="/" replace />
 
-  const onSubmit = handleSubmit((values) => login.mutate(values))
+  const onSubmit = handleSubmit((values) => signup.mutate(values))
 
   return (
     <AuthLayout>
       <AuthCard
-        icon={<LogIn className="size-8" strokeWidth={2.5} />}
-        title="Welcome back"
-        subtitle="Sign in to manage your account and devices"
+        icon={<UserPlus className="size-8" strokeWidth={2.5} />}
+        title="Create your account"
+        subtitle="Set up an account to manage your devices and secrets"
       >
         <form onSubmit={onSubmit} noValidate className="flex flex-col gap-5">
           <FormField
@@ -46,29 +46,38 @@ export function LoginPage() {
           <FormField
             label="Password"
             type="password"
-            autoComplete="current-password"
-            placeholder="Enter your password"
+            autoComplete="new-password"
+            placeholder="At least 8 characters"
             icon={<Lock />}
             error={errors.password?.message}
             {...register('password')}
           />
+          <FormField
+            label="Confirm password"
+            type="password"
+            autoComplete="new-password"
+            placeholder="Re-enter your password"
+            icon={<Lock />}
+            error={errors.confirmPassword?.message}
+            {...register('confirmPassword')}
+          />
 
-          {login.isError ? (
+          {signup.isError ? (
             <p role="alert" className="text-destructive text-sm">
-              {apiErrorMessage(login.error)}
+              {apiErrorMessage(signup.error)}
             </p>
           ) : null}
 
-          <Button type="submit" disabled={login.isPending} className="mt-1 h-11 justify-between">
-            {login.isPending ? 'Signing in…' : 'Log in'}
+          <Button type="submit" disabled={signup.isPending} className="mt-1 h-11 justify-between">
+            {signup.isPending ? 'Creating account…' : 'Create account'}
             <ArrowRight className="size-4" />
           </Button>
         </form>
 
         <p className="text-muted-foreground mt-6 text-center text-sm">
-          Don&apos;t have an account?{' '}
-          <Link to="/register" className="text-primary font-medium hover:underline">
-            Create one
+          Already have an account?{' '}
+          <Link to="/login" className="text-primary font-medium hover:underline">
+            Sign in
           </Link>
         </p>
       </AuthCard>

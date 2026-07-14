@@ -47,7 +47,8 @@
   --popover: #13181c;
   --popover-foreground: #f4f5f5;
 
-  --primary: #008645;
+  /* Dark uses the brighter brand green for filled controls (matches the design). */
+  --primary: #23bd21;
   --primary-foreground: #ffffff;
   --accent-strong: #23bd21;
 

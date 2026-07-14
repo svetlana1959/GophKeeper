@@ -5,19 +5,19 @@ stack. This document is the agreed plan; it is the reference for the phased work
 
 ## Locked decisions
 
-| Area | Decision |
-|------|----------|
-| Language | **TypeScript** (migrate, not rewrite-from-scratch) |
-| Build | **Vite** + **React 19** |
-| Routing | **react-router 7** — nested, lazy, data router |
-| Server state | **TanStack Query** (React Query) |
-| API contract | **openapi-typescript** — types generated from `/openapi.json` |
-| Runtime validation | **Zod** at every API boundary |
-| Styling | **Tailwind CSS + shadcn/ui** (Radix under the hood) |
-| Theming | **Light + dark from day one** (design has both) |
-| Layout target | **Desktop-first. No mobile now**, but structured so mobile is additive later |
-| Testing | **Vitest + React Testing Library** (unit/component), **Playwright** (e2e smoke) |
-| Formatting/lint | **Prettier** + existing ESLint, path aliases (`@/`) |
+| Area               | Decision                                                                        |
+| ------------------ | ------------------------------------------------------------------------------- |
+| Language           | **TypeScript** (migrate, not rewrite-from-scratch)                              |
+| Build              | **Vite** + **React 19**                                                         |
+| Routing            | **react-router 7** — nested, lazy, data router                                  |
+| Server state       | **TanStack Query** (React Query)                                                |
+| API contract       | **openapi-typescript** — types generated from `/openapi.json`                   |
+| Runtime validation | **Zod** at every API boundary                                                   |
+| Styling            | **Tailwind CSS + shadcn/ui** (Radix under the hood)                             |
+| Theming            | **Light + dark from day one** (design has both)                                 |
+| Layout target      | **Desktop-first. No mobile now**, but structured so mobile is additive later    |
+| Testing            | **Vitest + React Testing Library** (unit/component), **Playwright** (e2e smoke) |
+| Formatting/lint    | **Prettier** + existing ESLint, path aliases (`@/`)                             |
 
 ### Web scope: metadata & management only — **no browser crypto**
 
@@ -27,8 +27,8 @@ the zero-knowledge crypto path entirely. The web is for:
 - Account auth (email + password → bearer session token)
 - Device / trust-graph management (list devices, mint invites, revoke)
 - Dashboards, statistics, settings
-- Read-only secret **metadata** (names/types/counts) — *pending confirmation of
-  what is server-visible; see Open Items*
+- Read-only secret **metadata** (names/types/counts) — _pending confirmation of
+  what is server-visible; see Open Items_
 
 The Figma's **View / New / Edit / Share Secret** actions are **out of scope** —
 they require client-side decryption. On the Secrets screen we render the list as
@@ -95,8 +95,8 @@ src/
   cards from `/stats`, trusted devices, pending access requests = pending devices,
   recent activity) — all via React Query.
 - **Phase 3 — Devices.** List (`/devices`), detail, **mint invite** (the web's
-  most valuable, ZK-safe power), revoke. *Note: the invite payload tracks whichever
-  enrollment model is on `dev` at build time; see Open Items re M4.*
+  most valuable, ZK-safe power), revoke. _Note: the invite payload tracks whichever
+  enrollment model is on `dev` at build time; see Open Items re M4._
 - **Phase 4 — Statistics + Settings.**
 - **Phase 5 — Secrets (metadata).** Read-only list, value actions hidden. Gated on
   the metadata-visibility question below.
@@ -107,7 +107,7 @@ src/
 1. **Secret metadata visibility.** Are secret names/types server-visible plaintext
    metadata, or part of the encrypted payload? If encrypted, the Secrets screen is
    also out of web scope until a metadata channel exists. (User indicated category
-   *counts* are sent as metadata — confirm whether per-secret names are too.)
+   _counts_ are sent as metadata — confirm whether per-secret names are too.)
 2. **Enrollment model / M4 collision.** `dev` currently uses the old invite model
    (server generates the code). M4 (PR #145) switches `/enroll/invite` to a
    client-generated `{code_hash, roster}`. When M4 merges, the web invite flow must
