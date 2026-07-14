@@ -423,9 +423,10 @@ rogue recipient and break the zero-knowledge guarantee of §6.
   the next sync. (Per-secret *recipient policies* — sharing a secret with only a
   subset of the mesh — are a future layer on top; the trust graph is unchanged by
   them.)
-- **Trust = a provenance DAG**, rooted at an anchor. A device is trusted iff it
-  is **reachable from the root through non-revoked vouches**. Revocation prunes
-  by reachability.
+- **Trust = a provenance DAG**, rooted at one or more **anchors** (see below). A
+  device is trusted iff it is **reachable from an anchor through non-revoked
+  vouches**. Revocation prunes by reachability; a device with more than one
+  voucher survives losing one of them.
 
 **Device identity gains a signing key.** age keys are X25519 (encryption only),
 so a device cannot *sign* an attestation. Each device therefore also holds an
@@ -440,19 +441,38 @@ key order.
 
 - **Vouch** — `sign_issuer(account_id, issuer_id, seq, prev_hash, subject_id,
   subject_enc_pub, subject_sign_pub, issued_at)`: "issuer attests subject's keys
-  and admits it." **Genesis** is a *self-vouch* (issuer == subject): the founding
-  device anchors the tree.
+  and admits it." There is **no genesis self-vouch cert**: the tree is rooted at
+  **anchors** established out-of-band (§below), not at a cert.
 - **Revoke** — `sign_issuer(account_id, issuer_id, seq, prev_hash, target_id,
   issued_at)`: "issuer revokes target." `target == issuer` is **self-revoke**.
 
-**Trust computation (each device, locally, from the verified cert log).** Verify
-every cert's signature against its issuer's `sign_pub` and its chain; then
-`Trusted = { d : a non-revoked vouch path exists from Root to d }`. Reshare's
-recipient set is `Trusted ∩ server-active` (the server still gates *availability*,
-never *identity*), plus the recovery key.
+**Trust computation (each device, locally, from the verified cert log).** First
+drop any cert past a break in its issuer's `seq`/`prev_hash` chain (a reordering
+or truncation by the relay severs the tail). Then, over the surviving certs,
+verify each signature against its issuer's `sign_pub` — discovered as issuers are
+admitted, starting from the anchors. The computation keeps **two edge sets**,
+because reachability and authority are different questions:
 
-**Roots & recovery.** Interim root = the **founding device** (its self-vouch).
-The **recovery key is a bearer super-authority sitting *outside* the DAG** — not
+- **Reach edges** — *every* valid vouch by a trusted issuer. `Trusted = { d :
+  a non-revoked path from an anchor to d exists }`. Redundant vouches add
+  resilience.
+- **Auth edges** — only the *admitting* vouch (the one that first brought a
+  device in). Revoke authority reads these, so a gratuitous re-vouch of an
+  already-trusted device grants **no** authority over it — closing the bypass
+  where any member could vouch-then-revoke a peer or the root.
+
+A subject's keys are **bound by the vouch that first admits it**; a later vouch
+reusing that id with different keys is ignored (no silent rebind). *Residual:*
+the first admitting vouch for a fresh id still sets its keys, so a trusted device
+that learns a not-yet-joined id could race the inviter to bind it. Closing that
+fully needs **enrollment-attested identity** (the server vouching for the keys a
+device joined with) — deferred. Reshare's recipient set is `Trusted ∩
+server-active` (the server still gates *availability*, never *identity*), plus
+the recovery key.
+
+**Roots & recovery.** Interim root = the **founding device**, adopted as this
+device's own **anchor** at link (and peers' anchors via the invite roster). The
+**recovery key is a bearer super-authority sitting *outside* the DAG** — not
 a structural root: whoever holds it can issue vouches/revokes that are
 authoritative regardless of graph position (revoke anyone, re-vouch, re-root).
 This needs an Ed25519 **recovery signing** key (browser, other dev); until it

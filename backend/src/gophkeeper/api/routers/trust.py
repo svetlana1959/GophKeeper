@@ -42,6 +42,8 @@ async def publish(
     """
     if body.issuer_id != str(principal.device_id):
         raise AuthenticationError("a device may only publish its own trust certs")
+    if body.account_id != str(principal.account_id):
+        raise AuthenticationError("a cert's account_id must match the caller's account")
     cert = await service.publish(
         account_id=principal.account_id,
         issuer_device_id=principal.device_id,
