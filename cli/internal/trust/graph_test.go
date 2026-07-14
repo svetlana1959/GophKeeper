@@ -198,9 +198,9 @@ func TestRevokeAfterPrimingVouchIgnored(t *testing.T) {
 func TestChainGapDropsTail(t *testing.T) {
 	root, a, b := newDev("root"), newDev("a"), newDev("b")
 	l := newLog(t)
-	l.vouch(root, a)          // seq 0
+	l.vouch(root, a)             // seq 0
 	withheld := l.vouch(root, b) // seq 1 — dropped by the relay below
-	l.revoke(root, a)         // seq 2 — chains off seq 1
+	l.revoke(root, a)            // seq 2 — chains off seq 1
 
 	var delivered []trust.Cert
 	for _, c := range l.certs {
