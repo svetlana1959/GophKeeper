@@ -1,8 +1,10 @@
-# Goph Secret Manager (End-to-End Zero-Knowledge Sync)
-
-[![Build & Test](https://github.com/your-username/goph/actions/workflows/test.yml/badge.svg)](https://github.com/your-username/goph/actions)
-[![Go Version](https://img.shields.io/github/go-mod/go-version/your-username/goph?filename=cli%2Fgo.mod)](https://go.dev/)
-[![FastAPI](https://img.shields.io/badge/API-FastAPI-009688.svg?style=flat&logo=fastapi)](https://fastapi.tiangolo.com/)
+# GophKeeper Secret Manager (End-to-End Zero-Knowledge Sync)
+![GitHub License](https://img.shields.io/github/license/svetlana1959/GophKeeper)
+[![Go Version](https://img.shields.io/github/go-mod/go-version/svetlana1959/GophKeeper?filename=cli%2Fgo.mod)](https://go.dev/)
+[![FastAPI](https://img.shields.io/badge/API-FastAPI-009688.svg?style=flat&logo=fastapi)](https://fastapi.tiangolo.com/)\
+[![CI CLI](https://github.com/svetlana1959/GophKeeper/actions/workflows/ci-cli.yaml/badge.svg)](https://github.com/svetlana1959/GophKeeper/actions/workflows/ci-cli.yaml)
+[![CI Backend](https://github.com/svetlana1959/GophKeeper/actions/workflows/ci-backend.yaml/badge.svg)](https://github.com/svetlana1959/GophKeeper/actions/workflows/ci-backend.yaml)
+[![CI Frontend](https://github.com/svetlana1959/GophKeeper/actions/workflows/ci-frontend.yaml/badge.svg)](https://github.com/svetlana1959/GophKeeper/actions/workflows/ci-frontend.yaml)
 
 A secure, local-first, end-to-end encrypted secret manager utilizing **age (X25519)** encryption. Designed under a strict **Zero-Knowledge model**, the server acts as a blind, stateless storage orchestrator that never processes or holds unencrypted payloads or private keys.
 
