@@ -25,6 +25,9 @@ class Invite:
     account_id: UUID
     code_hash: str
     expires_at: datetime
+    roster_json: str = "[]"  # inviter's trusted devices, MAC'd under the code
+    join_mac: str = ""  # set on join: binds the joiner's keys to the code
+    joined_device_id: UUID | None = None  # the device that redeemed the code
     consumed_at: datetime | None = None
     created_at: datetime = field(default_factory=_now)
 
@@ -48,7 +51,10 @@ class InviteRepository(Protocol):
 
     async def find_by_code_hash(self, code_hash: str) -> Invite | None: ...
 
+    async def find_by_id(self, invite_id: UUID) -> Invite | None: ...
+
     async def consume(self, invite: Invite) -> bool:
-        """Persist consumption only if the row is still unconsumed. Returns True
-        if this call won the race, False if another join consumed it first."""
+        """Persist consumption only if the row is still unconsumed, recording the
+        join proof (join_mac + joined_device_id). Returns True if this call won
+        the race, False if another join consumed it first."""
         ...

@@ -20,6 +20,12 @@ class InvalidInvite(DomainError):
     """The pairing code is unknown, already used, or expired. Maps to 400."""
 
 
+class InviteNotFound(DomainError):
+    def __init__(self, invite_id: UUID) -> None:
+        super().__init__(f"invite {invite_id} not found")
+        self.invite_id = invite_id
+
+
 class EmailAlreadyRegistered(DomainError):
     """An account identity with this provider + identifier already exists.
     Maps to 409."""
