@@ -1,6 +1,9 @@
 package trust
 
-import "sort"
+import (
+	"fmt"
+	"sort"
+)
 
 // Anchor is a device signing identity this device verified out-of-band — its own
 // at link, or an inviter's roster entries via the invite code — and roots trust
@@ -49,29 +52,83 @@ type TrustedDevice struct {
 // to bind it. Closing that fully needs enrollment-attested identity (the server
 // vouching for the keys a device joined with); see docs/sync_design.md §11.
 func ComputeTrusted(certs []Cert, anchors []Anchor) map[string]TrustedDevice {
-	certs = validChains(certs)
+	a := admit(validChains(certs), anchors)
 
-	signPub := map[string]string{} // device id -> signing key, as we learn it
-	encPub := map[string]string{}  // device id -> age key
+	// Phase 2 — collect valid revocations. A revoke counts only if its issuer is
+	// admitted, it verifies, and the issuer is the target (self-revoke) or an
+	// ancestor of the target in the *admission* graph — i.e. it actually introduced
+	// the target, directly or transitively.
+	revoked := map[string]bool{}
+	for _, c := range a.certs {
+		if c.Kind != KindRevoke {
+			continue
+		}
+		issuerKey, ok := a.signPub[c.IssuerID]
+		if !ok || !a.admitted[c.IssuerID] || c.Verify(issuerKey) != nil {
+			continue
+		}
+		if c.IssuerID == c.TargetID || isAncestor(a.authEdges, c.IssuerID, c.TargetID) {
+			revoked[c.TargetID] = true
+		}
+	}
+
+	// Phase 3 — effective trust is reachability from the (non-revoked) anchors
+	// over reach edges, never entering a revoked device. This is what drops the
+	// subtree of a revoked voucher while letting a redundantly-vouched device
+	// survive through its other path.
+	trusted := map[string]TrustedDevice{}
+	var stack []string
+	for _, an := range anchors {
+		if revoked[an.DeviceID] {
+			continue
+		}
+		stack = append(stack, an.DeviceID)
+	}
+	for len(stack) > 0 {
+		id := stack[len(stack)-1]
+		stack = stack[:len(stack)-1]
+		if _, done := trusted[id]; done {
+			continue
+		}
+		trusted[id] = TrustedDevice{DeviceID: id, EncPub: a.encPub[id], SignPub: a.signPub[id]}
+		for _, sub := range a.reachEdges[id] {
+			if !revoked[sub] {
+				stack = append(stack, sub)
+			}
+		}
+	}
+	return trusted
+}
+
+// admission is the result of the fixpoint admission pass: the keys discovered for
+// every reachable device (including ones later revoked) and the two edge sets.
+type admission struct {
+	certs                 []Cert            // the validated certs it ran over
+	signPub, encPub       map[string]string // device id -> signing / age key
+	reachEdges, authEdges map[string][]string
+	admitted              map[string]bool
+}
+
+// admit runs Phase 1 — admission to a fixpoint — over already chain-validated
+// certs. A vouch admits its subject once its issuer's key is known (issuer already
+// admitted) and it verifies under that key. Two edge sets are kept, because
+// reachability and revoke-authority are different questions:
+//   - reachEdges records *every* valid vouch by a trusted issuer. It answers "is
+//     this device still connected to an anchor?", so redundant vouches add
+//     resilience — a device with two vouchers survives losing one.
+//   - authEdges records only the *admitting* vouch (the one that first brought the
+//     subject in). It answers "who may revoke this device?". A gratuitous re-vouch
+//     of an already-trusted device records no auth edge, so a member cannot
+//     fabricate ancestry over a device — or the root — it did not introduce.
+func admit(certs []Cert, anchors []Anchor) admission {
+	signPub := map[string]string{}
+	encPub := map[string]string{}
 	for _, a := range anchors {
 		signPub[a.DeviceID] = a.SignPub
 		encPub[a.DeviceID] = a.EncPub
 	}
-
-	// Phase 1 — admission to a fixpoint. A vouch admits its subject once its
-	// issuer's key is known (issuer already admitted) and it verifies under that
-	// key. Two edge sets are kept, because reachability and revoke-authority are
-	// different questions:
-	//   - reachEdges records *every* valid vouch by a trusted issuer. It answers
-	//     "is this device still connected to an anchor?" (Phase 3), so redundant
-	//     vouches add resilience — a device with two vouchers survives losing one.
-	//   - authEdges records only the *admitting* vouch (the one that first brought
-	//     the subject in). It answers "who may revoke this device?" (Phase 2). A
-	//     gratuitous re-vouch of an already-trusted device records no auth edge, so
-	//     a member cannot fabricate ancestry over a device — or the root — it did
-	//     not actually introduce.
-	reachEdges := map[string][]string{} // issuer -> every subject it validly vouched
-	authEdges := map[string][]string{}  // issuer -> subjects it admitted (introduced)
+	reachEdges := map[string][]string{}
+	authEdges := map[string][]string{}
 	admitted := map[string]bool{}
 	for id := range signPub {
 		admitted[id] = true
@@ -107,87 +164,151 @@ func ComputeTrusted(certs []Cert, anchors []Anchor) map[string]TrustedDevice {
 			break
 		}
 	}
-
-	// Phase 2 — collect valid revocations. A revoke counts only if its issuer is
-	// admitted, it verifies, and the issuer is the target (self-revoke) or an
-	// ancestor of the target in the *admission* graph — i.e. it actually introduced
-	// the target, directly or transitively.
-	revoked := map[string]bool{}
-	for _, c := range certs {
-		if c.Kind != KindRevoke {
-			continue
-		}
-		issuerKey, ok := signPub[c.IssuerID]
-		if !ok || !admitted[c.IssuerID] || c.Verify(issuerKey) != nil {
-			continue
-		}
-		if c.IssuerID == c.TargetID || isAncestor(authEdges, c.IssuerID, c.TargetID) {
-			revoked[c.TargetID] = true
-		}
+	return admission{
+		certs: certs, signPub: signPub, encPub: encPub,
+		reachEdges: reachEdges, authEdges: authEdges, admitted: admitted,
 	}
-
-	// Phase 3 — effective trust is reachability from the (non-revoked) anchors
-	// over reach edges, never entering a revoked device. This is what drops the
-	// subtree of a revoked voucher while letting a redundantly-vouched device
-	// survive through its other path.
-	trusted := map[string]TrustedDevice{}
-	var stack []string
-	for _, a := range anchors {
-		if revoked[a.DeviceID] {
-			continue
-		}
-		stack = append(stack, a.DeviceID)
-	}
-	for len(stack) > 0 {
-		id := stack[len(stack)-1]
-		stack = stack[:len(stack)-1]
-		if _, done := trusted[id]; done {
-			continue
-		}
-		trusted[id] = TrustedDevice{DeviceID: id, EncPub: encPub[id], SignPub: signPub[id]}
-		for _, sub := range reachEdges[id] {
-			if !revoked[sub] {
-				stack = append(stack, sub)
-			}
-		}
-	}
-	return trusted
 }
 
-// validChains keeps, for each issuer, only the longest prefix of its certs that
-// forms an intact hash chain: seq starts at 0 and increments by one, and each
-// cert's PrevHash equals the previous cert's Hash. A gap, a reordering, or a
-// tampered or withheld cert breaks the chain, and everything past the break is
-// dropped — so a relay that reorders or truncates a device's history cannot make
-// the survivors look contiguous. Signatures are checked later, during admission.
-func validChains(certs []Cert) []Cert {
-	byIssuer := map[string][]Cert{}
-	for _, c := range certs {
-		byIssuer[c.IssuerID] = append(byIssuer[c.IssuerID], c)
+// Head is the verified tip of one issuer's cert chain: the highest contiguous seq
+// whose signature (and the whole prefix below it) verifies under the issuer's key.
+type Head struct {
+	Seq  int64
+	Hash string
+}
+
+// TrustHeadRepository persists the highest verified head seen per issuer, so a
+// later pull can detect a relay that rolled back or withheld a chain's tail. It is
+// the port; the SQLite implementation is the adapter in internal/vault.
+type TrustHeadRepository interface {
+	List() (map[string]Head, error)     // issuer id -> last accepted head
+	Save(issuerID string, h Head) error // upsert by issuer id
+}
+
+// CheckProgress verifies that the current verified chains do not regress below the
+// heads previously accepted (in seen): an issuer whose head seq dropped, or that
+// vanished from the log entirely, means a relay rolled back or withheld its tail —
+// e.g. suppressing a revoke — and is rejected. On success it returns the advanced
+// heads to persist. It does not catch a relay that withholds a cert it never
+// revealed in the first place (no baseline exists for it); that needs a signed log
+// head from the server (deferred, see docs/sync_design.md §11).
+func CheckProgress(chains map[string][]Cert, seen map[string]Head) (map[string]Head, error) {
+	for issuer, prev := range seen {
+		chain, ok := chains[issuer]
+		if !ok {
+			return nil, fmt.Errorf(
+				"trust: issuer %s chain (seen through seq %d) is gone from the log — relay rollback",
+				issuer, prev.Seq)
+		}
+		if tip := Tip(chain); tip.Seq < prev.Seq {
+			return nil, fmt.Errorf(
+				"trust: issuer %s chain rolled back from seq %d to %d — relay rollback",
+				issuer, prev.Seq, tip.Seq)
+		}
 	}
-	// Iterate issuers in a stable order so the result is deterministic.
+	heads := make(map[string]Head, len(chains))
+	for issuer, chain := range chains {
+		heads[issuer] = Tip(chain)
+	}
+	return heads, nil
+}
+
+// VerifiedChains returns, per issuer whose signing key is known, that issuer's
+// signature-verified contiguous cert chain (seq 0..N, stopping at the first gap or
+// bad signature). Because only the issuer can produce a valid signature, a relay
+// cannot extend a chain past the issuer's real certs — so the tip of each returned
+// chain is the issuer's true head, injection-proof. Revoked issuers are included:
+// their history is still real and must not appear to vanish. This is the basis for
+// (a) a device signing its own next cert onto its real head, and (b) detecting a
+// relay that rolls back or withholds an issuer's tail.
+func VerifiedChains(certs []Cert, anchors []Anchor) map[string][]Cert {
+	byIssuer := validChainsByIssuer(certs)
+	a := admit(flatten(byIssuer), anchors)
+	out := map[string][]Cert{}
+	for issuer, key := range a.signPub {
+		var verified []Cert
+		for _, c := range byIssuer[issuer] {
+			if c.Verify(key) != nil {
+				break
+			}
+			verified = append(verified, c)
+		}
+		if len(verified) > 0 {
+			out[issuer] = verified
+		}
+	}
+	return out
+}
+
+// Tip returns the head (seq + hash) of a verified chain, or a zero Head with
+// Seq -1 for an empty chain (no certs published yet).
+func Tip(chain []Cert) Head {
+	if len(chain) == 0 {
+		return Head{Seq: -1}
+	}
+	last := chain[len(chain)-1]
+	return Head{Seq: last.Seq, Hash: last.Hash()}
+}
+
+// flatten concatenates per-issuer chains in a deterministic issuer order.
+func flatten(byIssuer map[string][]Cert) []Cert {
 	issuers := make([]string, 0, len(byIssuer))
 	for id := range byIssuer {
 		issuers = append(issuers, id)
 	}
 	sort.Strings(issuers)
-
 	var out []Cert
 	for _, id := range issuers {
-		group := byIssuer[id]
-		sort.Slice(group, func(i, j int) bool { return group[i].Seq < group[j].Seq })
+		out = append(out, byIssuer[id]...)
+	}
+	return out
+}
+
+// validChainsByIssuer keeps, for each issuer, only the longest prefix of its certs
+// that forms an intact hash chain: seq starts at 0 and increments by one, and each
+// cert's PrevHash equals the previous cert's Hash. A gap, a reordering, or a
+// tampered or withheld cert breaks the chain, and everything past the break is
+// dropped — so a relay that reorders or truncates a device's history cannot make
+// the survivors look contiguous. Signatures are checked later, during admission.
+//
+// The result is deterministic even under a hostile log: certs are ordered by seq
+// with a hash tiebreak, so two certs a relay forged at the same seq resolve the
+// same way on every device (and the chain simply breaks at the duplicate).
+func validChainsByIssuer(certs []Cert) map[string][]Cert {
+	grouped := map[string][]Cert{}
+	for _, c := range certs {
+		grouped[c.IssuerID] = append(grouped[c.IssuerID], c)
+	}
+	out := make(map[string][]Cert, len(grouped))
+	for id, group := range grouped {
+		sort.SliceStable(group, func(i, j int) bool {
+			if group[i].Seq != group[j].Seq {
+				return group[i].Seq < group[j].Seq
+			}
+			return group[i].Hash() < group[j].Hash() // total order on hostile duplicates
+		})
+		var chain []Cert
 		var expectedSeq int64
 		prevHash := ""
 		for _, c := range group {
 			if c.Seq != expectedSeq || c.PrevHash != prevHash {
 				break
 			}
-			out = append(out, c)
+			chain = append(chain, c)
 			prevHash = c.Hash()
 			expectedSeq++
 		}
+		if len(chain) > 0 {
+			out[id] = chain
+		}
 	}
 	return out
+}
+
+// validChains flattens validChainsByIssuer into one slice, in a deterministic
+// issuer order.
+func validChains(certs []Cert) []Cert {
+	return flatten(validChainsByIssuer(certs))
 }
 
 // isAncestor reports whether from can reach to over vouch edges (from vouched to,

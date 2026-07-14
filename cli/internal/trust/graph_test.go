@@ -253,3 +253,103 @@ func TestMultipleAnchors(t *testing.T) {
 	got := trust.ComputeTrusted(certs, []trust.Anchor{r1.anchor(), r2.anchor()})
 	assertTrusted(t, got, "r1", "r2", "a", "b")
 }
+
+// TestVerifiedChainsStopsAtForgedTip: a relay appends a cert under an issuer's id
+// at the next contiguous seq with a correct prev_hash but a signature it cannot
+// forge. VerifiedChains must return only the issuer's genuinely-signed prefix, so
+// the tip used for the device's own next publish is its real head.
+func TestVerifiedChainsStopsAtForgedTip(t *testing.T) {
+	root, a := newDev("root"), newDev("a")
+	l := newLog(t)
+	l.vouch(root, a) // root seq 0, genuinely signed
+
+	// Relay forges root's seq 1, chaining onto seq 0's real hash but signing with
+	// an attacker key (it lacks root's signing key).
+	attacker, _ := crypto.GenerateSigningKey()
+	forged := trust.Cert{
+		Kind: trust.KindVouch, AccountID: "acct", IssuerID: root.id,
+		Seq: 1, PrevHash: l.certs[0].Hash(),
+		SubjectID: "ghost", SubjectEncPub: "age1-ghost", SubjectSignPub: attacker.Public,
+	}
+	forged, _ = trust.Sign(forged, attacker.Private)
+
+	chains := trust.VerifiedChains(append(l.certs, forged), []trust.Anchor{root.anchor()})
+	if got := trust.Tip(chains[root.id]); got.Seq != 0 {
+		t.Fatalf("verified tip = seq %d, want 0 (forged seq 1 must not count)", got.Seq)
+	}
+}
+
+// TestVerifiedChainsIncludesRevokedIssuer: a revoked device's own chain history is
+// still real and must remain visible (else a later pull would look like the relay
+// made it vanish).
+func TestVerifiedChainsIncludesRevokedIssuer(t *testing.T) {
+	root, a, b := newDev("root"), newDev("a"), newDev("b")
+	l := newLog(t)
+	l.vouch(root, a)
+	l.vouch(a, b) // a vouches b (a is an issuer)
+	l.revoke(root, a)
+	chains := trust.VerifiedChains(l.certs, []trust.Anchor{root.anchor()})
+	if _, ok := chains["a"]; !ok {
+		t.Fatalf("revoked issuer a dropped from verified chains: %v", chains)
+	}
+}
+
+// TestCheckProgressRejectsRollback: once we have seen an issuer's chain to seq N,
+// a later log that presents fewer of its certs (a relay suppressing the tail, e.g.
+// a revoke) is refused; a genuinely advancing log is accepted.
+func TestCheckProgressRejectsRollback(t *testing.T) {
+	root, a := newDev("root"), newDev("a")
+	l := newLog(t)
+	l.vouch(root, a)  // root seq 0
+	l.revoke(root, a) // root seq 1 (the tail a hostile relay would hide)
+	anchors := []trust.Anchor{root.anchor()}
+
+	full := trust.VerifiedChains(l.certs, anchors)
+	seen, err := trust.CheckProgress(full, map[string]trust.Head{})
+	if err != nil {
+		t.Fatalf("first CheckProgress: %v", err)
+	}
+	if seen[root.id].Seq != 1 {
+		t.Fatalf("seen head = %d, want 1", seen[root.id].Seq)
+	}
+
+	// Relay now serves only root's seq 0 (revoke withheld).
+	truncated := trust.VerifiedChains(l.certs[:1], anchors)
+	if _, err := trust.CheckProgress(truncated, seen); err == nil {
+		t.Fatalf("rollback from seq 1 to 0 was accepted, want refusal")
+	}
+
+	// A log that still has the full chain is fine.
+	if _, err := trust.CheckProgress(full, seen); err != nil {
+		t.Fatalf("non-regressing log refused: %v", err)
+	}
+}
+
+// TestValidChainsDeterministicOnDuplicateSeq: a relay serving two different certs
+// at the same seq must yield the same result on every device (deterministic), and
+// the chain breaks at the ambiguity rather than picking arbitrarily each run.
+func TestValidChainsDeterministicOnDuplicateSeq(t *testing.T) {
+	root, a, b := newDev("root"), newDev("a"), newDev("b")
+	c0 := vouchFor(t, root, a) // root seq 0
+	// Two distinct seq-0 certs from root (only a hostile relay produces this).
+	dupA := c0
+	dupB := trust.Cert{
+		Kind: trust.KindVouch, AccountID: "acct", IssuerID: root.id,
+		SubjectID: b.id, SubjectEncPub: b.enc, SubjectSignPub: b.sign.Public,
+	}
+	dupB, _ = trust.Sign(dupB, root.sign.Private)
+
+	anchors := []trust.Anchor{root.anchor()}
+	first := trust.ComputeTrusted([]trust.Cert{dupA, dupB}, anchors)
+	for i := 0; i < 20; i++ {
+		got := trust.ComputeTrusted([]trust.Cert{dupB, dupA}, anchors) // reversed input
+		if len(got) != len(first) {
+			t.Fatalf("non-deterministic under duplicate seq: %v vs %v", trustedIDs(got), trustedIDs(first))
+		}
+		for id := range first {
+			if _, ok := got[id]; !ok {
+				t.Fatalf("non-deterministic under duplicate seq: %v vs %v", trustedIDs(got), trustedIDs(first))
+			}
+		}
+	}
+}
