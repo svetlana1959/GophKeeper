@@ -4,7 +4,7 @@
  */
 
 export interface paths {
-    "/api/health": {
+    "/health": {
         parameters: {
             query?: never;
             header?: never;
@@ -15,7 +15,7 @@ export interface paths {
          * Liveness probe
          * @description Return ``{"status": "ok"}`` once the app is serving.
          */
-        get: operations["health_api_health_get"];
+        get: operations["health_health_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -24,7 +24,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/auth/challenge": {
+    "/auth/challenge": {
         parameters: {
             query?: never;
             header?: never;
@@ -42,14 +42,14 @@ export interface paths {
          *     and the nonce. The device decrypts the challenge with its private key and
          *     answers via `/auth/verify`.
          */
-        post: operations["challenge_api_auth_challenge_post"];
+        post: operations["challenge_auth_challenge_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/auth/verify": {
+    "/auth/verify": {
         parameters: {
             query?: never;
             header?: never;
@@ -65,14 +65,14 @@ export interface paths {
          *     On success the server returns a bearer `access_token` to send as
          *     `Authorization: Bearer <token>` on subsequent calls.
          */
-        post: operations["verify_api_auth_verify_post"];
+        post: operations["verify_auth_verify_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/auth/whoami": {
+    "/auth/whoami": {
         parameters: {
             query?: never;
             header?: never;
@@ -83,7 +83,7 @@ export interface paths {
          * Identify the current session
          * @description Return the device and account the bearer token authenticates.
          */
-        get: operations["whoami_api_auth_whoami_get"];
+        get: operations["whoami_auth_whoami_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -92,7 +92,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/accounts": {
+    "/accounts": {
         parameters: {
             query?: never;
             header?: never;
@@ -109,14 +109,14 @@ export interface paths {
          *     (minted in the browser) is stored as the account's recovery key; its private
          *     half never leaves the user.
          */
-        post: operations["register_account_api_accounts_post"];
+        post: operations["register_account_accounts_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/accounts/login": {
+    "/accounts/login": {
         parameters: {
             query?: never;
             header?: never;
@@ -129,14 +129,14 @@ export interface paths {
          * Log in to an account
          * @description Exchange email + password for a web session token.
          */
-        post: operations["login_api_accounts_login_post"];
+        post: operations["login_accounts_login_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/accounts/me": {
+    "/accounts/me": {
         parameters: {
             query?: never;
             header?: never;
@@ -150,7 +150,7 @@ export interface paths {
          *     Accepts either a web session or a device session, so the CLI can read the
          *     recovery key it must seal secrets to.
          */
-        get: operations["me_api_accounts_me_get"];
+        get: operations["me_accounts_me_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -159,31 +159,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/accounts/me/recovery": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        /**
-         * Set the account's recovery key
-         * @description Set the account's recovery public key (minted in the browser), once.
-         *
-         *     Registration can carry a recovery key already; this lets an account that
-         *     signed up without one mint it later. It is write-once — a second attempt is
-         *     refused (409) so secrets sealed to the existing key are never stranded.
-         */
-        put: operations["set_recovery_key_api_accounts_me_recovery_put"];
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/sync/push": {
+    "/sync/push": {
         parameters: {
             query?: never;
             header?: never;
@@ -202,14 +178,14 @@ export interface paths {
          *     reconcile) while the rest of the batch still applies. `recipients` sets which
          *     devices may pull the secret.
          */
-        post: operations["push_api_sync_push_post"];
+        post: operations["push_sync_push_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/sync/changes": {
+    "/sync/changes": {
         parameters: {
             query?: never;
             header?: never;
@@ -224,7 +200,7 @@ export interface paths {
          *     deletion propagates. The response `cursor` is the new high-water mark to pass
          *     as `since` next time.
          */
-        get: operations["changes_api_sync_changes_get"];
+        get: operations["changes_sync_changes_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -233,7 +209,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/enroll/invite": {
+    "/enroll/invite": {
         parameters: {
             query?: never;
             header?: never;
@@ -250,14 +226,14 @@ export interface paths {
          *     plaintext code never reaches the server — only its hash and the MAC'd roster,
          *     which the server relays to the joiner but cannot forge.
          */
-        post: operations["create_invite_api_enroll_invite_post"];
+        post: operations["create_invite_enroll_invite_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/enroll/join": {
+    "/enroll/join": {
         parameters: {
             query?: never;
             header?: never;
@@ -275,14 +251,14 @@ export interface paths {
          *     trust anchors. The device is active immediately; the inviter vouches for it
          *     (a signed cert) on its next sync.
          */
-        post: operations["join_api_enroll_join_post"];
+        post: operations["join_enroll_join_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/enroll/invite/{invite_id}": {
+    "/enroll/invite/{invite_id}": {
         parameters: {
             query?: never;
             header?: never;
@@ -296,7 +272,7 @@ export interface paths {
          *     The inviter verifies the MAC under the code it minted — proving this exact
          *     device redeemed that code — and then publishes a vouch cert for it.
          */
-        get: operations["invite_proof_api_enroll_invite__invite_id__get"];
+        get: operations["invite_proof_enroll_invite__invite_id__get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -305,7 +281,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/devices": {
+    "/devices": {
         parameters: {
             query?: never;
             header?: never;
@@ -316,7 +292,7 @@ export interface paths {
          * List the account's devices
          * @description Return every device in the caller's account.
          */
-        get: operations["list_devices_api_devices_get"];
+        get: operations["list_devices_devices_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -325,7 +301,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/devices/{device_id}": {
+    "/devices/{device_id}": {
         parameters: {
             query?: never;
             header?: never;
@@ -338,7 +314,7 @@ export interface paths {
          *
          *     A device belonging to another account is reported as 404, not disclosed.
          */
-        get: operations["fetch_device_api_devices__device_id__get"];
+        get: operations["fetch_device_devices__device_id__get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -347,7 +323,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/trust/certs": {
+    "/trust/certs": {
         parameters: {
             query?: never;
             header?: never;
@@ -361,7 +337,7 @@ export interface paths {
          *     The client verifies every cert's signature and per-issuer chain, then
          *     recomputes which devices are trusted.
          */
-        get: operations["changes_api_trust_certs_get"];
+        get: operations["changes_trust_certs_get"];
         put?: never;
         /**
          * Publish a signed trust cert
@@ -371,14 +347,14 @@ export interface paths {
          *     this device), and its `seq` must be exactly one past its last published cert.
          *     The server stores the cert opaquely; it does not check the signature.
          */
-        post: operations["publish_api_trust_certs_post"];
+        post: operations["publish_trust_certs_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/stats/overview": {
+    "/stats/overview": {
         parameters: {
             query?: never;
             header?: never;
@@ -389,7 +365,7 @@ export interface paths {
          * Get Dashboard overview statistics
          * @description Return temporary static counts for the Dashboard overview. No secret ciphertext is inspected.
          */
-        get: operations["overview_api_stats_overview_get"];
+        get: operations["overview_stats_overview_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -398,7 +374,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/stats/activity": {
+    "/stats/activity": {
         parameters: {
             query?: never;
             header?: never;
@@ -409,7 +385,7 @@ export interface paths {
          * Get Dashboard activity series
          * @description Return a temporary static daily series for the selected Dashboard period.
          */
-        get: operations["activity_api_stats_activity_get"];
+        get: operations["activity_stats_activity_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -418,7 +394,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/stats/security": {
+    "/stats/security": {
         parameters: {
             query?: never;
             header?: never;
@@ -429,7 +405,7 @@ export interface paths {
          * Get Dashboard security summary
          * @description Return temporary static device, alert, and synchronization statistics.
          */
-        get: operations["security_api_stats_security_get"];
+        get: operations["security_stats_security_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -820,14 +796,6 @@ export interface components {
              */
             expires_in: number;
         };
-        /** SetRecoveryKeyRequest */
-        SetRecoveryKeyRequest: {
-            /**
-             * Recovery Pubkey
-             * @description Recovery age public key, minted in the browser. The private half is shown to the user once and never sent. Write-once per account.
-             */
-            recovery_pubkey: string;
-        };
         /** StatsActivityResponse */
         StatsActivityResponse: {
             /** @description Time window represented by the activity points. */
@@ -1028,7 +996,7 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
-    health_api_health_get: {
+    health_health_get: {
         parameters: {
             query?: never;
             header?: never;
@@ -1050,7 +1018,7 @@ export interface operations {
             };
         };
     };
-    challenge_api_auth_challenge_post: {
+    challenge_auth_challenge_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -1090,7 +1058,7 @@ export interface operations {
             };
         };
     };
-    verify_api_auth_verify_post: {
+    verify_auth_verify_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -1130,7 +1098,7 @@ export interface operations {
             };
         };
     };
-    whoami_api_auth_whoami_get: {
+    whoami_auth_whoami_get: {
         parameters: {
             query?: never;
             header?: {
@@ -1168,7 +1136,7 @@ export interface operations {
             };
         };
     };
-    register_account_api_accounts_post: {
+    register_account_accounts_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -1208,7 +1176,7 @@ export interface operations {
             };
         };
     };
-    login_api_accounts_login_post: {
+    login_accounts_login_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -1248,7 +1216,7 @@ export interface operations {
             };
         };
     };
-    me_api_accounts_me_get: {
+    me_accounts_me_get: {
         parameters: {
             query?: never;
             header?: {
@@ -1286,56 +1254,7 @@ export interface operations {
             };
         };
     };
-    set_recovery_key_api_accounts_me_recovery_put: {
-        parameters: {
-            query?: never;
-            header?: {
-                authorization?: string | null;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["SetRecoveryKeyRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["AccountResponse"];
-                };
-            };
-            /** @description Missing, invalid, or expired web session token. */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description This account already has a recovery key. */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    push_api_sync_push_post: {
+    push_sync_push_post: {
         parameters: {
             query?: never;
             header?: {
@@ -1377,7 +1296,7 @@ export interface operations {
             };
         };
     };
-    changes_api_sync_changes_get: {
+    changes_sync_changes_get: {
         parameters: {
             query?: {
                 /** @description Highest seq already applied; 0 for a full pull */
@@ -1418,7 +1337,7 @@ export interface operations {
             };
         };
     };
-    create_invite_api_enroll_invite_post: {
+    create_invite_enroll_invite_post: {
         parameters: {
             query?: never;
             header?: {
@@ -1460,7 +1379,7 @@ export interface operations {
             };
         };
     };
-    join_api_enroll_join_post: {
+    join_enroll_join_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -1507,7 +1426,7 @@ export interface operations {
             };
         };
     };
-    invite_proof_api_enroll_invite__invite_id__get: {
+    invite_proof_enroll_invite__invite_id__get: {
         parameters: {
             query?: never;
             header?: {
@@ -1554,7 +1473,7 @@ export interface operations {
             };
         };
     };
-    list_devices_api_devices_get: {
+    list_devices_devices_get: {
         parameters: {
             query?: never;
             header?: {
@@ -1592,7 +1511,7 @@ export interface operations {
             };
         };
     };
-    fetch_device_api_devices__device_id__get: {
+    fetch_device_devices__device_id__get: {
         parameters: {
             query?: never;
             header?: {
@@ -1639,7 +1558,7 @@ export interface operations {
             };
         };
     };
-    changes_api_trust_certs_get: {
+    changes_trust_certs_get: {
         parameters: {
             query?: {
                 /** @description Highest log cursor already seen; 0 for the full log */
@@ -1680,7 +1599,7 @@ export interface operations {
             };
         };
     };
-    publish_api_trust_certs_post: {
+    publish_trust_certs_post: {
         parameters: {
             query?: never;
             header?: {
@@ -1729,7 +1648,7 @@ export interface operations {
             };
         };
     };
-    overview_api_stats_overview_get: {
+    overview_stats_overview_get: {
         parameters: {
             query?: never;
             header?: never;
@@ -1749,7 +1668,7 @@ export interface operations {
             };
         };
     };
-    activity_api_stats_activity_get: {
+    activity_stats_activity_get: {
         parameters: {
             query?: {
                 /** @description Activity window: 7d, 30d, or 90d. */
@@ -1781,7 +1700,7 @@ export interface operations {
             };
         };
     };
-    security_api_stats_security_get: {
+    security_stats_security_get: {
         parameters: {
             query?: never;
             header?: never;

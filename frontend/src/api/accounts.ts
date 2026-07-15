@@ -20,7 +20,7 @@ export type Account = z.infer<typeof accountSchema>
 
 export const accountsApi = {
   async login(email: string, password: string): Promise<AccountSession> {
-    const { data } = await http.post('/api/accounts/login', { email, password })
+    const { data } = await http.post('/accounts/login', { email, password })
     return accountSessionSchema.parse(data)
   },
 
@@ -29,7 +29,7 @@ export const accountsApi = {
     password: string,
     recoveryPubkey: string | null = null,
   ): Promise<AccountSession> {
-    const { data } = await http.post('/api/accounts', {
+    const { data } = await http.post('/accounts', {
       email,
       password,
       recovery_pubkey: recoveryPubkey,
@@ -38,14 +38,14 @@ export const accountsApi = {
   },
 
   async me(): Promise<Account> {
-    const { data } = await http.get('/api/accounts/me')
+    const { data } = await http.get('/accounts/me')
     return accountSchema.parse(data)
   },
 
   /** Set the account's recovery public key (write-once; the backend 409s if one
    *  is already set). The private half is minted in the browser and never sent. */
   async setRecoveryKey(recoveryPubkey: string): Promise<Account> {
-    const { data } = await http.put('/api/accounts/me/recovery', { recovery_pubkey: recoveryPubkey })
+    const { data } = await http.put('/accounts/me/recovery', { recovery_pubkey: recoveryPubkey })
     return accountSchema.parse(data)
   },
 }
