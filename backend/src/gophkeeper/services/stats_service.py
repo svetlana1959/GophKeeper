@@ -26,9 +26,9 @@ class DeviceStats:
     pending: int = 0
 
     @property
-    def alerts(self) -> int:
-        """Known lifecycle risks; there is no separate alert subsystem yet."""
-        return self.revoked + self.pending
+    def has_warning(self) -> bool:
+        """Whether stored device lifecycle state warrants attention."""
+        return self.revoked > 0 or self.pending > 0
 
 
 @dataclass(frozen=True)

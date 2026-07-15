@@ -57,11 +57,13 @@ async def security(
 ) -> StatsSecurityResponse:
     devices = await service.device_stats(account_id)
     return StatsSecurityResponse(
-        status="warning" if devices.alerts else "good",
+        status="warning" if devices.has_warning else "good",
         trusted_devices=devices.trusted,
         revoked_devices=devices.revoked,
         pending_devices=devices.pending,
-        alerts=devices.alerts,
+        # TODO: return a real count once security alerts are persisted. Device
+        # lifecycle states affect status but are not themselves alert records.
+        alerts=0,
         # TODO: persist successful account sync events. Device.last_seen_at is
         # authentication metadata and must not be presented as a sync timestamp.
         last_sync_at=None,

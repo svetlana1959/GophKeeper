@@ -47,7 +47,7 @@ class StatsSecurityResponse(BaseModel):
     trusted_devices: int = Field(description="Number of active trusted devices.")
     revoked_devices: int = Field(description="Number of revoked devices.")
     pending_devices: int = Field(description="Number of devices awaiting approval.")
-    alerts: int = Field(description="Known device lifecycle risks (revoked plus pending).")
+    alerts: int = Field(description="Persisted active security alerts; zero until implemented.")
     last_sync_at: datetime | None = Field(
         description="Latest successful account sync, or null until such events are persisted."
     )

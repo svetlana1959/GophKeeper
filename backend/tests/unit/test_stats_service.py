@@ -60,13 +60,14 @@ async def test_device_stats_are_scoped_and_keep_statuses_separate():
     assert result.trusted == 1
     assert result.revoked == 1
     assert result.pending == 1
-    assert result.alerts == 2
+    assert result.has_warning is True
 
 
 async def test_device_stats_for_empty_account_are_zero():
     result = await StatsService(FakeUnitOfWork()).device_stats(uuid4())
 
-    assert result.trusted == result.revoked == result.pending == result.alerts == 0
+    assert result.trusted == result.revoked == result.pending == 0
+    assert result.has_warning is False
 
 
 @pytest.mark.parametrize(

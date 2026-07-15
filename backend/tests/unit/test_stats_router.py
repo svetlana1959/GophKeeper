@@ -40,7 +40,7 @@ def test_security_uses_real_device_summary_and_has_no_fake_sync_time():
         "trusted_devices": 2,
         "revoked_devices": 1,
         "pending_devices": 1,
-        "alerts": 2,
+        "alerts": 0,
         "last_sync_at": None,
     }
 
