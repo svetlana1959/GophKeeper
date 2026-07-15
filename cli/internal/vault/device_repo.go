@@ -15,14 +15,15 @@ var _ device.Repository = (*deviceRepo)(nil)
 
 func (r *deviceRepo) Save(d *device.Device) error {
 	_, err := r.db.Exec(`
-		INSERT INTO trusted_devices (id, device_name, public_key, is_active, updated_at)
-		VALUES (?, ?, ?, ?, ?)
+		INSERT INTO trusted_devices (id, device_name, public_key, sign_public_key, is_active, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?)
 		ON CONFLICT(id) DO UPDATE SET
-			device_name = excluded.device_name,
-			public_key  = excluded.public_key,
-			is_active   = excluded.is_active,
-			updated_at  = excluded.updated_at`,
-		d.ID, d.Name, d.PublicKey, boolToInt(d.Active), d.UpdatedAt.UnixNano())
+			device_name     = excluded.device_name,
+			public_key      = excluded.public_key,
+			sign_public_key = excluded.sign_public_key,
+			is_active       = excluded.is_active,
+			updated_at      = excluded.updated_at`,
+		d.ID, d.Name, d.PublicKey, d.SignPublicKey, boolToInt(d.Active), d.UpdatedAt.UnixNano())
 	if err != nil {
 		return fmt.Errorf("vault: save device: %w", err)
 	}
@@ -71,7 +72,7 @@ func (r *deviceRepo) SetActive(id string, active bool) error {
 	return mustAffectOne(res, device.ErrNotFound)
 }
 
-const deviceCols = `SELECT id, device_name, public_key, is_active, updated_at FROM trusted_devices`
+const deviceCols = `SELECT id, device_name, public_key, sign_public_key, is_active, updated_at FROM trusted_devices`
 
 func scanDevice(sc rowScanner) (*device.Device, error) {
 	var (
@@ -79,7 +80,7 @@ func scanDevice(sc rowScanner) (*device.Device, error) {
 		active  int
 		updated int64
 	)
-	err := sc.Scan(&d.ID, &d.Name, &d.PublicKey, &active, &updated)
+	err := sc.Scan(&d.ID, &d.Name, &d.PublicKey, &d.SignPublicKey, &active, &updated)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, device.ErrNotFound
 	}

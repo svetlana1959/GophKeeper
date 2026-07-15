@@ -24,9 +24,15 @@ func (r *localRepo) Save(ld *device.LocalDevice) error {
 	if _, err := tx.Exec(`DELETE FROM local_device`); err != nil {
 		return fmt.Errorf("vault: clear local device: %w", err)
 	}
+	// A nil []byte binds as SQL NULL, which the NOT NULL column rejects; a
+	// zero-length blob is the intended "no signing key" sentinel.
+	signKey := ld.SignStoredKey
+	if signKey == nil {
+		signKey = []byte{}
+	}
 	if _, err := tx.Exec(
-		`INSERT INTO local_device (device_id, stored_key, pin_protected) VALUES (?, ?, ?)`,
-		ld.DeviceID, ld.StoredKey, boolToInt(ld.PINProtected)); err != nil {
+		`INSERT INTO local_device (device_id, stored_key, sign_stored_key, pin_protected) VALUES (?, ?, ?, ?)`,
+		ld.DeviceID, ld.StoredKey, signKey, boolToInt(ld.PINProtected)); err != nil {
 		return fmt.Errorf("vault: save local device: %w", err)
 	}
 	return tx.Commit()
@@ -38,8 +44,8 @@ func (r *localRepo) Get() (*device.LocalDevice, error) {
 		pin int
 	)
 	err := r.db.QueryRow(
-		`SELECT device_id, stored_key, pin_protected FROM local_device LIMIT 1`).
-		Scan(&ld.DeviceID, &ld.StoredKey, &pin)
+		`SELECT device_id, stored_key, sign_stored_key, pin_protected FROM local_device LIMIT 1`).
+		Scan(&ld.DeviceID, &ld.StoredKey, &ld.SignStoredKey, &pin)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, device.ErrNoLocalDevice
 	}

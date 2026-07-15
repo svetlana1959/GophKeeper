@@ -10,6 +10,7 @@ import (
 	"github.com/svetlana1959/GophKeeper/cli/internal/device"
 	"github.com/svetlana1959/GophKeeper/cli/internal/secret"
 	"github.com/svetlana1959/GophKeeper/cli/internal/syncstate"
+	"github.com/svetlana1959/GophKeeper/cli/internal/trust"
 
 	_ "modernc.org/sqlite"
 )
@@ -57,8 +58,59 @@ func Open(path string) (*DB, error) {
 		sqlDB.Close()
 		return nil, fmt.Errorf("vault: apply schema: %w", err)
 	}
+	if err := migrate(sqlDB); err != nil {
+		sqlDB.Close()
+		return nil, err
+	}
 
 	return &DB{sql: sqlDB}, nil
+}
+
+// migrate applies additive column changes that CREATE TABLE IF NOT EXISTS cannot
+// make to an already-existing table. Each step is guarded by a column-existence
+// check so it is idempotent on both fresh and older vaults.
+func migrate(db *sql.DB) error {
+	steps := []struct{ table, column, ddl string }{
+		{"trusted_devices", "sign_public_key",
+			`ALTER TABLE trusted_devices ADD COLUMN sign_public_key TEXT NOT NULL DEFAULT ''`},
+		{"local_device", "sign_stored_key",
+			`ALTER TABLE local_device ADD COLUMN sign_stored_key BLOB NOT NULL DEFAULT x''`},
+	}
+	for _, s := range steps {
+		has, err := hasColumn(db, s.table, s.column)
+		if err != nil {
+			return err
+		}
+		if has {
+			continue
+		}
+		if _, err := db.Exec(s.ddl); err != nil {
+			return fmt.Errorf("vault: migrate %s.%s: %w", s.table, s.column, err)
+		}
+	}
+	return nil
+}
+
+func hasColumn(db *sql.DB, table, column string) (bool, error) {
+	rows, err := db.Query(fmt.Sprintf(`PRAGMA table_info(%s)`, table))
+	if err != nil {
+		return false, fmt.Errorf("vault: inspect %s: %w", table, err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var (
+			cid, notnull, pk int
+			name, ctype      string
+			dflt             sql.NullString
+		)
+		if err := rows.Scan(&cid, &name, &ctype, &notnull, &dflt, &pk); err != nil {
+			return false, fmt.Errorf("vault: scan %s columns: %w", table, err)
+		}
+		if name == column {
+			return true, nil
+		}
+	}
+	return false, rows.Err()
 }
 
 // Close releases the database connection.
@@ -75,3 +127,14 @@ func (db *DB) Local() device.LocalRepository { return &localRepo{db: db.sql} }
 
 // Sync returns the synchronization-state repository.
 func (db *DB) Sync() syncstate.Repository { return &syncRepo{db: db.sql} }
+
+// Anchors returns the trust-anchor repository.
+func (db *DB) Anchors() trust.AnchorRepository { return &anchorRepo{db: db.sql} }
+
+// PendingInvites returns the outstanding-minted-invites repository.
+func (db *DB) PendingInvites() trust.PendingInviteRepository {
+	return &pendingInviteRepo{db: db.sql}
+}
+
+// TrustHeads returns the per-issuer verified-head repository (rollback detection).
+func (db *DB) TrustHeads() trust.TrustHeadRepository { return &trustHeadRepo{db: db.sql} }

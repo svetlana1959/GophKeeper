@@ -16,6 +16,7 @@ from gophkeeper.infrastructure.repositories import (
     SqlAlchemyIdentityRepository,
     SqlAlchemyInviteRepository,
     SqlAlchemySecretRepository,
+    SqlAlchemyTrustCertRepository,
 )
 
 
@@ -34,6 +35,7 @@ class SqlAlchemyUnitOfWork(UnitOfWork):
         self.devices = SqlAlchemyDeviceRepository(self._session)
         self.invites = SqlAlchemyInviteRepository(self._session)
         self.identities = SqlAlchemyIdentityRepository(self._session)
+        self.trust_certs = SqlAlchemyTrustCertRepository(self._session)
         return self
 
     async def __aexit__(

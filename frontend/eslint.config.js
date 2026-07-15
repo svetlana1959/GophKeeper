@@ -2,14 +2,16 @@ import js from '@eslint/js'
 import globals from 'globals'
 import reactHooks from 'eslint-plugin-react-hooks'
 import reactRefresh from 'eslint-plugin-react-refresh'
-import { defineConfig, globalIgnores } from 'eslint/config'
+import tseslint from 'typescript-eslint'
+import { globalIgnores } from 'eslint/config'
 
-export default defineConfig([
-  globalIgnores(['dist']),
+export default tseslint.config(
+  globalIgnores(['dist', 'src/api/schema.d.ts']),
   {
-    files: ['**/*.{js,jsx}'],
+    files: ['**/*.{ts,tsx}'],
     extends: [
       js.configs.recommended,
+      ...tseslint.configs.recommended,
       reactHooks.configs.flat.recommended,
       reactRefresh.configs.vite,
     ],
@@ -17,10 +19,14 @@ export default defineConfig([
       globals: globals.browser,
       parserOptions: { ecmaFeatures: { jsx: true } },
     },
+    rules: {
+      // shadcn/ui primitives export a component plus its cva variants (a const).
+      'react-refresh/only-export-components': ['error', { allowConstantExport: true }],
+    },
   },
   {
     // Build/config files run in Node, not the browser.
-    files: ['*.config.js'],
+    files: ['**/*.config.{js,ts}'],
     languageOptions: { globals: globals.node },
   },
-])
+)
