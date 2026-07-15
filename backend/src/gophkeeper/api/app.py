@@ -10,7 +10,7 @@ import logging
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, APIRouter
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from gophkeeper.api.errors import register_exception_handlers
@@ -94,17 +94,21 @@ def create_app() -> FastAPI:
 
     register_exception_handlers(app)
 
-    @app.get("/health", tags=["health"], summary="Liveness probe")
+    api_router = APIRouter(prefix="/api")
+
+    @api_router.get("/health", tags=["health"], summary="Liveness probe")
     async def health() -> dict[str, str]:
         """Return ``{"status": "ok"}`` once the app is serving."""
         return {"status": "ok"}
 
-    app.include_router(auth.router)
-    app.include_router(account.router)
-    app.include_router(sync.router)
-    app.include_router(enroll.router)
-    app.include_router(device.router)
-    app.include_router(trust.router)
-    app.include_router(stats.router)
+    api_router.include_router(auth.router)
+    api_router.include_router(account.router)
+    api_router.include_router(sync.router)
+    api_router.include_router(enroll.router)
+    api_router.include_router(device.router)
+    api_router.include_router(trust.router)
+    api_router.include_router(stats.router)
+
+    app.include_router(api_router)
 
     return app
