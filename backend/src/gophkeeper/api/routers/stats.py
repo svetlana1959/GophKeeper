@@ -1,9 +1,10 @@
-"""Temporary mock endpoints for the Dashboard statistics UI."""
+"""Account-scoped Dashboard statistics endpoints."""
 
-from datetime import UTC, date, datetime, timedelta
+from uuid import UUID
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Depends, Query
 
+from gophkeeper.api.deps import get_account_id, provide
 from gophkeeper.api.schemas.stats import (
     ActivityPointResponse,
     StatsActivityResponse,
@@ -11,87 +12,57 @@ from gophkeeper.api.schemas.stats import (
     StatsPeriod,
     StatsSecurityResponse,
 )
+from gophkeeper.services.stats_service import StatsService, StatsWindow
 
 router = APIRouter(prefix="/stats", tags=["stats"])
+_stats_service = provide(StatsService)
 
 
-# TODO: Category statistics must eventually come from the client or separately
-# synchronized encrypted metadata. The zero-knowledge backend cannot inspect
-# ciphertext to determine whether a secret is a password, bank card, note, or file.
-_MOCK_OVERVIEW = StatsOverviewResponse(
-    passwords=71,
-    bank_cards=4,
-    notes=35,
-    files=13,
-    trusted_devices=4,
-    revoked_devices=0,
-)
-
-_MOCK_LAST_DATE = date(2026, 7, 13)
-
-
-def _mock_activity_points(days: int) -> list[ActivityPointResponse]:
-    """Build a deterministic fixture ending on the mock Dashboard date."""
-    start = _MOCK_LAST_DATE - timedelta(days=days - 1)
-    return [
-        ActivityPointResponse(
-            date=start + timedelta(days=index),
-            created=(index * 4 + 3) % 6,
-            updated=(index * 2 + 2) % 7,
-            deleted=index % 3,
-        )
-        for index in range(days)
-    ]
+@router.get("/overview", response_model=StatsOverviewResponse)
+async def overview(
+    account_id: UUID = Depends(get_account_id),
+    service: StatsService = Depends(_stats_service),
+) -> StatsOverviewResponse:
+    devices = await service.device_stats(account_id)
+    # TODO: synchronize privacy-preserving category counters from clients. The
+    # zero-knowledge backend cannot infer secret types from opaque ciphertext.
+    return StatsOverviewResponse(
+        passwords=0,
+        bank_cards=0,
+        notes=0,
+        files=0,
+        trusted_devices=devices.trusted,
+        revoked_devices=devices.revoked,
+        pending_devices=devices.pending,
+    )
 
 
-_MOCK_ACTIVITY = {
-    StatsPeriod.SEVEN_DAYS: _mock_activity_points(7),
-    StatsPeriod.THIRTY_DAYS: _mock_activity_points(30),
-    StatsPeriod.NINETY_DAYS: _mock_activity_points(90),
-}
-
-_MOCK_SECURITY = StatsSecurityResponse(
-    status="good",
-    trusted_devices=4,
-    revoked_devices=0,
-    alerts=0,
-    last_sync_at=datetime(2026, 7, 13, 21, 30, tzinfo=UTC),
-)
-
-
-@router.get(
-    "/overview",
-    response_model=StatsOverviewResponse,
-    summary="Get Dashboard overview statistics",
-    description=(
-        "Return temporary static counts for the Dashboard overview. "
-        "No secret ciphertext is inspected."
-    ),
-)
-async def overview() -> StatsOverviewResponse:
-    return _MOCK_OVERVIEW
-
-
-@router.get(
-    "/activity",
-    response_model=StatsActivityResponse,
-    summary="Get Dashboard activity series",
-    description="Return a temporary static daily series for the selected Dashboard period.",
-)
+@router.get("/activity", response_model=StatsActivityResponse)
 async def activity(
-    period: StatsPeriod = Query(
-        default=StatsPeriod.SEVEN_DAYS,
-        description="Activity window: 7d, 30d, or 90d.",
-    ),
+    period: StatsPeriod = Query(default=StatsPeriod.SEVEN_DAYS),
+    account_id: UUID = Depends(get_account_id),
+    service: StatsService = Depends(_stats_service),
 ) -> StatsActivityResponse:
-    return StatsActivityResponse(period=period, points=_MOCK_ACTIVITY[period])
+    points = await service.activity(account_id, StatsWindow(period.value))
+    return StatsActivityResponse(
+        period=period,
+        points=[ActivityPointResponse(**vars(point)) for point in points],
+    )
 
 
-@router.get(
-    "/security",
-    response_model=StatsSecurityResponse,
-    summary="Get Dashboard security summary",
-    description="Return temporary static device, alert, and synchronization statistics.",
-)
-async def security() -> StatsSecurityResponse:
-    return _MOCK_SECURITY
+@router.get("/security", response_model=StatsSecurityResponse)
+async def security(
+    account_id: UUID = Depends(get_account_id),
+    service: StatsService = Depends(_stats_service),
+) -> StatsSecurityResponse:
+    devices = await service.device_stats(account_id)
+    return StatsSecurityResponse(
+        status="warning" if devices.alerts else "good",
+        trusted_devices=devices.trusted,
+        revoked_devices=devices.revoked,
+        pending_devices=devices.pending,
+        alerts=devices.alerts,
+        # TODO: persist successful account sync events. Device.last_seen_at is
+        # authentication metadata and must not be presented as a sync timestamp.
+        last_sync_at=None,
+    )

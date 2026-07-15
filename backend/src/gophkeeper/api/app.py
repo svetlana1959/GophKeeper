@@ -58,7 +58,7 @@ _TAGS_METADATA = [
     },
     {
         "name": "stats",
-        "description": "Temporary static Dashboard statistics for frontend integration.",
+        "description": "Account-scoped Dashboard statistics from zero-knowledge-safe metadata.",
     },
     {"name": "health", "description": "Liveness."},
 ]

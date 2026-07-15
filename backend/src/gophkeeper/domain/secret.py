@@ -17,7 +17,7 @@ client. The server never holds a key and cannot read it.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from typing import Protocol
 from uuid import UUID
 
@@ -95,6 +95,16 @@ class Secret:
         return not self.deleted
 
 
+@dataclass(frozen=True)
+class SecretActivityCount:
+    """Counts of the latest persisted secret mutations on one UTC day."""
+
+    date: date
+    created: int
+    updated: int
+    deleted: int
+
+
 class SecretRepository(Protocol):
     """Port for persisting Secret aggregates (a ``typing.Protocol``).
 
@@ -124,6 +134,12 @@ class SecretRepository(Protocol):
     ) -> list[Secret]:
         """Return secrets (incl. tombstones) the device is a recipient of with
         seq > since_seq, ordered by seq — the delta that device pulls to catch up."""
+        ...
+
+    async def activity_counts(
+        self, account_id: str, *, start_at: datetime, end_at: datetime
+    ) -> list[SecretActivityCount]:
+        """Aggregate latest persisted mutations in a half-open UTC interval."""
         ...
 
     async def set_recipients(self, secret_id: UUID, device_ids: list[UUID]) -> None:
