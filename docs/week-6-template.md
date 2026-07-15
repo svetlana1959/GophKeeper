@@ -33,14 +33,23 @@ Finalize the project, freeze the scope, and prepare the application for release.
 ---
 ## Final Testing
 ### Testing Summary
-- CLI: unit tests exist across `crypto`, `config`, `vault`, `remote`, `app` (including a large `sync_test.go`), run via `make test` / `make vet` in CI (`ci-cli.yaml`).
-- Backend: PR #121 adds unit coverage for device, access-request, and API-schema/route logic, and reports backend coverage above 80% (`make lint` and `make test` passing per the PR description)
+- CLI: unit tests cover the `crypto`, `config`, `vault`, `remote`, and `app` packages, including synchronization scenarios in `sync_test.go`. They are executed through `make test` and `make vet` in CI (`ci-cli.yaml`).
+
+- Backend: PRs #143 and #151 add and improve unit and integration test coverage for the current backend implementation. The tests verify API behavior, authentication, account isolation, statistics, device management, synchronization flows, response data, and database state.
+
+<img width="1288" height="933" alt="Снимок экрана 2026-07-15 063323" src="https://github.com/user-attachments/assets/b1fae2e7-1094-4717-a115-647146fadae7" />
+<img width="1270" height="447" alt="Снимок экрана 2026-07-15 063357" src="https://github.com/user-attachments/assets/e152fe15-71c3-4029-b5db-dace32c12636" />
+
 
 ---
 ## Code Quality
 ### Code Cleanup
-- Go side enforces `golangci-lint` (`.golangci.yml`) and `make vet`/`make test` as PR gates
-- Backend enforces `ruff format --check` + `ruff check` via `make lint`; PR #121 includes a dedicated "style: apply ruff formatting" commit
+- The Go codebase uses `golangci-lint`, `make vet`, and `make test` as CI quality gates.
+- The backend uses `ruff format --check`, `ruff check`, and automated unit and integration tests.
+- PRs #143 and #151 include the latest test and code-quality improvements for the backend.
+
+<img width="918" height="120" alt="Снимок экрана 2026-07-15 064013" src="https://github.com/user-attachments/assets/2b4742c1-64af-4b32-a80c-b3887d007496" />
+
 
 ### Comments and Refactoring
 - Go packages include `doc.go` files per package (`crypto`, `vault`, `remote`, `config`) documenting purpose, consistent with the Definition of Done's "every exported function/type/package documented."
@@ -107,7 +116,86 @@ go build -o goph .
 ---
 ## API Documentation
 ### Final Updates
-# !МАЛИК ТУТ НАПИШИ!
+Interactive Swagger documentation is available at:
+
+`http://localhost:8080/docs`
+
+OpenAPI specification:
+
+`http://localhost:8080/openapi.json`
+
+#### Authentication
+
+GophKeeper supports device authentication using an age challenge-response flow.
+
+1. `POST /auth/challenge` — request an encrypted challenge.
+2. The client decrypts the challenge using its private key.
+3. `POST /auth/verify` — return the decrypted nonce and receive a bearer token.
+4. The token is used in protected API requests.
+
+#### Main API groups
+
+##### Auth
+
+- `POST /auth/challenge` — request a device login challenge.
+- `POST /auth/verify` — verify the challenge and receive a session token.
+- `GET /auth/whoami` — return the current device and account.
+
+##### Sync
+
+- `POST /sync/push` — upload encrypted secret changes.
+- `GET /sync/changes` — retrieve encrypted changes since a sync cursor.
+
+The backend never decrypts secret contents and stores only ciphertext.
+
+##### Accounts
+
+- `POST /accounts` — create an account.
+- `POST /accounts/login` — log in to an account.
+- `GET /accounts/me` — retrieve the current account.
+- `PUT /accounts/me/recovery` — configure the account recovery key.
+
+##### Device enrollment
+
+- `POST /enroll/invite` — create a pairing invite.
+- `POST /enroll/join` — join an account using an invite code.
+- `GET /enroll/invite/{invite_id}` — check whether an invite was used.
+
+##### Devices
+
+- `GET /devices` — list devices linked to the account.
+- `GET /devices/{device_id}` — retrieve a specific device.
+
+##### Trust
+
+- `POST /trust/certs` — publish a signed trust or revoke certificate.
+- `GET /trust/certs` — retrieve trust certificates since a cursor.
+
+##### Statistics
+
+- `GET /stats/overview` — return dashboard overview statistics.
+- `GET /stats/activity?period=7d|30d|90d` — return activity data for charts.
+- `GET /stats/security` — return device and security statistics.
+
+##### Health
+
+- `GET /health` — check whether the backend is running.
+
+#### Zero-knowledge architecture
+
+Secret encryption and decryption are performed on the client. The backend stores and synchronizes opaque ciphertext and cannot access plaintext secrets.
+
+
+#### Swagger API
+
+<img width="1247" height="877" alt="Снимок экрана 2026-07-15 054650" src="https://github.com/user-attachments/assets/2099bad0-5e72-402f-a84f-010dcbb3dd97" />
+<img width="1247" height="876" alt="Снимок экрана 2026-07-15 054658" src="https://github.com/user-attachments/assets/843532bf-f644-4b9f-8826-0af92dd91fef" />
+
+
+#### API schemas
+
+<img width="1222" height="897" alt="Снимок экрана 2026-07-15 054718" src="https://github.com/user-attachments/assets/0460dbc9-dc79-4850-aaba-72790fd6a8ba" />
+<img width="1243" height="877" alt="Снимок экрана 2026-07-15 054711" src="https://github.com/user-attachments/assets/902c5146-b1a9-45e9-b841-e42fffe2c1aa" />
 
 ---
 ## UI/UX Documentation
@@ -221,7 +309,11 @@ uvicorn gophkeeper.main:app --host 127.0.0.1 --port 8080 --env-file .env --reloa
 ```
 
 ### Docker Verification
-!МАЛИК ТУТ ТОЖЕ НАПИШИ!
+The backend and database services were successfully built and started using Docker Compose. The health endpoint confirmed that the API was running correctly.
+
+<img width="885" height="336" alt="Снимок экрана 2026-07-15 062905" src="https://github.com/user-attachments/assets/a4447396-2b52-4529-a719-2f4a3a71ec8a" />
+<img width="1762" height="757" alt="Снимок экрана 2026-07-15 062738" src="https://github.com/user-attachments/assets/dce73e07-643e-4863-a026-430936601587" />
+
 
 ---
 ## Final Validation Checklist
