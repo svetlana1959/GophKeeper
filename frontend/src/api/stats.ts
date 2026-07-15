@@ -40,15 +40,15 @@ export type StatsActivity = z.infer<typeof statsActivitySchema>
 
 export const statsApi = {
   async overview(): Promise<StatsOverview> {
-    const { data } = await http.get('/stats/overview')
+    const { data } = await http.get('/api/stats/overview')
     return statsOverviewSchema.parse(data)
   },
   async security(): Promise<StatsSecurity> {
-    const { data } = await http.get('/stats/security')
+    const { data } = await http.get('/api/stats/security')
     return statsSecuritySchema.parse(data)
   },
   async activity(period: StatsActivity['period'] = '7d'): Promise<StatsActivity> {
-    const { data } = await http.get('/stats/activity', { params: { period } })
+    const { data } = await http.get('/api/stats/activity', { params: { period } })
     return statsActivitySchema.parse(data)
   },
 }

@@ -20,7 +20,7 @@ export type Device = z.infer<typeof deviceSchema>
 
 export const devicesApi = {
   async list(): Promise<Device[]> {
-    const { data } = await http.get('/devices', { skipAuthLogout: true })
+    const { data } = await http.get('/api/devices', { skipAuthLogout: true })
     return z.array(deviceSchema).parse(data)
   },
 }

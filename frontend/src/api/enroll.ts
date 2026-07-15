@@ -27,13 +27,13 @@ export type InviteProof = z.infer<typeof inviteProofSchema>
 export const enrollApi = {
   /** Register a client-generated invite by its code hash (empty roster for web). */
   async createInvite(codeHash: string): Promise<CreateInvite> {
-    const { data } = await http.post('/enroll/invite', { code_hash: codeHash, roster: [] })
+    const { data } = await http.post('/api/enroll/invite', { code_hash: codeHash, roster: [] })
     return createInviteSchema.parse(data)
   },
 
   /** Poll an invite to see whether a device has redeemed it yet. */
   async inviteProof(inviteId: string): Promise<InviteProof> {
-    const { data } = await http.get(`/enroll/invite/${inviteId}`)
+    const { data } = await http.get(`/api/enroll/invite/${inviteId}`)
     return inviteProofSchema.parse(data)
   },
 }

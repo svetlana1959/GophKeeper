@@ -8,7 +8,7 @@ import tailwindcss from '@tailwindcss/vite'
 // Dev-only: proxy API paths to the backend so the browser talks same-origin and
 // avoids CORS. In production nginx serves the SPA and proxies the same paths.
 const apiTarget = process.env.VITE_API_TARGET || 'http://localhost:8080'
-const proxied = ['/accounts', '/auth', '/enroll', '/sync', '/devices', '/stats', '/health']
+const proxied = ['/api']
 
 // Some client routes (e.g. /devices) share a prefix with an API path. Proxy only
 // real API calls (XHR/fetch) and let full-page navigations fall through to the SPA
