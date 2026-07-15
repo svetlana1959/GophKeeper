@@ -57,7 +57,7 @@ func (b *syncBackend) authed(r *http.Request) bool {
 func (b *syncBackend) handler(t *testing.T) http.Handler {
 	mux := http.NewServeMux()
 
-	mux.HandleFunc("POST /auth/challenge", func(w http.ResponseWriter, _ *http.Request) {
+	mux.HandleFunc("POST /api/auth/challenge", func(w http.ResponseWriter, _ *http.Request) {
 		ct, err := crypto.Engine{}.Seal(b.nonce, []string{b.publicKey})
 		if err != nil {
 			t.Fatalf("seal: %v", err)
@@ -68,7 +68,7 @@ func (b *syncBackend) handler(t *testing.T) http.Handler {
 		})
 	})
 
-	mux.HandleFunc("POST /auth/verify", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("POST /api/auth/verify", func(w http.ResponseWriter, r *http.Request) {
 		var body struct{ Nonce string }
 		_ = json.NewDecoder(r.Body).Decode(&body)
 		got, _ := base64.StdEncoding.DecodeString(body.Nonce)
@@ -79,7 +79,7 @@ func (b *syncBackend) handler(t *testing.T) http.Handler {
 		respond(w, http.StatusOK, map[string]any{"access_token": b.token, "token_type": "bearer"})
 	})
 
-	mux.HandleFunc("POST /sync/push", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("POST /api/sync/push", func(w http.ResponseWriter, r *http.Request) {
 		if !b.authed(r) {
 			respond(w, http.StatusUnauthorized, map[string]any{"detail": "unauthorized"})
 			return
@@ -106,7 +106,7 @@ func (b *syncBackend) handler(t *testing.T) http.Handler {
 		respond(w, http.StatusOK, map[string]any{"results": results})
 	})
 
-	mux.HandleFunc("GET /devices", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("GET /api/devices", func(w http.ResponseWriter, r *http.Request) {
 		if !b.authed(r) {
 			respond(w, http.StatusUnauthorized, map[string]any{"detail": "unauthorized"})
 			return
@@ -124,7 +124,7 @@ func (b *syncBackend) handler(t *testing.T) http.Handler {
 		respond(w, http.StatusOK, devices)
 	})
 
-	mux.HandleFunc("GET /accounts/me", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("GET /api/accounts/me", func(w http.ResponseWriter, r *http.Request) {
 		if !b.authed(r) {
 			respond(w, http.StatusUnauthorized, map[string]any{"detail": "unauthorized"})
 			return
@@ -134,7 +134,7 @@ func (b *syncBackend) handler(t *testing.T) http.Handler {
 		})
 	})
 
-	mux.HandleFunc("POST /enroll/invite", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("POST /api/enroll/invite", func(w http.ResponseWriter, r *http.Request) {
 		if !b.authed(r) {
 			respond(w, http.StatusUnauthorized, map[string]any{"detail": "unauthorized"})
 			return
@@ -144,7 +144,7 @@ func (b *syncBackend) handler(t *testing.T) http.Handler {
 		})
 	})
 
-	mux.HandleFunc("POST /enroll/join", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("POST /api/enroll/join", func(w http.ResponseWriter, r *http.Request) {
 		var body struct {
 			DeviceName string `json:"device_name"`
 			PublicKey  string `json:"public_key"`
@@ -167,7 +167,7 @@ func (b *syncBackend) handler(t *testing.T) http.Handler {
 		})
 	})
 
-	mux.HandleFunc("GET /enroll/invite/{id}", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("GET /api/enroll/invite/{id}", func(w http.ResponseWriter, r *http.Request) {
 		if !b.authed(r) {
 			respond(w, http.StatusUnauthorized, map[string]any{"detail": "unauthorized"})
 			return
@@ -182,7 +182,7 @@ func (b *syncBackend) handler(t *testing.T) http.Handler {
 		})
 	})
 
-	mux.HandleFunc("GET /sync/changes", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("GET /api/sync/changes", func(w http.ResponseWriter, r *http.Request) {
 		if !b.authed(r) {
 			respond(w, http.StatusUnauthorized, map[string]any{"detail": "unauthorized"})
 			return
@@ -205,7 +205,7 @@ func (b *syncBackend) handler(t *testing.T) http.Handler {
 		respond(w, http.StatusOK, map[string]any{"secrets": out, "cursor": cursor})
 	})
 
-	mux.HandleFunc("GET /trust/certs", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("GET /api/trust/certs", func(w http.ResponseWriter, r *http.Request) {
 		if !b.authed(r) {
 			respond(w, http.StatusUnauthorized, map[string]any{"detail": "unauthorized"})
 			return
@@ -226,7 +226,7 @@ func (b *syncBackend) handler(t *testing.T) http.Handler {
 		respond(w, http.StatusOK, map[string]any{"certs": b.certs[since:], "cursor": len(b.certs)})
 	})
 
-	mux.HandleFunc("POST /trust/certs", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("POST /api/trust/certs", func(w http.ResponseWriter, r *http.Request) {
 		if !b.authed(r) {
 			respond(w, http.StatusUnauthorized, map[string]any{"detail": "unauthorized"})
 			return
