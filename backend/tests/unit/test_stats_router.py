@@ -1,9 +1,11 @@
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from datetime import date, timedelta
 from uuid import uuid4
 
 import pytest
 from fastapi import FastAPI
-from fastapi.testclient import TestClient
+from httpx import ASGITransport, AsyncClient
 
 from gophkeeper.api.deps import get_account_id
 from gophkeeper.api.routers import stats as stats_router
@@ -22,17 +24,20 @@ class FakeStatsService:
         return [ActivityPoint(start + timedelta(days=day)) for day in range(period.days)]
 
 
-def _client(service: FakeStatsService) -> TestClient:
+@asynccontextmanager
+async def _client(service: FakeStatsService) -> AsyncIterator[AsyncClient]:
     app = FastAPI()
     app.include_router(stats_router.router)
     app.dependency_overrides[get_account_id] = lambda: uuid4()
     app.dependency_overrides[stats_router._stats_service] = lambda: service
-    return TestClient(app)
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://localhost") as client:
+        yield client
 
 
-def test_security_uses_real_device_summary_and_has_no_fake_sync_time():
-    with _client(FakeStatsService(DeviceStats(trusted=2, revoked=1, pending=1))) as client:
-        response = client.get("/stats/security")
+async def test_security_uses_real_device_summary_and_has_no_fake_sync_time():
+    async with _client(FakeStatsService(DeviceStats(trusted=2, revoked=1, pending=1))) as client:
+        response = await client.get("/stats/security")
 
     assert response.status_code == 200
     assert response.json() == {
@@ -45,9 +50,9 @@ def test_security_uses_real_device_summary_and_has_no_fake_sync_time():
     }
 
 
-def test_empty_security_is_good_and_all_counts_are_zero():
-    with _client(FakeStatsService()) as client:
-        response = client.get("/stats/security")
+async def test_empty_security_is_good_and_all_counts_are_zero():
+    async with _client(FakeStatsService()) as client:
+        response = await client.get("/stats/security")
 
     assert response.status_code == 200
     assert response.json() == {
@@ -60,9 +65,9 @@ def test_empty_security_is_good_and_all_counts_are_zero():
     }
 
 
-def test_empty_overview_still_works_without_category_metadata():
-    with _client(FakeStatsService()) as client:
-        response = client.get("/stats/overview")
+async def test_empty_overview_still_works_without_category_metadata():
+    async with _client(FakeStatsService()) as client:
+        response = await client.get("/stats/overview")
 
     assert response.status_code == 200
     assert response.json() == {
@@ -77,18 +82,18 @@ def test_empty_overview_still_works_without_category_metadata():
 
 
 @pytest.mark.parametrize(("period", "days"), [("7d", 7), ("30d", 30), ("90d", 90)])
-def test_activity_returns_requested_number_of_points(period: str, days: int):
-    with _client(FakeStatsService()) as client:
-        response = client.get("/stats/activity", params={"period": period})
+async def test_activity_returns_requested_number_of_points(period: str, days: int):
+    async with _client(FakeStatsService()) as client:
+        response = await client.get("/stats/activity", params={"period": period})
 
     assert response.status_code == 200
     assert response.json()["period"] == period
     assert len(response.json()["points"]) == days
 
 
-def test_activity_rejects_unknown_period():
-    with _client(FakeStatsService()) as client:
-        response = client.get("/stats/activity", params={"period": "14d"})
+async def test_activity_rejects_unknown_period():
+    async with _client(FakeStatsService()) as client:
+        response = await client.get("/stats/activity", params={"period": "14d"})
 
     assert response.status_code == 422
     assert response.json()["detail"][0]["loc"] == ["query", "period"]

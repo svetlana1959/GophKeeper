@@ -30,10 +30,13 @@ async def database():
     await adapter.connect()
     await _clear_database(adapter)
 
-    yield adapter
-
-    await _clear_database(adapter)
-    await adapter.disconnect()
+    try:
+        yield adapter
+    finally:
+        try:
+            await _clear_database(adapter)
+        finally:
+            await adapter.disconnect()
 
 
 @pytest.fixture
