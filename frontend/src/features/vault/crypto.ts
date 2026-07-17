@@ -24,14 +24,14 @@ export interface DeviceIdentity {
   recipient: string
 }
 
-function base64ToBytes(b64: string): Uint8Array {
+export function base64ToBytes(b64: string): Uint8Array {
   const bin = atob(b64)
   const out = new Uint8Array(bin.length)
   for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i)
   return out
 }
 
-function bytesToBase64(bytes: Uint8Array): string {
+export function bytesToBase64(bytes: Uint8Array): string {
   let bin = ''
   for (const b of bytes) bin += String.fromCharCode(b)
   return btoa(bin)
@@ -50,14 +50,20 @@ export async function recipientOf(identity: string): Promise<string> {
   return identityToRecipient(identity)
 }
 
+/** Decrypt age ciphertext to raw bytes (e.g. the auth challenge nonce, which is
+ *  not a content blob). */
+export async function decryptRaw(ciphertext: Uint8Array, identity: string): Promise<Uint8Array> {
+  const decrypter = new Decrypter()
+  decrypter.addIdentity(identity)
+  return decrypter.decrypt(ciphertext)
+}
+
 /** Decrypt a secret's age ciphertext with an identity, returning its content. */
 export async function decryptContent(
   ciphertext: Uint8Array,
   identity: string,
 ): Promise<SecretContent> {
-  const decrypter = new Decrypter()
-  decrypter.addIdentity(identity)
-  const plain = await decrypter.decrypt(ciphertext)
+  const plain = await decryptRaw(ciphertext, identity)
   const json = JSON.parse(new TextDecoder().decode(plain))
   return {
     name: json.name,

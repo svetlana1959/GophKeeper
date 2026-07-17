@@ -1,0 +1,70 @@
+import { generateX25519Identity, identityToRecipient } from 'age-encryption'
+import { describe, expect, it } from 'vitest'
+import { bytesToBase64, sealContent } from './crypto'
+import { enrollBrowserDevice, isAccountRecoveryKey, pullAndDecrypt } from './session'
+
+// End-to-end against a live backend — the real vault module, real API, real age.
+// Skipped in normal runs; drive it with E2E_API=http://localhost:8080/api.
+const API = process.env.E2E_API
+
+async function post(path: string, body: unknown, token?: string) {
+  const res = await fetch(`${API}${path}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+    body: JSON.stringify(body),
+  })
+  if (!res.ok) throw new Error(`${path} -> ${res.status} ${await res.text()}`)
+  return res.json()
+}
+
+describe.skipIf(!API)('vault session (e2e)', () => {
+  it('browser enrolls, pulls, and decrypts a recovery-sealed secret', async () => {
+    // A fresh account with a recovery key.
+    const recoveryIdentity = await generateX25519Identity()
+    const recoveryRecipient = await identityToRecipient(recoveryIdentity)
+    const email = `vault-e2e-${Date.now()}@example.test`
+    const { access_token: accountToken } = await post('/accounts', {
+      email,
+      password: 'hunter2secret',
+    })
+    await fetch(`${API}/accounts/me/recovery`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accountToken}` },
+      body: JSON.stringify({ recovery_pubkey: recoveryRecipient }),
+    })
+
+    // The browser makes itself a device.
+    const device = await enrollBrowserDevice({ accountToken, deviceName: 'Chrome on Mac', baseUrl: API })
+    expect(device.deviceToken).toBeTruthy()
+    expect(device.recipient).toMatch(/^age1/)
+
+    // Seed a secret sealed to {this device, recovery key}, pushed as the device.
+    const ciphertext = await sealContent(
+      { name: 'github', folder: 'work', value: new TextEncoder().encode('ghp_xyz'), description: 'token' },
+      [device.recipient, recoveryRecipient],
+    )
+    const secretId = crypto.randomUUID()
+    await post(
+      '/sync/push',
+      { items: [{ id: secretId, ciphertext_b64: bytesToBase64(ciphertext), recipients: [device.recipient, recoveryRecipient] }] },
+      device.deviceToken,
+    )
+
+    // Recovery-key validation: right key true, wrong key false.
+    expect(await isAccountRecoveryKey({ accountToken, recoveryKey: recoveryIdentity, baseUrl: API })).toBe(true)
+    const wrong = await generateX25519Identity()
+    expect(await isAccountRecoveryKey({ accountToken, recoveryKey: wrong, baseUrl: API })).toBe(false)
+
+    // Pull + decrypt with the recovery key.
+    const secrets = await pullAndDecrypt({ deviceToken: device.deviceToken, identity: recoveryIdentity, baseUrl: API })
+    const github = secrets.find((s) => s.id === secretId)
+    expect(github).toBeDefined()
+    expect(github!.name).toBe('github')
+    expect(github!.folder).toBe('work')
+    expect(new TextDecoder().decode(github!.value)).toBe('ghp_xyz')
+
+    // And the browser's OWN device key decrypts it too (it was a recipient).
+    const asDevice = await pullAndDecrypt({ deviceToken: device.deviceToken, identity: device.identity, baseUrl: API })
+    expect(asDevice.find((s) => s.id === secretId)?.name).toBe('github')
+  })
+})
