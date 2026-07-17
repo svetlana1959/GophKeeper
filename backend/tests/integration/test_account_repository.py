@@ -1,4 +1,10 @@
-"""Integration tests for AccountRepository."""
+"""Narrow AccountRepository tests — the update SQL, pinned at the data layer.
+
+The recovery-key flow is also driven through the API (test_error_mapping.py);
+these add a direct, focused check of the UPDATE round-trip and of the not-found
+guard, which the API can't reach — a caller only ever updates its own,
+already-loaded account, so an update against a missing row can't originate there.
+"""
 
 from uuid import uuid4
 
@@ -11,7 +17,7 @@ from gophkeeper.infrastructure.unit_of_work import SqlAlchemyUnitOfWork
 pytestmark = pytest.mark.integration
 
 
-async def test_update_sets_recovery_pubkey(database):
+async def test_update_persists_recovery_pubkey(database):
     account_id = uuid4()
     async with SqlAlchemyUnitOfWork(database) as uow:
         await uow.accounts.add(Account(id=account_id))
@@ -25,9 +31,7 @@ async def test_update_sets_recovery_pubkey(database):
         await uow.commit()
 
     async with SqlAlchemyUnitOfWork(database) as uow:
-        fetched = await uow.accounts.get(account_id)
-
-    assert fetched.recovery_pubkey == "age1recoverypublickey"
+        assert (await uow.accounts.get(account_id)).recovery_pubkey == "age1recoverypublickey"
 
 
 async def test_update_unknown_account_raises(database):

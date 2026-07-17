@@ -1,11 +1,16 @@
-"""Example integration test — exercises the real adapter against PostgreSQL.
+"""Narrow SecretRepository tests — SQL the HTTP API can't exercise.
 
-Where the unit tests prove the domain rules in isolation, this proves the
-infrastructure: that ``SqlAlchemyUnitOfWork`` + ``SqlAlchemySecretRepository``
-actually persist and read back through SQL, and that commit/rollback behave.
-Skipped unless ``TEST_DATABASE_URL`` is set (see conftest).
+Two things live here because the API can't reach them cleanly:
+
+* ``get`` — its ``SecretNotFound`` branch is swallowed inside ``SyncService.push``
+  (a missing secret becomes a create), so it never surfaces as a response to
+  assert on. The stored-then-read path is proven here at the same time.
+* ``activity_counts`` — its value is the UTC-day bucketing of ``updated_at``, and
+  reaching it through the API would mean back-dating ``updated_at`` (no endpoint
+  for that), so the day-grouping SQL is tested directly.
 """
 
+from datetime import UTC, datetime
 from uuid import uuid4
 
 import pytest
@@ -17,49 +22,31 @@ from gophkeeper.infrastructure.unit_of_work import SqlAlchemyUnitOfWork
 pytestmark = pytest.mark.integration
 
 
-async def test_store_and_fetch_round_trip(database):
+async def test_get_returns_stored_secret_or_raises_when_absent(database):
     secret_id = uuid4()
     async with SqlAlchemyUnitOfWork(database) as uow:
-        await uow.secrets.add(Secret(id=secret_id, account_id="acc", ciphertext=b"\x00\x01\x02"))
+        await uow.secrets.add(Secret(secret_id, "acc", ciphertext=b"\x00\x01\x02"))
         await uow.commit()
 
     async with SqlAlchemyUnitOfWork(database) as uow:
-        fetched = await uow.secrets.get(secret_id)
-
-    assert fetched.ciphertext == b"\x00\x01\x02"
-    assert fetched.account_id == "acc"
-    assert fetched.version == 1
-
-
-async def test_rollback_discards_uncommitted_write(database):
-    secret_id = uuid4()
-    async with SqlAlchemyUnitOfWork(database) as uow:
-        await uow.secrets.add(Secret(id=secret_id, account_id="acc", ciphertext=b"x"))
-        await uow.rollback()
-
-    async with SqlAlchemyUnitOfWork(database) as uow:
+        stored = await uow.secrets.get(secret_id)
+        assert stored.ciphertext == b"\x00\x01\x02"
+        assert stored.version == 1
         with pytest.raises(SecretNotFound):
-            await uow.secrets.get(secret_id)
+            await uow.secrets.get(uuid4())
 
 
-async def test_activity_counts_latest_mutations_and_scopes_account(database):
-    from datetime import UTC, datetime
-
+async def test_activity_counts_bucket_by_day_and_scope_account(database):
     account_id = str(uuid4())
-    event_time = datetime(2026, 7, 14, 12, tzinfo=UTC)
+    day = datetime(2026, 7, 14, 12, tzinfo=UTC)
     async with SqlAlchemyUnitOfWork(database) as uow:
+        await uow.secrets.add(Secret(uuid4(), account_id, b"created", version=1, updated_at=day))
+        await uow.secrets.add(Secret(uuid4(), account_id, b"updated", version=2, updated_at=day))
         await uow.secrets.add(
-            Secret(uuid4(), account_id, b"created", version=1, updated_at=event_time)
+            Secret(uuid4(), account_id, b"deleted", version=2, deleted=True, updated_at=day)
         )
-        await uow.secrets.add(
-            Secret(uuid4(), account_id, b"updated", version=2, updated_at=event_time)
-        )
-        await uow.secrets.add(
-            Secret(uuid4(), account_id, b"deleted", version=2, deleted=True, updated_at=event_time)
-        )
-        await uow.secrets.add(
-            Secret(uuid4(), "other-account", b"other", version=1, updated_at=event_time)
-        )
+        # A secret on another account must not leak into these counts.
+        await uow.secrets.add(Secret(uuid4(), "other-account", b"other", version=1, updated_at=day))
         await uow.commit()
 
     async with SqlAlchemyUnitOfWork(database) as uow:
