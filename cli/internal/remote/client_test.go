@@ -210,6 +210,26 @@ func (f *fakeBackend) handler(t *testing.T) http.Handler {
 		writeJSON(w, http.StatusOK, map[string]any{"certs": out, "cursor": f.certSeq})
 	})
 
+	mux.HandleFunc("GET /api/accounts/me", func(w http.ResponseWriter, r *http.Request) {
+		if !f.authed(r) {
+			writeJSON(w, http.StatusUnauthorized, map[string]string{"detail": "unauthorized"})
+			return
+		}
+		writeJSON(w, http.StatusOK, remote.Account{ID: "acc-1", RecoveryPubkey: "age1recovery"})
+	})
+
+	mux.HandleFunc("GET /api/enroll/invite/{id}", func(w http.ResponseWriter, r *http.Request) {
+		if !f.authed(r) {
+			writeJSON(w, http.StatusUnauthorized, map[string]string{"detail": "unauthorized"})
+			return
+		}
+		writeJSON(w, http.StatusOK, remote.InviteProof{
+			Consumed: true,
+			JoinMAC:  "mac-1",
+			Device:   remote.Device{ID: "dev-joined", AccountID: "acc-1", Status: "active"},
+		})
+	})
+
 	return mux
 }
 
