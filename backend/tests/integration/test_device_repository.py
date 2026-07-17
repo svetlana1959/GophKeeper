@@ -100,7 +100,8 @@ async def test_delete_inactive_uses_last_seen_then_falls_back_to_updated_at(data
     seen_recently, seen_long_ago, never_seen_old = uuid4(), uuid4(), uuid4()
 
     async with SqlAlchemyUnitOfWork(database) as uow:
-        await uow.accounts.add(Account(id=account_id))
+        # Recovery key present → the account can be reaped (it can restore).
+        await uow.accounts.add(Account(id=account_id, recovery_pubkey="age1recovery"))
         recent = Device(seen_recently, account_id, "active", "k-active")
         recent.last_seen_at = now - timedelta(days=1)
         stale = Device(seen_long_ago, account_id, "stale", "k-stale")
@@ -120,3 +121,26 @@ async def test_delete_inactive_uses_last_seen_then_falls_back_to_updated_at(data
     async with SqlAlchemyUnitOfWork(database) as uow:
         remaining = {d.id for d in await uow.devices.list_for_account(account_id)}
     assert remaining == {seen_recently}
+
+
+async def test_delete_inactive_spares_accounts_without_a_recovery_key(database):
+    # No recovery key → reaping the device would strand the vault, so the backstop
+    # must leave it alone no matter how idle it is.
+    account_id = uuid4()
+    now = datetime.now(UTC)
+    device_id = uuid4()
+
+    async with SqlAlchemyUnitOfWork(database) as uow:
+        await uow.accounts.add(Account(id=account_id, recovery_pubkey=None))
+        stale = Device(device_id, account_id, "lonely", "k-lonely")
+        stale.last_seen_at = now - timedelta(days=365)
+        await uow.devices.add(stale)
+        await uow.commit()
+
+    async with SqlAlchemyUnitOfWork(database) as uow:
+        reaped = await uow.devices.delete_inactive(cutoff=now - timedelta(days=90))
+        await uow.commit()
+
+    assert reaped == 0
+    async with SqlAlchemyUnitOfWork(database) as uow:
+        assert {d.id for d in await uow.devices.list_for_account(account_id)} == {device_id}

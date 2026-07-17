@@ -137,12 +137,26 @@ class SqlAlchemyDeviceRepository(DeviceRepository):
         return result.rowcount or 0
 
     async def delete_inactive(self, *, cutoff: datetime) -> int:
-        """Hard-delete every device (browser or CLI) idle since before ``cutoff``,
+        """Hard-delete every idle device *whose account has a recovery key*,
         returning the count. A never-authenticated device falls back to when it
-        was created (``updated_at``). This is the long-horizon backstop that
-        catches devices which declared no expiry."""
+        was created (``updated_at``).
+
+        The recovery-key guard is load-bearing, not a nicety: deleting a device
+        cascades its secret_recipients (and any trust certs it issued). Reaping
+        the last device of an account with no recovery key would leave ciphertext
+        no one can decrypt — irrecoverable. Restricting the backstop to accounts
+        that CAN restore via the recovery key keeps every vault recoverable, and
+        those accounts restore through the recovery key rather than the (now
+        gappy) server trust log."""
         result = await self._session.execute(
-            text("DELETE FROM devices WHERE COALESCE(last_seen_at, updated_at) < :cutoff"),
+            text(
+                "DELETE FROM devices d "
+                "WHERE COALESCE(d.last_seen_at, d.updated_at) < :cutoff "
+                "AND EXISTS ("
+                "  SELECT 1 FROM accounts a "
+                "  WHERE a.id = d.account_id AND a.recovery_pubkey IS NOT NULL"
+                ")"
+            ),
             {"cutoff": cutoff},
         )
         return result.rowcount or 0
