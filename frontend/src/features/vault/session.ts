@@ -125,6 +125,28 @@ export async function enrollBrowserDevice(opts: {
   return { deviceId: join.device.id, identity, recipient, deviceToken: verify.access_token }
 }
 
+/** Re-authenticate an already-enrolled device (e.g. one restored from storage)
+ *  for a fresh session token — the age challenge/response, no new enrollment. A
+ *  401 here means the device was reaped or revoked; the caller should re-link. */
+export async function reauthenticateDevice(opts: {
+  identity: string
+  baseUrl?: string
+}): Promise<string> {
+  const baseUrl = opts.baseUrl ?? DEFAULT_BASE
+  const recipient = await recipientOf(opts.identity)
+  const challenge = await api<{ challenge: string; challenge_token: string }>(
+    baseUrl,
+    '/auth/challenge',
+    { method: 'POST', body: { public_key: recipient } },
+  )
+  const nonce = await decryptRaw(base64ToBytes(challenge.challenge), opts.identity)
+  const verify = await api<{ access_token: string }>(baseUrl, '/auth/verify', {
+    method: 'POST',
+    body: { challenge_token: challenge.challenge_token, nonce: bytesToBase64(nonce) },
+  })
+  return verify.access_token
+}
+
 /** Extend this device's expiry while it's in active use, so an in-use browser
  *  isn't reaped. Best-effort: a failure (e.g. an expired session token) is left
  *  for the caller to ignore — the worst case is the device expires and re-links. */
