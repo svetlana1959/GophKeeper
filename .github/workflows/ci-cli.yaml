@@ -69,13 +69,17 @@ jobs:
 
       - name: Run tests
         working-directory: cli
-        run: go test -race -covermode=atomic -coverprofile=coverage.out ./...
+        run: go test -race -covermode=atomic -coverpkg=./... -coverprofile=coverage.out ./...
 
       - name: Add coverage to summary
         working-directory: cli
         run: |
           echo "## CLI coverage" >> "$GITHUB_STEP_SUMMARY"
           go tool cover -func=coverage.out | tail -n1 >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Check coverage threshold
+        working-directory: cli
+        run: go run github.com/vladopajic/go-test-coverage/v2@v2.18.8 --config=./.testcoverage.yml
 
   build:
     name: Cross-compile
