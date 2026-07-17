@@ -1,42 +1,35 @@
 import { MoreVertical, Plus } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import type { Device } from '@/api/devices'
 import { DeviceIcon } from '@/features/dashboard/components/device-icon'
 import { SectionCard } from '@/features/dashboard/components/section-card'
-import { ViewAllLink } from '@/features/dashboard/components/atoms'
+import { EmptyState } from '@/features/dashboard/components/atoms'
+import { useDevices } from '@/features/dashboard/use-devices'
 import { useEnrollment } from '@/features/enrollment/enrollment-context'
-import type { DeviceView } from '../sample-devices'
-import { SAMPLE_DEVICES } from '../sample-devices'
+import { isOnline, lastActiveLabel } from '../device-display'
 
-function DeviceRow({ device }: { device: DeviceView }) {
+function DeviceRow({ device }: { device: Device }) {
+  const online = isOnline(device)
   return (
     <div className="flex items-center gap-4 py-4">
-      <DeviceIcon name={device.name} />
+      <DeviceIcon name={device.device_name} />
       <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2">
-          <p className="text-foreground truncate font-semibold">{device.name}</p>
-          {device.thisDevice ? (
-            <span className="bg-primary/15 text-primary rounded-full px-2 py-0.5 text-[10px] font-semibold tracking-wide uppercase">
-              This device
-            </span>
-          ) : null}
-        </div>
+        <p className="text-foreground truncate font-semibold">{device.device_name}</p>
         <p className="text-muted-foreground truncate text-sm">
-          {device.os} • {device.client} • Last active: {device.lastActive}
+          <span className="capitalize">{device.status}</span> • Last active:{' '}
+          {lastActiveLabel(device)}
         </p>
       </div>
       <span
         className={cn(
           'flex items-center gap-2 text-sm',
-          device.online ? 'text-primary' : 'text-muted-foreground',
+          online ? 'text-primary' : 'text-muted-foreground',
         )}
       >
         <span
-          className={cn(
-            'size-1.5 rounded-full',
-            device.online ? 'bg-primary' : 'bg-muted-foreground',
-          )}
+          className={cn('size-1.5 rounded-full', online ? 'bg-primary' : 'bg-muted-foreground')}
         />
-        {device.online ? 'Online' : 'Offline'}
+        {online ? 'Online' : 'Offline'}
       </span>
       <button
         type="button"
@@ -51,14 +44,20 @@ function DeviceRow({ device }: { device: DeviceView }) {
 
 export function TrustedDevicesList() {
   const { openAddDevice } = useEnrollment()
+  const devices = useDevices()
+  const trusted = (devices.data ?? []).filter((d) => d.status === 'active')
 
   return (
-    <SectionCard title="Trusted Devices" action={<ViewAllLink to="/devices" />}>
-      <div className="divide-border/60 divide-y">
-        {SAMPLE_DEVICES.map((device) => (
-          <DeviceRow key={device.id} device={device} />
-        ))}
-      </div>
+    <SectionCard title="Trusted Devices">
+      {trusted.length > 0 ? (
+        <div className="divide-border/60 divide-y">
+          {trusted.map((device) => (
+            <DeviceRow key={device.id} device={device} />
+          ))}
+        </div>
+      ) : (
+        <EmptyState>No trusted devices yet.</EmptyState>
+      )}
       <button
         type="button"
         onClick={openAddDevice}
