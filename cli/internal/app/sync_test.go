@@ -250,7 +250,7 @@ func respond(w http.ResponseWriter, status int, v any) {
 // a device joins now that the CLI no longer bootstraps accounts.
 func mustLink(t *testing.T, sess *app.Session) {
 	t.Helper()
-	if err := sess.Link(context.Background(), "GK-CODE"); err != nil {
+	if err := sess.Link(context.Background(), "GK-CODE", false); err != nil {
 		t.Fatalf("Link: %v", err)
 	}
 }
@@ -579,12 +579,16 @@ func TestLink(t *testing.T) {
 	}
 	defer sess.Close()
 
-	if err := sess.Link(context.Background(), "GK-CODE"); err != nil {
+	if err := sess.Link(context.Background(), "GK-CODE", false); err != nil {
 		t.Fatalf("Link: %v", err)
 	}
 	// Already linked now.
-	if err := sess.Link(context.Background(), "GK-CODE"); !errors.Is(err, app.ErrAlreadyLinked) {
+	if err := sess.Link(context.Background(), "GK-CODE", false); !errors.Is(err, app.ErrAlreadyLinked) {
 		t.Fatalf("second Link err = %v, want ErrAlreadyLinked", err)
+	}
+	// --force clears the stale local binding and re-links.
+	if err := sess.Link(context.Background(), "GK-CODE", true); err != nil {
+		t.Fatalf("forced re-Link err = %v, want success", err)
 	}
 }
 
@@ -708,6 +712,67 @@ func TestSync_VouchesForJoinerThenSeals(t *testing.T) {
 	}
 	if _, err := (crypto.Engine{}).Open(ct, joinerEnc.Private); err != nil {
 		t.Fatalf("joiner cannot decrypt resealed secret: %v", err)
+	}
+}
+
+// Approving a self-enrolled device (e.g. a browser) manually vouches for it and
+// reshares the vault, so it becomes a recipient without an invite/join dance.
+func TestApproveDevice(t *testing.T) {
+	setHome(t)
+	be := newSyncBackend()
+	srv := httptest.NewServer(be.handler(t))
+	defer srv.Close()
+
+	res, err := app.Init(app.InitParams{DeviceName: "laptop", Remote: srv.URL})
+	if err != nil {
+		t.Fatalf("Init: %v", err)
+	}
+	be.publicKey = res.PublicKey
+	other, _ := crypto.GenerateKeyPair()
+	be.extraDevicePub = other.Public // dev-2, the untrusted "browser"
+
+	sess, err := app.Open()
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	defer sess.Close()
+
+	mustLink(t, sess)
+	mustSet(t, sess, app.SetParams{Name: "gh", Value: []byte("tok")})
+	if _, err := sess.Sync(context.Background(), ""); err != nil {
+		t.Fatalf("Sync: %v", err)
+	}
+
+	// FindDevice surfaces the device for the approval prompt.
+	dev, err := sess.FindDevice(context.Background(), "", "dev-2")
+	if err != nil {
+		t.Fatalf("FindDevice: %v", err)
+	}
+	if dev.PublicKey != other.Public {
+		t.Fatalf("FindDevice returned the wrong device: %+v", dev)
+	}
+
+	if _, err := sess.ApproveDevice(context.Background(), "", "dev-2"); err != nil {
+		t.Fatalf("ApproveDevice: %v", err)
+	}
+
+	// A vouch cert for dev-2 was published...
+	vouched := false
+	for _, c := range be.certs {
+		if c.Kind == trust.KindVouch && c.SubjectID == "dev-2" {
+			vouched = true
+		}
+	}
+	if !vouched {
+		t.Fatalf("no vouch cert for dev-2: %+v", be.certs)
+	}
+	// ...and the secret is now decryptable by dev-2's own key.
+	var ct []byte
+	for _, s := range be.secrets {
+		ct = s.ct
+	}
+	if _, err := (crypto.Engine{}).Open(ct, other.Private); err != nil {
+		t.Fatalf("dev-2 cannot decrypt the resealed secret: %v", err)
 	}
 }
 

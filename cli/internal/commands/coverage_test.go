@@ -438,6 +438,26 @@ func TestDeviceLs_NotLinked(t *testing.T) {
 	}
 }
 
+func TestDeviceApprove_NoRemote(t *testing.T) {
+	initBasic(t)
+	if _, err := run(t, "device", "approve", "some-device-id"); !errors.Is(err, app.ErrNoRemote) {
+		t.Errorf("device approve without remote err = %v, want ErrNoRemote", err)
+	}
+}
+
+func TestFingerprint(t *testing.T) {
+	fp := fingerprint("age1examplekey")
+	if !strings.Contains(fp, "·") {
+		t.Errorf("fingerprint = %q, want the form hhhh·hhhh", fp)
+	}
+	if fingerprint("age1examplekey") != fp {
+		t.Error("fingerprint is not deterministic")
+	}
+	if fingerprint("age1differentkey") == fp {
+		t.Error("different keys produced the same fingerprint")
+	}
+}
+
 // --- shortKey (device.go) ---------------------------------------------------
 
 func TestShortKey(t *testing.T) {

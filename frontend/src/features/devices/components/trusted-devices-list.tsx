@@ -1,64 +1,81 @@
-import { MoreVertical, Plus } from 'lucide-react'
+import { useState } from 'react'
+import { MoreVertical, Plus, Trash2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import type { Device } from '@/api/devices'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { DeviceIcon } from '@/features/dashboard/components/device-icon'
 import { SectionCard } from '@/features/dashboard/components/section-card'
-import { ViewAllLink } from '@/features/dashboard/components/atoms'
+import { EmptyState } from '@/features/dashboard/components/atoms'
+import { useDevices } from '@/features/dashboard/use-devices'
 import { useEnrollment } from '@/features/enrollment/enrollment-context'
-import type { DeviceView } from '../sample-devices'
-import { SAMPLE_DEVICES } from '../sample-devices'
+import { isOnline, lastActiveLabel } from '../device-display'
+import { RemoveDeviceDialog } from './remove-device-dialog'
 
-function DeviceRow({ device }: { device: DeviceView }) {
+function DeviceRow({ device }: { device: Device }) {
+  const online = isOnline(device)
+  const [removing, setRemoving] = useState(false)
+
   return (
     <div className="flex items-center gap-4 py-4">
-      <DeviceIcon name={device.name} />
+      <DeviceIcon name={device.device_name} />
       <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2">
-          <p className="text-foreground truncate font-semibold">{device.name}</p>
-          {device.thisDevice ? (
-            <span className="bg-primary/15 text-primary rounded-full px-2 py-0.5 text-[10px] font-semibold tracking-wide uppercase">
-              This device
-            </span>
-          ) : null}
-        </div>
+        <p className="text-foreground truncate font-semibold">{device.device_name}</p>
         <p className="text-muted-foreground truncate text-sm">
-          {device.os} • {device.client} • Last active: {device.lastActive}
+          <span className="capitalize">{device.status}</span> • Last active:{' '}
+          {lastActiveLabel(device)}
         </p>
       </div>
       <span
         className={cn(
           'flex items-center gap-2 text-sm',
-          device.online ? 'text-primary' : 'text-muted-foreground',
+          online ? 'text-primary' : 'text-muted-foreground',
         )}
       >
         <span
-          className={cn(
-            'size-1.5 rounded-full',
-            device.online ? 'bg-primary' : 'bg-muted-foreground',
-          )}
+          className={cn('size-1.5 rounded-full', online ? 'bg-primary' : 'bg-muted-foreground')}
         />
-        {device.online ? 'Online' : 'Offline'}
+        {online ? 'Online' : 'Offline'}
       </span>
-      <button
-        type="button"
-        aria-label="Device options"
-        className="text-muted-foreground hover:text-foreground transition-colors"
-      >
-        <MoreVertical className="size-4" />
-      </button>
+      <DropdownMenu>
+        <DropdownMenuTrigger
+          aria-label="Device options"
+          className="text-muted-foreground hover:text-foreground rounded-md p-1 transition-colors outline-none data-[state=open]:text-foreground"
+        >
+          <MoreVertical className="size-4" />
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem data-variant="destructive" onSelect={() => setRemoving(true)}>
+            <Trash2 className="size-4" />
+            Remove device
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <RemoveDeviceDialog device={device} open={removing} onOpenChange={setRemoving} />
     </div>
   )
 }
 
 export function TrustedDevicesList() {
   const { openAddDevice } = useEnrollment()
+  const devices = useDevices()
+  const trusted = (devices.data ?? []).filter((d) => d.status === 'active')
 
   return (
-    <SectionCard title="Trusted Devices" action={<ViewAllLink to="/devices" />}>
-      <div className="divide-border/60 divide-y">
-        {SAMPLE_DEVICES.map((device) => (
-          <DeviceRow key={device.id} device={device} />
-        ))}
-      </div>
+    <SectionCard title="Trusted Devices">
+      {trusted.length > 0 ? (
+        <div className="divide-border/60 divide-y">
+          {trusted.map((device) => (
+            <DeviceRow key={device.id} device={device} />
+          ))}
+        </div>
+      ) : (
+        <EmptyState>No trusted devices yet.</EmptyState>
+      )}
       <button
         type="button"
         onClick={openAddDevice}

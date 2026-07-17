@@ -48,6 +48,14 @@ class SecuritySettings(BaseModel):
     challenge_ttl_seconds: int = 120
     session_ttl_seconds: int = 3600
     invite_ttl_seconds: int = 600
+    # A device may declare how long it should live (idle TTL); the server caps it
+    # here so a bad clock or client can't pin a device open forever. 90 days.
+    device_max_ttl_seconds: int = 90 * 24 * 3600
+    # How often the background reaper deletes devices past their declared expiry.
+    device_reap_interval_seconds: int = 3600
+    # Backstop sweep: any device (browser or CLI) idle longer than this is reaped,
+    # even if it declared no expiry. Recovery-key restore brings an account back.
+    device_inactive_sweep_seconds: int = 90 * 24 * 3600
 
 
 class RunSettings(BaseModel):

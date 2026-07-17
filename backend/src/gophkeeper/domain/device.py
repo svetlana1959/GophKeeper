@@ -47,6 +47,10 @@ class Device:
     sign_public_key: str = ""  # Ed25519 (base64); verifies the device's trust certs
     status: str = ACTIVE
     last_seen_at: datetime | None = None
+    # When the device should stop being valid. None = never (CLI devices). A
+    # device self-declares this (see ``set_expiry``); the reaper deletes devices
+    # past it and ``may_authenticate`` rejects them even before the sweep runs.
+    expires_at: datetime | None = None
     updated_at: datetime = field(default_factory=_now)
 
     def __post_init__(self) -> None:
@@ -64,15 +68,23 @@ class Device:
     def is_active(self) -> bool:
         return self.status == ACTIVE
 
+    def is_expired(self, *, at: datetime | None = None) -> bool:
+        """Whether the device has passed its self-declared expiry. Devices with
+        no expiry (``expires_at is None``) never expire."""
+        if self.expires_at is None:
+            return False
+        return (at or _now()) >= self.expires_at
+
     def may_authenticate(self) -> bool:
         """Whether this device is allowed to obtain and use a session.
 
         The single source of truth for "can this device talk to the server":
-        only an active device may. Checked on the challenge/verify path *and*
-        on every authenticated request (see ``get_principal``), so revoking a
-        device denies it immediately rather than at token expiry.
+        an active, unexpired device may. Checked on the challenge/verify path
+        *and* on every authenticated request (see ``get_principal``), so revoking
+        or expiring a device denies it immediately — an expired device is locked
+        out even before the background reaper deletes it.
         """
-        return self.status == ACTIVE
+        return self.status == ACTIVE and not self.is_expired()
 
     def touch(self, *, at: datetime | None = None) -> None:
         """Record that the device just made an authenticated call."""
@@ -91,6 +103,12 @@ class Device:
         self.status = REVOKED
         self.updated_at = _now()
 
+    def set_expiry(self, expires_at: datetime | None) -> None:
+        """Declare when the device should expire (enroll / heartbeat). ``None``
+        clears any expiry. The caller is responsible for capping the value."""
+        self.expires_at = expires_at
+        self.updated_at = _now()
+
 
 class DeviceRepository(Protocol):
     async def add(self, device: Device) -> None: ...
@@ -104,3 +122,9 @@ class DeviceRepository(Protocol):
     async def list_for_account(self, account_id: UUID) -> list[Device]: ...
 
     async def save(self, device: Device) -> None: ...
+
+    async def delete(self, device_id: UUID) -> None: ...
+
+    async def delete_expired(self, *, now: datetime) -> int: ...
+
+    async def delete_inactive(self, *, cutoff: datetime) -> int: ...

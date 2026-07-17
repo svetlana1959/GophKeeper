@@ -3,7 +3,7 @@ import type { ReactNode } from 'react'
 import { Card } from '@/components/ui/card'
 import { formatSyncTimestamp } from '@/lib/format'
 import type { StatsSecurity } from '@/api/stats'
-import { SAMPLE_DEVICES } from '../sample-devices'
+import { useDevices } from '@/features/dashboard/use-devices'
 
 function SummaryCard({ icon, value, label }: { icon: ReactNode; value: ReactNode; label: string }) {
   return (
@@ -20,12 +20,13 @@ function SummaryCard({ icon, value, label }: { icon: ReactNode; value: ReactNode
 }
 
 export function DevicesSummaryCards({ security }: { security: StatsSecurity | undefined }) {
-  const thisDevice = SAMPLE_DEVICES.find((d) => d.thisDevice)
+  const devices = useDevices()
+  const total = devices.data?.length ?? 0
   return (
     <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
       <SummaryCard
         icon={<ShieldCheck className="size-7" strokeWidth={1.75} />}
-        value={security?.trusted_devices ?? SAMPLE_DEVICES.length}
+        value={security?.trusted_devices ?? 0}
         label="Trusted devices"
       />
       <SummaryCard
@@ -35,8 +36,8 @@ export function DevicesSummaryCards({ security }: { security: StatsSecurity | un
       />
       <SummaryCard
         icon={<Laptop className="size-7" strokeWidth={1.75} />}
-        value="This device"
-        label={thisDevice?.name ?? 'Web session'}
+        value={total}
+        label={total === 1 ? 'Device total' : 'Devices total'}
       />
     </div>
   )
