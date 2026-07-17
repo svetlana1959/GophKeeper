@@ -5,6 +5,7 @@ import { VaultContext, type LinkState, type VaultStatus } from './vault-context'
 import {
   browserLabel,
   enrollBrowserDevice,
+  heartbeatDevice,
   isAccountRecoveryKey,
   pullAndDecrypt,
   type BrowserDevice,
@@ -17,6 +18,10 @@ const IDLE_LOCK_MS = 15 * 60 * 1000
 
 // How often to check whether an approving device has reshared the vault to us.
 const APPROVE_POLL_MS = 3000
+
+// How often an unlocked browser device tells the server it's still in use, so it
+// isn't reaped while open. Well under the declared TTL.
+const HEARTBEAT_MS = 5 * 60 * 1000
 
 export function VaultProvider({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<VaultStatus>('locked')
@@ -117,6 +122,17 @@ export function VaultProvider({ children }: { children: ReactNode }) {
       setLink(null)
     }
   }, [])
+
+  // Keep an unlocked browser device alive while the tab is open. Only devices
+  // (approve flow) have a token to beat with; recovery unlock has none.
+  useEffect(() => {
+    if (status !== 'unlocked' || !device.current) return
+    const token = device.current.deviceToken
+    const beat = () => void heartbeatDevice({ token }).catch(() => {})
+    const timer = setInterval(beat, HEARTBEAT_MS)
+    beat()
+    return () => clearInterval(timer)
+  }, [status])
 
   // Slide-to-lock on inactivity while unlocked.
   useEffect(() => {

@@ -18,6 +18,12 @@ import {
 
 const DEFAULT_BASE = '/api'
 
+// How long a freshly linked browser device asks to live. It heartbeats to extend
+// this while in use; if the tab is abandoned (key wiped on lock/close, no more
+// heartbeats) the server reaps the device once this elapses — so orphaned browser
+// devices don't pile up. Settings will make this configurable (Phase 5).
+export const DEFAULT_DEVICE_TTL_SECONDS = 24 * 60 * 60
+
 async function api<T>(
   baseUrl: string,
   path: string,
@@ -78,6 +84,7 @@ export function browserLabel(): string {
 export async function enrollBrowserDevice(opts: {
   accountToken: string
   deviceName: string
+  ttlSeconds?: number
   baseUrl?: string
 }): Promise<BrowserDevice> {
   const baseUrl = opts.baseUrl ?? DEFAULT_BASE
@@ -98,6 +105,8 @@ export async function enrollBrowserDevice(opts: {
       sign_public_key: '',
       // A self-enrolled browser is its own inviter; no one verifies the mac.
       join_mac: code.slice(0, 8),
+      // The browser declares its own lifetime; the server caps and reaps it.
+      ttl_seconds: opts.ttlSeconds ?? DEFAULT_DEVICE_TTL_SECONDS,
     },
   })
 
@@ -114,6 +123,22 @@ export async function enrollBrowserDevice(opts: {
   })
 
   return { deviceId: join.device.id, identity, recipient, deviceToken: verify.access_token }
+}
+
+/** Extend this device's expiry while it's in active use, so an in-use browser
+ *  isn't reaped. Best-effort: a failure (e.g. an expired session token) is left
+ *  for the caller to ignore — the worst case is the device expires and re-links. */
+export async function heartbeatDevice(opts: {
+  token: string
+  ttlSeconds?: number
+  baseUrl?: string
+}): Promise<void> {
+  const baseUrl = opts.baseUrl ?? DEFAULT_BASE
+  await api(baseUrl, '/devices/heartbeat', {
+    method: 'POST',
+    token: opts.token,
+    body: { ttl_seconds: opts.ttlSeconds ?? DEFAULT_DEVICE_TTL_SECONDS },
+  })
 }
 
 /** True if `recoveryKey` is the account's recovery key — checked before decrypt so
