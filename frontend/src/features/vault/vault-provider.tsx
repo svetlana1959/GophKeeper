@@ -1,41 +1,18 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { tokenStore } from '@/api/http'
 import { VaultContext, type VaultStatus } from './vault-context'
-import {
-  enrollBrowserDevice,
-  isAccountRecoveryKey,
-  pullAndDecrypt,
-  type BrowserDevice,
-  type DecryptedSecret,
-} from './session'
+import { isAccountRecoveryKey, pullAndDecrypt, type DecryptedSecret } from './session'
 
 // Auto-lock after inactivity: wipe the decryption key + decrypted secrets from
-// memory. The device enrollment (token) is kept so re-unlock is cheap; only the
-// sensitive material goes. MVP holds everything in memory only — a reload locks.
+// memory. MVP holds everything in memory only — a reload locks.
 const IDLE_LOCK_MS = 15 * 60 * 1000
-
-function browserLabel(): string {
-  const ua = navigator.userAgent
-  const browser = /Firefox/.test(ua)
-    ? 'Firefox'
-    : /Edg/.test(ua)
-      ? 'Edge'
-      : /Chrome/.test(ua)
-        ? 'Chrome'
-        : /Safari/.test(ua)
-          ? 'Safari'
-          : 'Browser'
-  const os = /Mac/.test(ua) ? 'Mac' : /Win/.test(ua) ? 'Windows' : /Linux/.test(ua) ? 'Linux' : ''
-  return os ? `${browser} on ${os}` : browser
-}
 
 export function VaultProvider({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<VaultStatus>('locked')
   const [secrets, setSecrets] = useState<DecryptedSecret[]>([])
   const [error, setError] = useState<string | null>(null)
 
-  // Sensitive material stays in refs, out of React state/devtools.
-  const device = useRef<BrowserDevice | null>(null)
+  // The recovery key stays in a ref, out of React state/devtools.
   const unlockIdentity = useRef<string | null>(null)
 
   const lock = useCallback(() => {
@@ -59,16 +36,11 @@ export function VaultProvider({ children }: { children: ReactNode }) {
         setStatus('locked')
         return
       }
-      if (!device.current) {
-        device.current = await enrollBrowserDevice({
-          accountToken,
-          deviceName: browserLabel(),
-        })
-      }
-      const decrypted = await pullAndDecrypt({
-        deviceToken: device.current.deviceToken,
-        identity: recoveryKey,
-      })
+      // The recovery key decrypts everything on its own, so the web doesn't need
+      // to become a device to unlock this way — it reads /sync/all with the
+      // account token. (Enrolling here would leave a junk device behind on every
+      // unlock.) The approve flow is what enrolls a real device.
+      const decrypted = await pullAndDecrypt({ token: accountToken, identity: recoveryKey })
       unlockIdentity.current = recoveryKey
       setSecrets(decrypted)
       setStatus('unlocked')

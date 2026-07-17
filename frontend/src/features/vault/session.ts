@@ -123,14 +123,14 @@ export interface DecryptedSecret {
  *  ciphertext but not a device, so the recipient-scoped /changes wouldn't return
  *  anything. Secrets not sealed to this identity are skipped. */
 export async function pullAndDecrypt(opts: {
-  deviceToken: string
+  token: string
   identity: string
   baseUrl?: string
 }): Promise<DecryptedSecret[]> {
   const baseUrl = opts.baseUrl ?? DEFAULT_BASE
   const { secrets } = await api<{
     secrets: { id: string; version: number; deleted: boolean; ciphertext_b64: string }[]
-  }>(baseUrl, '/sync/all', { token: opts.deviceToken })
+  }>(baseUrl, '/sync/all', { token: opts.token })
 
   const out: DecryptedSecret[] = []
   for (const s of secrets) {

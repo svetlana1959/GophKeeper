@@ -10,7 +10,10 @@ const API = process.env.E2E_API
 async function post(path: string, body: unknown, token?: string) {
   const res = await fetch(`${API}${path}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
     body: JSON.stringify(body),
   })
   if (!res.ok) throw new Error(`${path} -> ${res.status} ${await res.text()}`)
@@ -34,29 +37,54 @@ describe.skipIf(!API)('vault session (e2e)', () => {
     })
 
     // The browser makes itself a device.
-    const device = await enrollBrowserDevice({ accountToken, deviceName: 'Chrome on Mac', baseUrl: API })
+    const device = await enrollBrowserDevice({
+      accountToken,
+      deviceName: 'Chrome on Mac',
+      baseUrl: API,
+    })
     expect(device.deviceToken).toBeTruthy()
     expect(device.recipient).toMatch(/^age1/)
 
     // Seed a secret sealed to {this device, recovery key}, pushed as the device.
     const ciphertext = await sealContent(
-      { name: 'github', folder: 'work', value: new TextEncoder().encode('ghp_xyz'), description: 'token' },
+      {
+        name: 'github',
+        folder: 'work',
+        value: new TextEncoder().encode('ghp_xyz'),
+        description: 'token',
+      },
       [device.recipient, recoveryRecipient],
     )
     const secretId = crypto.randomUUID()
     await post(
       '/sync/push',
-      { items: [{ id: secretId, ciphertext_b64: bytesToBase64(ciphertext), recipients: [device.recipient, recoveryRecipient] }] },
+      {
+        items: [
+          {
+            id: secretId,
+            ciphertext_b64: bytesToBase64(ciphertext),
+            recipients: [device.recipient, recoveryRecipient],
+          },
+        ],
+      },
       device.deviceToken,
     )
 
     // Recovery-key validation: right key true, wrong key false.
-    expect(await isAccountRecoveryKey({ accountToken, recoveryKey: recoveryIdentity, baseUrl: API })).toBe(true)
+    expect(
+      await isAccountRecoveryKey({ accountToken, recoveryKey: recoveryIdentity, baseUrl: API }),
+    ).toBe(true)
     const wrong = await generateX25519Identity()
-    expect(await isAccountRecoveryKey({ accountToken, recoveryKey: wrong, baseUrl: API })).toBe(false)
+    expect(await isAccountRecoveryKey({ accountToken, recoveryKey: wrong, baseUrl: API })).toBe(
+      false,
+    )
 
     // Pull + decrypt with the recovery key.
-    const secrets = await pullAndDecrypt({ deviceToken: device.deviceToken, identity: recoveryIdentity, baseUrl: API })
+    const secrets = await pullAndDecrypt({
+      token: device.deviceToken,
+      identity: recoveryIdentity,
+      baseUrl: API,
+    })
     const github = secrets.find((s) => s.id === secretId)
     expect(github).toBeDefined()
     expect(github!.name).toBe('github')
@@ -64,7 +92,20 @@ describe.skipIf(!API)('vault session (e2e)', () => {
     expect(new TextDecoder().decode(github!.value)).toBe('ghp_xyz')
 
     // And the browser's OWN device key decrypts it too (it was a recipient).
-    const asDevice = await pullAndDecrypt({ deviceToken: device.deviceToken, identity: device.identity, baseUrl: API })
+    const asDevice = await pullAndDecrypt({
+      token: device.deviceToken,
+      identity: device.identity,
+      baseUrl: API,
+    })
     expect(asDevice.find((s) => s.id === secretId)?.name).toBe('github')
+
+    // Device-free recovery: the account token alone reads + decrypts (no device
+    // enrollment) — so recovery unlock doesn't leave a junk device behind.
+    const viaAccount = await pullAndDecrypt({
+      token: accountToken,
+      identity: recoveryIdentity,
+      baseUrl: API,
+    })
+    expect(viaAccount.find((s) => s.id === secretId)?.name).toBe('github')
   })
 })

@@ -12,8 +12,7 @@ function base64ToBytes(b64: string): Uint8Array {
 // `content` JSON, whose []byte Value is base64 in JSON). Decrypting this in the
 // app's build proves the browser can read actual CLI-sealed secrets — not just
 // its own round-trips. Regenerate with the Go fixture if the format ever changes.
-const CLI_IDENTITY =
-  'AGE-SECRET-KEY-18FP4YL6RKQ6S3GK9Y2HQW2T07QY4JN37A2J8SWFEA8XS9NEQ88JQ4809GF'
+const CLI_IDENTITY = 'AGE-SECRET-KEY-18FP4YL6RKQ6S3GK9Y2HQW2T07QY4JN37A2J8SWFEA8XS9NEQ88JQ4809GF'
 const CLI_CIPHERTEXT = base64ToBytes(
   'YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBZQnZCYkV3ajFwNXZkSWJxNWppN1lEVTFoRFF3Q1FsKzN3eUp5THk4bG1rCjF0b3dMaHZMYzIvSTdLUjgreUVib1dqenZka0NHMFFNbVR1YjlSSTN5WEUKLS0tIGREMmllTzlrSDNUQ08rcmJlQ3JycDgrOWpGMCtNanN5alBQWVNBVmhUUVEKAfHCz390pRs62N7WOndY9BoQN7OAwdMntstf9hAjvrUdoCRKD9woTcM7ZUTz8oTWadkCQMZukz2zSA0SHOp7O+15SPec5GstLasIgz2uob0ExBzlhlAZ/kXiwX8+fMxsbj3n+U8+DuWgBLxq7V2h7p12YjOsaf0bjun/iSdo7olpKQs=',
 )
