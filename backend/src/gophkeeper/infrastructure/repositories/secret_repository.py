@@ -6,6 +6,7 @@ model stays a plain dataclass with no mapper, and the mapping is explicit and
 visible right here. New aggregates get a sibling adapter following this shape.
 """
 
+from datetime import datetime
 from typing import Any
 from uuid import UUID
 
@@ -13,7 +14,7 @@ from sqlalchemy import RowMapping, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from gophkeeper.domain.errors import SecretNotFound, VersionConflict
-from gophkeeper.domain.secret import Secret, SecretRepository
+from gophkeeper.domain.secret import Secret, SecretActivityCount, SecretRepository
 
 # seq is excluded from writes: the DB assigns it (default nextval on insert,
 # nextval explicitly on update) and we read it back via RETURNING.
@@ -95,6 +96,38 @@ class SqlAlchemySecretRepository(SecretRepository):
             },
         )
         return [_from_row(row) for row in result.mappings().all()]
+
+    async def activity_counts(
+        self, account_id: str, *, start_at: datetime, end_at: datetime
+    ) -> list[SecretActivityCount]:
+        """Count each secret's latest persisted mutation, grouped by UTC day.
+
+        The table stores a current snapshot rather than an event log. Consequently,
+        this query cannot reconstruct superseded mutations or an original creation
+        date after a secret has been updated.
+        """
+        result = await self._session.execute(
+            text(
+                "SELECT (updated_at AT TIME ZONE 'UTC')::date AS activity_date, "
+                "COUNT(*) FILTER (WHERE version = 1 AND NOT deleted) AS created, "
+                "COUNT(*) FILTER (WHERE version > 1 AND NOT deleted) AS updated, "
+                "COUNT(*) FILTER (WHERE deleted) AS deleted "
+                "FROM secrets "
+                "WHERE account_id = :account_id "
+                "AND updated_at >= :start_at AND updated_at < :end_at "
+                "GROUP BY activity_date ORDER BY activity_date"
+            ),
+            {"account_id": account_id, "start_at": start_at, "end_at": end_at},
+        )
+        return [
+            SecretActivityCount(
+                date=row["activity_date"],
+                created=row["created"],
+                updated=row["updated"],
+                deleted=row["deleted"],
+            )
+            for row in result.mappings().all()
+        ]
 
     async def set_recipients(self, secret_id: UUID, device_ids: list[UUID]) -> None:
         await self._session.execute(

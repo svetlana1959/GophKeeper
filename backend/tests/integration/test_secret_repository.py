@@ -40,3 +40,35 @@ async def test_rollback_discards_uncommitted_write(database):
     async with SqlAlchemyUnitOfWork(database) as uow:
         with pytest.raises(SecretNotFound):
             await uow.secrets.get(secret_id)
+
+
+async def test_activity_counts_latest_mutations_and_scopes_account(database):
+    from datetime import UTC, datetime
+
+    account_id = str(uuid4())
+    event_time = datetime(2026, 7, 14, 12, tzinfo=UTC)
+    async with SqlAlchemyUnitOfWork(database) as uow:
+        await uow.secrets.add(
+            Secret(uuid4(), account_id, b"created", version=1, updated_at=event_time)
+        )
+        await uow.secrets.add(
+            Secret(uuid4(), account_id, b"updated", version=2, updated_at=event_time)
+        )
+        await uow.secrets.add(
+            Secret(uuid4(), account_id, b"deleted", version=2, deleted=True, updated_at=event_time)
+        )
+        await uow.secrets.add(
+            Secret(uuid4(), "other-account", b"other", version=1, updated_at=event_time)
+        )
+        await uow.commit()
+
+    async with SqlAlchemyUnitOfWork(database) as uow:
+        counts = await uow.secrets.activity_counts(
+            account_id,
+            start_at=datetime(2026, 7, 14, tzinfo=UTC),
+            end_at=datetime(2026, 7, 15, tzinfo=UTC),
+        )
+
+    assert len(counts) == 1
+    assert counts[0].date.isoformat() == "2026-07-14"
+    assert (counts[0].created, counts[0].updated, counts[0].deleted) == (1, 1, 1)
