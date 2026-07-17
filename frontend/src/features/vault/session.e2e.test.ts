@@ -153,12 +153,15 @@ describe.skipIf(!API)('vault session (e2e)', () => {
       deviceName: 'Chrome on Mac',
       baseUrl: API,
     })
-    expect(restored.deviceToken).toBeTruthy()
+    expect(restored.device.deviceToken).toBeTruthy()
+    expect(restored.failed).toBe(0)
+    // The reseal decrypted the vault in passing — no re-pull needed.
+    expect(restored.secrets.find((s) => s.id === secretId)?.name).toBe('aws')
 
     // The restored browser now decrypts with its OWN device key — no recovery key.
     const asDevice = await pullAndDecrypt({
-      token: restored.deviceToken,
-      identity: restored.identity,
+      token: restored.device.deviceToken,
+      identity: restored.device.identity,
       baseUrl: API,
     })
     const aws = asDevice.find((s) => s.id === secretId)

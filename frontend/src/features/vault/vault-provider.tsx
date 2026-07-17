@@ -2,9 +2,12 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { tokenStore } from '@/api/http'
 import { deviceFingerprint } from './crypto'
 import {
+  clearPendingDevice,
   clearPersistedDevice,
+  loadPendingDevice,
   peekPersistedDevice,
   persistDevice,
+  savePendingDevice,
   unlockPersistedDevice,
   WrongPinError,
   type PersistedDeviceMeta,
@@ -17,6 +20,7 @@ import {
   heartbeatDevice,
   isAccountRecoveryKey,
   isDeviceApproved,
+  isUnauthorized,
   pullAndDecrypt,
   reauthenticateDevice,
   resealVaultToDevice,
@@ -35,10 +39,6 @@ const APPROVE_POLL_MS = 3000
 // How often an unlocked browser device tells the server it's still in use, so it
 // isn't reaped while open. Well under the declared TTL.
 const HEARTBEAT_MS = 5 * 60 * 1000
-
-function is401(e: unknown): boolean {
-  return e instanceof Error && / 401 /.test(` ${e.message} `)
-}
 
 export function VaultProvider({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<VaultStatus>('locked')
@@ -107,7 +107,7 @@ export function VaultProvider({ children }: { children: ReactNode }) {
     setRestoring({ done: 0, total: 0 })
     try {
       const settings = loadVaultSettings()
-      const dev = await resealVaultToDevice({
+      const { device: dev, secrets: resealed } = await resealVaultToDevice({
         accountToken,
         recoveryKey,
         deviceName: browserLabel(),
@@ -116,10 +116,10 @@ export function VaultProvider({ children }: { children: ReactNode }) {
       })
       device.current = dev
       unlockIdentity.current = dev.identity
-      setHasDeviceKey(true)
+      // reseal already decrypted the vault; use it rather than re-pulling.
+      setSecrets(resealed)
       setViaRecovery(false)
-      // Re-read with the device's own key now that it's a recipient.
-      setSecrets(await pullAndDecrypt({ token: dev.deviceToken, identity: dev.identity }))
+      setHasDeviceKey(true) // last, so the heartbeat effect sees device.current set
       if (settings.persist) {
         await persistDevice(dev, { ttlSeconds: settings.ttlSeconds })
         setPersisted(peekPersistedDevice())
@@ -154,7 +154,7 @@ export function VaultProvider({ children }: { children: ReactNode }) {
         setStatus('locked')
         return
       }
-      if (is401(e)) {
+      if (isUnauthorized(e)) {
         // The device was reaped or revoked server-side; the saved key is dead.
         clearPersistedDevice()
         setPersisted(null)
@@ -182,14 +182,39 @@ export function VaultProvider({ children }: { children: ReactNode }) {
     setError(null)
     const deviceName = browserLabel()
     const settings = loadVaultSettings()
-    setLink({ phase: 'enrolling', deviceName, deviceId: null, fingerprint: null })
     pollAbort.current = false
+
+    // Reuse this browser's pending device across link attempts so re-linking
+    // (cancel, reload, re-click) doesn't spawn a fresh device row each time — one
+    // browser stays one device. A browser can't read a MAC or any stable hardware
+    // id, so its own persisted keypair *is* its identity.
+    const enrollFresh = async () => {
+      const d = await enrollBrowserDevice({ accountToken, deviceName, ttlSeconds: settings.ttlSeconds })
+      savePendingDevice({ deviceId: d.deviceId, identity: d.identity, recipient: d.recipient })
+      return d
+    }
+    const pending = loadPendingDevice()
+    setLink({
+      phase: 'enrolling',
+      deviceName,
+      deviceId: pending?.deviceId ?? null,
+      fingerprint: null,
+    })
     try {
-      const enrolled = await enrollBrowserDevice({
-        accountToken,
-        deviceName,
-        ttlSeconds: settings.ttlSeconds,
-      })
+      let enrolled: BrowserDevice
+      if (pending) {
+        try {
+          const token = await reauthenticateDevice({ identity: pending.identity })
+          enrolled = { ...pending, deviceToken: token }
+        } catch (e) {
+          if (!isUnauthorized(e)) throw e
+          // The pending device was reaped server-side; start clean.
+          clearPendingDevice()
+          enrolled = await enrollFresh()
+        }
+      } else {
+        enrolled = await enrollFresh()
+      }
       if (pollAbort.current) return
       device.current = enrolled
       const fingerprint = await deviceFingerprint(enrolled.recipient)
@@ -212,14 +237,15 @@ export function VaultProvider({ children }: { children: ReactNode }) {
           })
           if (pollAbort.current) return
           unlockIdentity.current = enrolled.identity
-          setHasDeviceKey(true)
           setSecrets(decrypted)
+          clearPendingDevice() // approved — no longer just "pending"
           if (settings.persist) {
             await persistDevice(enrolled, { pin, ttlSeconds: settings.ttlSeconds })
             setPersisted(peekPersistedDevice())
           }
           setStatus('unlocked')
           setLink(null)
+          setHasDeviceKey(true) // last, so the heartbeat effect sees device.current
           return
         }
         await new Promise((r) => setTimeout(r, APPROVE_POLL_MS))
@@ -245,15 +271,39 @@ export function VaultProvider({ children }: { children: ReactNode }) {
   }, [])
 
   // Keep an unlocked browser device alive while the tab is open. Only devices
-  // (link / saved-device unlock) have a token to beat with; recovery unlock has none.
+  // (link / saved-device / restore) have a token to beat with; recovery unlock
+  // has none — hence the hasDeviceKey dependency, which also (re)starts the beat
+  // when a recovery unlock is later restored into a device.
   useEffect(() => {
     if (status !== 'unlocked' || !device.current) return
-    const token = device.current.deviceToken
-    const beat = () => void heartbeatDevice({ token }).catch(() => {})
-    const timer = setInterval(beat, HEARTBEAT_MS)
-    beat()
-    return () => clearInterval(timer)
-  }, [status])
+    let cancelled = false
+    const beat = async () => {
+      const dev = device.current
+      if (!dev) return
+      try {
+        await heartbeatDevice({ token: dev.deviceToken })
+      } catch (e) {
+        // The device session token expires well before the device TTL; on a 401
+        // re-authenticate with the device's own key for a fresh token and retry,
+        // so a long-open tab keeps extending its expiry.
+        if (cancelled || !isUnauthorized(e) || !device.current) return
+        try {
+          const token = await reauthenticateDevice({ identity: device.current.identity })
+          if (cancelled || !device.current) return
+          device.current = { ...device.current, deviceToken: token }
+          await heartbeatDevice({ token })
+        } catch {
+          // Give up this tick; the next interval tries again.
+        }
+      }
+    }
+    const timer = setInterval(() => void beat(), HEARTBEAT_MS)
+    void beat()
+    return () => {
+      cancelled = true
+      clearInterval(timer)
+    }
+  }, [status, hasDeviceKey])
 
   // Slide-to-lock on inactivity while unlocked.
   useEffect(() => {

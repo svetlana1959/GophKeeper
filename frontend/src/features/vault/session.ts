@@ -19,6 +19,22 @@ import {
 
 const DEFAULT_BASE = '/api'
 
+/** An HTTP error from the vault API, carrying the status so callers can react to
+ *  it precisely (e.g. a 401 → the device was reaped) instead of string-matching. */
+export class ApiError extends Error {
+  readonly status: number
+  constructor(status: number, message: string) {
+    super(message)
+    this.name = 'ApiError'
+    this.status = status
+  }
+}
+
+/** True for an authentication failure (device reaped, revoked, or token expired). */
+export function isUnauthorized(e: unknown): boolean {
+  return e instanceof ApiError && e.status === 401
+}
+
 // How long a freshly linked browser device asks to live. It heartbeats to extend
 // this while in use; if the tab is abandoned (key wiped on lock/close, no more
 // heartbeats) the server reaps the device once this elapses — so orphaned browser
@@ -40,7 +56,7 @@ async function api<T>(
   })
   if (!res.ok) {
     const detail = await res.text().catch(() => '')
-    throw new Error(`${init.method ?? 'GET'} ${path} -> ${res.status} ${detail}`)
+    throw new ApiError(res.status, `${init.method ?? 'GET'} ${path} -> ${res.status} ${detail}`)
   }
   return res.json() as Promise<T>
 }
@@ -241,13 +257,45 @@ export interface RestoreProgress {
   total: number
 }
 
+export interface RestoreResult {
+  device: BrowserDevice
+  /** The vault, already decrypted during the reseal — the caller shouldn't re-pull. */
+  secrets: DecryptedSecret[]
+  /** How many secrets couldn't be resealed (a push conflict that survived a retry). */
+  failed: number
+}
+
+interface PushItem {
+  id: string
+  ciphertext_b64: string
+  base_version: number
+  recipients: string[]
+}
+
+interface PushResult {
+  id: string
+  status: string
+  version: number
+}
+
+async function pushItems(baseUrl: string, token: string, items: PushItem[]): Promise<PushResult[]> {
+  const { results } = await api<{ results: PushResult[] }>(baseUrl, '/sync/push', {
+    method: 'POST',
+    token,
+    body: { items },
+  })
+  return results
+}
+
 /** Recovery restore: after unlocking with the recovery key on an account whose
  *  devices have all lapsed, make THIS browser a real device. Enroll it, then
  *  reseal every secret — decrypt with the recovery key, re-seal to the browser's
  *  own key (plus any surviving devices and the recovery key, which stays a
- *  recipient so recovery keeps working) — and push. Afterwards the browser
- *  decrypts with its own key and can be saved/PIN-protected, so the user no
- *  longer pastes the recovery key each visit. Returns the new device. */
+ *  recipient so recovery keeps working) — and push in one batch. Afterwards the
+ *  browser decrypts with its own key and can be saved/PIN-protected, so the user
+ *  no longer pastes the recovery key each visit. Returns the new device plus the
+ *  decrypted vault (so the caller need not re-pull) and how many secrets a push
+ *  conflict left un-resealed. */
 export async function resealVaultToDevice(opts: {
   accountToken: string
   recoveryKey: string
@@ -255,7 +303,7 @@ export async function resealVaultToDevice(opts: {
   ttlSeconds?: number
   baseUrl?: string
   onProgress?: (p: RestoreProgress) => void
-}): Promise<BrowserDevice> {
+}): Promise<RestoreResult> {
   const baseUrl = opts.baseUrl ?? DEFAULT_BASE
   const device = await enrollBrowserDevice({
     accountToken: opts.accountToken,
@@ -282,32 +330,43 @@ export async function resealVaultToDevice(opts: {
   }>(baseUrl, '/sync/all', { token: device.deviceToken })
   const live = secrets.filter((s) => !s.deleted)
 
+  // Decrypt and re-seal every secret (skipping any not sealed to the recovery
+  // key), collecting the plaintext so the caller doesn't decrypt twice.
+  const items: PushItem[] = []
+  const decrypted: DecryptedSecret[] = []
   let done = 0
   opts.onProgress?.({ done, total: live.length })
   for (const s of live) {
     try {
       const content = await decryptContent(base64ToBytes(s.ciphertext_b64), opts.recoveryKey)
-      const sealed = await sealContent(content, recipients)
-      await api(baseUrl, '/sync/push', {
-        method: 'POST',
-        token: device.deviceToken,
-        body: {
-          items: [
-            {
-              id: s.id,
-              ciphertext_b64: bytesToBase64(sealed),
-              base_version: s.version,
-              recipients,
-            },
-          ],
-        },
+      items.push({
+        id: s.id,
+        ciphertext_b64: bytesToBase64(await sealContent(content, recipients)),
+        base_version: s.version,
+        recipients,
       })
+      decrypted.push({ id: s.id, version: s.version, ...content })
     } catch {
-      // Not recovery-sealed (or a concurrent edit); leave it and move on. The
-      // browser simply won't be a recipient of that one until it's re-shared.
+      // Not sealed to the recovery key; leave it as-is.
     }
     done += 1
     opts.onProgress?.({ done, total: live.length })
   }
-  return device
+
+  // One batched push. A conflict (someone edited between our read and write)
+  // comes back status:'conflict' with the current version — retry those once at
+  // that version rather than silently dropping the secret.
+  let failed = 0
+  if (items.length > 0) {
+    const results = await pushItems(baseUrl, device.deviceToken, items)
+    const byId = new Map(items.map((it) => [it.id, it]))
+    const retry = results
+      .filter((r) => r.status !== 'applied')
+      .map((r) => ({ ...byId.get(r.id)!, base_version: r.version }))
+    if (retry.length > 0) {
+      const retried = await pushItems(baseUrl, device.deviceToken, retry)
+      failed = retried.filter((r) => r.status !== 'applied').length
+    }
+  }
+  return { device, secrets: decrypted, failed }
 }

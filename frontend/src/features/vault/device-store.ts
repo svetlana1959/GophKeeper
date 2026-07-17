@@ -11,6 +11,12 @@
 import { base64ToBytes, bytesToBase64 } from './crypto'
 
 const STORE_KEY = 'gophkeeper.vault.device'
+// A device that has enrolled but isn't approved yet. Kept separately so repeated
+// link attempts (cancel, reload, re-click) reuse the SAME device instead of
+// enrolling a new one each time — one browser stays one device. Cleared once the
+// device is approved and promoted to the (PIN-protected) STORE_KEY slot. Stored in
+// the clear: pre-approval it's a recipient of nothing, so its value is minimal.
+const PENDING_KEY = 'gophkeeper.vault.pending'
 const PBKDF2_ITERATIONS = 210_000
 
 interface StoredDevice {
@@ -141,4 +147,30 @@ export async function unlockPersistedDevice(pin?: string): Promise<UnlockedDevic
 
 export function clearPersistedDevice(): void {
   localStorage.removeItem(STORE_KEY)
+}
+
+/** A device that has enrolled but isn't approved yet — this browser's stable
+ *  identity across link attempts. */
+export interface PendingDevice {
+  deviceId: string
+  identity: string
+  recipient: string
+}
+
+export function savePendingDevice(device: PendingDevice): void {
+  localStorage.setItem(PENDING_KEY, JSON.stringify(device))
+}
+
+export function loadPendingDevice(): PendingDevice | null {
+  const raw = localStorage.getItem(PENDING_KEY)
+  if (!raw) return null
+  try {
+    return JSON.parse(raw) as PendingDevice
+  } catch {
+    return null
+  }
+}
+
+export function clearPendingDevice(): void {
+  localStorage.removeItem(PENDING_KEY)
 }
