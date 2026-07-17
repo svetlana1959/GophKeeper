@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { decryptContent, generateDeviceIdentity, recipientOf, sealContent } from './crypto'
+import {
+  decryptContent,
+  deviceFingerprint,
+  generateDeviceIdentity,
+  recipientOf,
+  sealContent,
+} from './crypto'
 
 function base64ToBytes(b64: string): Uint8Array {
   const bin = atob(b64)
@@ -44,5 +50,13 @@ describe('vault crypto', () => {
   it('recipientOf recovers the public half (recovery-key validation)', async () => {
     const device = await generateDeviceIdentity()
     expect(await recipientOf(device.identity)).toBe(device.recipient)
+  })
+
+  it('deviceFingerprint matches the Go CLI fingerprint byte-for-byte', async () => {
+    // Value produced by the CLI's fingerprint() (sha256 of the recipient string,
+    // first four bytes as aabb·ccdd) for this exact input. If either side changes,
+    // the two stop matching and the approve prompt becomes unverifiable.
+    const recipient = 'age1qqqqzz9jn2c2z5j4y8w9k7wq0m8yq2t3g4h5j6k7l8m9n0p1q2r3s4t5u6v7w8'
+    expect(await deviceFingerprint(recipient)).toBe('1690·64ed')
   })
 })

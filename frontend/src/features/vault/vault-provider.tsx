@@ -1,24 +1,43 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { tokenStore } from '@/api/http'
-import { VaultContext, type VaultStatus } from './vault-context'
-import { isAccountRecoveryKey, pullAndDecrypt, type DecryptedSecret } from './session'
+import { deviceFingerprint } from './crypto'
+import { VaultContext, type LinkState, type VaultStatus } from './vault-context'
+import {
+  browserLabel,
+  enrollBrowserDevice,
+  isAccountRecoveryKey,
+  pullAndDecrypt,
+  type BrowserDevice,
+  type DecryptedSecret,
+} from './session'
 
 // Auto-lock after inactivity: wipe the decryption key + decrypted secrets from
 // memory. MVP holds everything in memory only — a reload locks.
 const IDLE_LOCK_MS = 15 * 60 * 1000
 
+// How often to check whether an approving device has reshared the vault to us.
+const APPROVE_POLL_MS = 3000
+
 export function VaultProvider({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<VaultStatus>('locked')
   const [secrets, setSecrets] = useState<DecryptedSecret[]>([])
   const [error, setError] = useState<string | null>(null)
+  const [link, setLink] = useState<LinkState | null>(null)
 
-  // The recovery key stays in a ref, out of React state/devtools.
+  // The unlock key (recovery key or this browser's device key) stays in a ref,
+  // out of React state/devtools. The enrolled device — including its private
+  // key — lives here too while the approve flow runs.
   const unlockIdentity = useRef<string | null>(null)
+  const device = useRef<BrowserDevice | null>(null)
+  const pollAbort = useRef(false)
 
   const lock = useCallback(() => {
+    pollAbort.current = true
     unlockIdentity.current = null
+    device.current = null
     setSecrets([])
     setError(null)
+    setLink(null)
     setStatus('locked')
   }, [])
 
@@ -50,6 +69,55 @@ export function VaultProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
+  const cancelLink = useCallback(() => {
+    pollAbort.current = true
+    device.current = null
+    setLink(null)
+  }, [])
+
+  const linkDevice = useCallback(async () => {
+    const accountToken = tokenStore.get()
+    if (!accountToken) {
+      setError('Your session expired — sign in again.')
+      return
+    }
+    setError(null)
+    const deviceName = browserLabel()
+    setLink({ phase: 'enrolling', deviceName, fingerprint: null })
+    pollAbort.current = false
+    try {
+      const enrolled = await enrollBrowserDevice({ accountToken, deviceName })
+      if (pollAbort.current) return
+      device.current = enrolled
+      const fingerprint = await deviceFingerprint(enrolled.recipient)
+      setLink({ phase: 'awaiting', deviceName, fingerprint })
+
+      // Wait for an existing device to run `goph device approve`, which vouches
+      // for us and reshares the vault. Once anything decrypts under our own key,
+      // approval has landed — unlock in memory.
+      while (!pollAbort.current) {
+        const decrypted = await pullAndDecrypt({
+          token: enrolled.deviceToken,
+          identity: enrolled.identity,
+        })
+        if (pollAbort.current) return
+        if (decrypted.length > 0) {
+          unlockIdentity.current = enrolled.identity
+          setSecrets(decrypted)
+          setStatus('unlocked')
+          setLink(null)
+          return
+        }
+        await new Promise((r) => setTimeout(r, APPROVE_POLL_MS))
+      }
+    } catch (e) {
+      if (pollAbort.current) return
+      setError(e instanceof Error ? e.message : 'Could not link this browser.')
+      device.current = null
+      setLink(null)
+    }
+  }, [])
+
   // Slide-to-lock on inactivity while unlocked.
   useEffect(() => {
     if (status !== 'unlocked') return
@@ -68,8 +136,8 @@ export function VaultProvider({ children }: { children: ReactNode }) {
   }, [status, lock])
 
   const value = useMemo(
-    () => ({ status, secrets, error, unlockWithRecoveryKey, lock }),
-    [status, secrets, error, unlockWithRecoveryKey, lock],
+    () => ({ status, secrets, error, link, unlockWithRecoveryKey, linkDevice, cancelLink, lock }),
+    [status, secrets, error, link, unlockWithRecoveryKey, linkDevice, cancelLink, lock],
   )
   return <VaultContext.Provider value={value}>{children}</VaultContext.Provider>
 }

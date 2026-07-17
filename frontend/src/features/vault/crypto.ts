@@ -50,6 +50,17 @@ export async function recipientOf(identity: string): Promise<string> {
   return identityToRecipient(identity)
 }
 
+/** A short, human-readable fingerprint of a device's public key. Must match the
+ *  CLI's `fingerprint()` (sha256 of the recipient string, first four bytes as
+ *  aabb·ccdd) so the user can compare the two by eye when approving. */
+export async function deviceFingerprint(recipient: string): Promise<string> {
+  const digest = new Uint8Array(
+    await crypto.subtle.digest('SHA-256', new TextEncoder().encode(recipient)),
+  )
+  const hex = (i: number) => (digest[i] ?? 0).toString(16).padStart(2, '0')
+  return `${hex(0)}${hex(1)}·${hex(2)}${hex(3)}`
+}
+
 /** Decrypt age ciphertext to raw bytes (e.g. the auth challenge nonce, which is
  *  not a content blob). */
 export async function decryptRaw(ciphertext: Uint8Array, identity: string): Promise<Uint8Array> {

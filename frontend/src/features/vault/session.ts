@@ -45,6 +45,33 @@ export interface BrowserDevice {
   deviceToken: string
 }
 
+/** A friendly name for this browser, e.g. "Firefox on Linux" — shown in the
+ *  device list and next to the approval prompt so the user recognises it. */
+export function browserLabel(): string {
+  const ua = typeof navigator === 'undefined' ? '' : navigator.userAgent
+  const browser = /Edg\//.test(ua)
+    ? 'Edge'
+    : /Firefox\//.test(ua)
+      ? 'Firefox'
+      : /Chrome\//.test(ua)
+        ? 'Chrome'
+        : /Safari\//.test(ua)
+          ? 'Safari'
+          : 'Browser'
+  const os = /Windows/.test(ua)
+    ? 'Windows'
+    : /Mac OS X|Macintosh/.test(ua)
+      ? 'Mac'
+      : /Android/.test(ua)
+        ? 'Android'
+        : /iPhone|iPad/.test(ua)
+          ? 'iOS'
+          : /Linux/.test(ua)
+            ? 'Linux'
+            : 'this device'
+  return `${browser} on ${os}`
+}
+
 /** Make this browser a device: mint an invite (account session), join with a
  *  freshly generated keypair, then authenticate via the age challenge to get a
  *  device token. The private key never leaves the tab. */
