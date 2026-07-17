@@ -127,3 +127,14 @@ class SqlAlchemyDeviceRepository(DeviceRepository):
             {"now": now},
         )
         return result.rowcount or 0
+
+    async def delete_inactive(self, *, cutoff: datetime) -> int:
+        """Hard-delete every device (browser or CLI) idle since before ``cutoff``,
+        returning the count. A never-authenticated device falls back to when it
+        was created (``updated_at``). This is the long-horizon backstop that
+        catches devices which declared no expiry."""
+        result = await self._session.execute(
+            text("DELETE FROM devices WHERE COALESCE(last_seen_at, updated_at) < :cutoff"),
+            {"cutoff": cutoff},
+        )
+        return result.rowcount or 0

@@ -55,6 +55,16 @@ class FakeDeviceRepository:
             del self.devices[device_id]
         return len(expired)
 
+    async def delete_inactive(self, *, cutoff: datetime) -> int:
+        stale = [
+            d.id
+            for d in self.devices.values()
+            if (d.last_seen_at or d.updated_at) < cutoff
+        ]
+        for device_id in stale:
+            del self.devices[device_id]
+        return len(stale)
+
 
 class FakeUnitOfWork:
     def __init__(self):
@@ -198,3 +208,33 @@ async def test_reap_expired_deletes_only_past_devices():
     assert live.id in uow.devices.devices
     assert never.id in uow.devices.devices
     assert uow.committed
+
+
+async def test_reap_expired_also_sweeps_long_idle_devices():
+    uow = FakeUnitOfWork()
+    account_id = uuid4()
+    now = datetime.now(UTC)
+    sweep = settings.security.device_inactive_sweep_seconds
+    # No declared expiry, but last seen well past the inactivity horizon.
+    stale = Device(
+        id=uuid4(),
+        account_id=account_id,
+        device_name="forgotten laptop",
+        public_key="age1old",
+        last_seen_at=now - timedelta(seconds=sweep + 3600),
+    )
+    active = Device(
+        id=uuid4(),
+        account_id=account_id,
+        device_name="daily laptop",
+        public_key="age1active",
+        last_seen_at=now - timedelta(days=1),
+    )
+    for d in (stale, active):
+        await uow.devices.add(d)
+
+    reaped = await DeviceService(uow).reap_expired(now=now)
+
+    assert reaped == 1
+    assert stale.id not in uow.devices.devices
+    assert active.id in uow.devices.devices

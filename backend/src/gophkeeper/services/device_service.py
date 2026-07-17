@@ -61,9 +61,13 @@ class DeviceService:
             return device
 
     async def reap_expired(self, *, now: datetime | None = None) -> int:
-        """Delete every device past its declared expiry, returning the count.
-        Idempotent and account-agnostic — this is the background sweep."""
+        """The background sweep: delete devices past their declared expiry, plus
+        the long-idle backstop that catches devices which declared none. Returns
+        the total deleted. Idempotent and account-agnostic."""
+        now = now or datetime.now(UTC)
+        cutoff = now - timedelta(seconds=settings.security.device_inactive_sweep_seconds)
         async with self._uow as uow:
-            deleted = await uow.devices.delete_expired(now=now or datetime.now(UTC))
+            deleted = await uow.devices.delete_expired(now=now)
+            deleted += await uow.devices.delete_inactive(cutoff=cutoff)
             await uow.commit()
             return deleted

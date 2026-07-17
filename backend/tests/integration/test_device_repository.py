@@ -91,3 +91,32 @@ async def test_delete_expired_reaps_only_past_devices_and_round_trips_expiry(dat
     # expires_at round-trips through the column, and NULL stays NULL.
     assert remaining[live_id].expires_at is not None
     assert remaining[never_id].expires_at is None
+
+
+async def test_delete_inactive_uses_last_seen_then_falls_back_to_updated_at(database):
+    account_id = uuid4()
+    now = datetime.now(UTC)
+    cutoff = now - timedelta(days=90)
+    seen_recently, seen_long_ago, never_seen_old = uuid4(), uuid4(), uuid4()
+
+    async with SqlAlchemyUnitOfWork(database) as uow:
+        await uow.accounts.add(Account(id=account_id))
+        recent = Device(seen_recently, account_id, "active", "k-active")
+        recent.last_seen_at = now - timedelta(days=1)
+        stale = Device(seen_long_ago, account_id, "stale", "k-stale")
+        stale.last_seen_at = now - timedelta(days=120)
+        # Never authenticated: falls back to updated_at, which we age past cutoff.
+        pending = Device(never_seen_old, account_id, "pending", "k-pending")
+        pending.updated_at = now - timedelta(days=200)
+        for d in (recent, stale, pending):
+            await uow.devices.add(d)
+        await uow.commit()
+
+    async with SqlAlchemyUnitOfWork(database) as uow:
+        reaped = await uow.devices.delete_inactive(cutoff=cutoff)
+        await uow.commit()
+
+    assert reaped == 2
+    async with SqlAlchemyUnitOfWork(database) as uow:
+        remaining = {d.id for d in await uow.devices.list_for_account(account_id)}
+    assert remaining == {seen_recently}
