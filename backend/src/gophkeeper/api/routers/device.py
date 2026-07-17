@@ -9,7 +9,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends
 
-from gophkeeper.api.deps import get_principal, provide
+from gophkeeper.api.deps import get_account_id, get_principal, provide
 from gophkeeper.api.schemas.device import DeviceResponse
 from gophkeeper.security.principal import DevicePrincipal
 from gophkeeper.services.device_service import DeviceService
@@ -24,11 +24,16 @@ router = APIRouter(prefix="/devices", tags=["devices"])
     responses={401: {"description": "Missing, invalid, or expired bearer token."}},
 )
 async def list_devices(
-    principal: DevicePrincipal = Depends(get_principal),
+    account_id: UUID = Depends(get_account_id),
     service: DeviceService = Depends(provide(DeviceService)),
 ) -> list[DeviceResponse]:
-    """Return every device in the caller's account."""
-    devices = await service.list_for_account(principal.account_id)
+    """Return every device in the caller's account.
+
+    Accepts either a web (account) session or a device session — a device list is
+    account-scoped and non-secret, and the web needs it to show your devices and
+    drive device approval. `get_account_id` resolves either token to its account.
+    """
+    devices = await service.list_for_account(account_id)
     return [DeviceResponse.from_domain(d) for d in devices]
 
 
