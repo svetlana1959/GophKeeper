@@ -19,6 +19,7 @@ import {
   isDeviceApproved,
   pullAndDecrypt,
   reauthenticateDevice,
+  resealVaultToDevice,
   type BrowserDevice,
   type DecryptedSecret,
 } from './session'
@@ -46,6 +47,8 @@ export function VaultProvider({ children }: { children: ReactNode }) {
   const [link, setLink] = useState<LinkState | null>(null)
   const [persisted, setPersisted] = useState<PersistedDeviceMeta | null>(() => peekPersistedDevice())
   const [hasDeviceKey, setHasDeviceKey] = useState(false)
+  const [viaRecovery, setViaRecovery] = useState(false)
+  const [restoring, setRestoring] = useState<{ done: number; total: number } | null>(null)
 
   // The unlock key (recovery key or this browser's device key) stays in a ref,
   // out of React state/devtools. The live device — including its private key —
@@ -59,6 +62,8 @@ export function VaultProvider({ children }: { children: ReactNode }) {
     unlockIdentity.current = null
     device.current = null
     setHasDeviceKey(false)
+    setViaRecovery(false)
+    setRestoring(null)
     setSecrets([])
     setError(null)
     setLink(null)
@@ -86,10 +91,43 @@ export function VaultProvider({ children }: { children: ReactNode }) {
       const decrypted = await pullAndDecrypt({ token: accountToken, identity: recoveryKey })
       unlockIdentity.current = recoveryKey
       setSecrets(decrypted)
+      setViaRecovery(true)
       setStatus('unlocked')
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not unlock the vault.')
       setStatus('locked')
+    }
+  }, [])
+
+  const restoreAsDevice = useCallback(async () => {
+    const accountToken = tokenStore.get()
+    const recoveryKey = unlockIdentity.current
+    if (!accountToken || !recoveryKey) return
+    setError(null)
+    setRestoring({ done: 0, total: 0 })
+    try {
+      const settings = loadVaultSettings()
+      const dev = await resealVaultToDevice({
+        accountToken,
+        recoveryKey,
+        deviceName: browserLabel(),
+        ttlSeconds: settings.ttlSeconds,
+        onProgress: (p) => setRestoring(p),
+      })
+      device.current = dev
+      unlockIdentity.current = dev.identity
+      setHasDeviceKey(true)
+      setViaRecovery(false)
+      // Re-read with the device's own key now that it's a recipient.
+      setSecrets(await pullAndDecrypt({ token: dev.deviceToken, identity: dev.identity }))
+      if (settings.persist) {
+        await persistDevice(dev, { ttlSeconds: settings.ttlSeconds })
+        setPersisted(peekPersistedDevice())
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not make this browser a device.')
+    } finally {
+      setRestoring(null)
     }
   }, [])
 
@@ -243,7 +281,10 @@ export function VaultProvider({ children }: { children: ReactNode }) {
       persisted,
       // Can save the current device key, or add a PIN to an unprotected one.
       canPersist: hasDeviceKey && (persisted === null || !persisted.protected),
+      viaRecovery,
+      restoring,
       unlockWithRecoveryKey,
+      restoreAsDevice,
       unlockWithSavedDevice,
       linkDevice,
       cancelLink,
@@ -258,7 +299,10 @@ export function VaultProvider({ children }: { children: ReactNode }) {
       link,
       persisted,
       hasDeviceKey,
+      viaRecovery,
+      restoring,
       unlockWithRecoveryKey,
+      restoreAsDevice,
       unlockWithSavedDevice,
       linkDevice,
       cancelLink,

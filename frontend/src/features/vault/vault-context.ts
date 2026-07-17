@@ -28,8 +28,16 @@ export interface VaultContextValue {
   /** True when there's a device key in memory that can be saved, or a PIN added
    *  to an unprotected saved key. False after a device-free recovery unlock. */
   canPersist: boolean
+  /** True when unlocked via the recovery key with no device of our own — the cue
+   *  to offer "make this browser a device" (recovery restore). */
+  viaRecovery: boolean
+  /** Progress of an in-flight recovery restore, else null. */
+  restoring: { done: number; total: number } | null
   /** Unlock by decrypting the vault with the account recovery key. */
   unlockWithRecoveryKey: (recoveryKey: string) => Promise<void>
+  /** Make this browser a device after a recovery unlock: enroll it and reseal the
+   *  vault so it has its own key (no more pasting the recovery key). */
+  restoreAsDevice: () => Promise<void>
   /** Unlock using this browser's saved device key. PIN required iff protected. */
   unlockWithSavedDevice: (pin?: string) => Promise<void>
   /** Enroll this browser as a device and wait for another device to approve it.

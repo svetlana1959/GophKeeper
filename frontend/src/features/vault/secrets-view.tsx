@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Eye, EyeOff, FolderClosed, KeyRound, Lock, Search } from 'lucide-react'
+import { Eye, EyeOff, FolderClosed, KeyRound, Laptop, Loader2, Lock, Search } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -130,6 +130,35 @@ function SecretDetail({ secret }: { secret: DecryptedSecret | null }) {
   )
 }
 
+function RecoveryRestoreBanner() {
+  const { viaRecovery, restoring, restoreAsDevice } = useVault()
+  if (!viaRecovery && !restoring) return null
+
+  return (
+    <Card className="border-primary/40 bg-primary/5 mb-4 flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex items-start gap-3">
+        <Laptop className="text-primary mt-0.5 size-5 shrink-0" strokeWidth={1.75} />
+        <div>
+          <p className="text-foreground text-sm font-medium">You're unlocked with your recovery key</p>
+          <p className="text-muted-foreground text-sm">
+            Make this browser a device to unlock with a PIN next time — no recovery key needed.
+          </p>
+        </div>
+      </div>
+      {restoring ? (
+        <span className="text-muted-foreground flex shrink-0 items-center gap-2 text-sm">
+          <Loader2 className="size-4 animate-spin" />
+          Resealing {restoring.done}/{restoring.total}…
+        </span>
+      ) : (
+        <Button onClick={() => void restoreAsDevice()} className="shrink-0">
+          <Laptop className="size-4" strokeWidth={2} /> Make this a device
+        </Button>
+      )}
+    </Card>
+  )
+}
+
 export function VaultSecretsView() {
   const { secrets, lock } = useVault()
   const [selectedId, setSelectedId] = useState<string | null>(secrets[0]?.id ?? null)
@@ -137,6 +166,7 @@ export function VaultSecretsView() {
 
   return (
     <div>
+      <RecoveryRestoreBanner />
       <div className="mb-4 flex items-center justify-between">
         <p className="text-muted-foreground text-sm">
           Decrypted in this browser · {secrets.length} secret{secrets.length === 1 ? '' : 's'}

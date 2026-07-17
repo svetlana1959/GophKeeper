@@ -14,6 +14,7 @@ import {
   decryptRaw,
   generateDeviceIdentity,
   recipientOf,
+  sealContent,
 } from './crypto'
 
 const DEFAULT_BASE = '/api'
@@ -233,4 +234,80 @@ export async function pullAndDecrypt(opts: {
     }
   }
   return out
+}
+
+export interface RestoreProgress {
+  done: number
+  total: number
+}
+
+/** Recovery restore: after unlocking with the recovery key on an account whose
+ *  devices have all lapsed, make THIS browser a real device. Enroll it, then
+ *  reseal every secret — decrypt with the recovery key, re-seal to the browser's
+ *  own key (plus any surviving devices and the recovery key, which stays a
+ *  recipient so recovery keeps working) — and push. Afterwards the browser
+ *  decrypts with its own key and can be saved/PIN-protected, so the user no
+ *  longer pastes the recovery key each visit. Returns the new device. */
+export async function resealVaultToDevice(opts: {
+  accountToken: string
+  recoveryKey: string
+  deviceName: string
+  ttlSeconds?: number
+  baseUrl?: string
+  onProgress?: (p: RestoreProgress) => void
+}): Promise<BrowserDevice> {
+  const baseUrl = opts.baseUrl ?? DEFAULT_BASE
+  const device = await enrollBrowserDevice({
+    accountToken: opts.accountToken,
+    deviceName: opts.deviceName,
+    ttlSeconds: opts.ttlSeconds,
+    baseUrl,
+  })
+
+  // Reseal to every active device's key (the browser is now among them) plus the
+  // recovery key, so recovery still works and no surviving device loses access.
+  const recoveryRecipient = await recipientOf(opts.recoveryKey)
+  const devices = await api<{ public_key: string; status: string }[]>(baseUrl, '/devices', {
+    token: opts.accountToken,
+  })
+  const recipients = Array.from(
+    new Set([
+      ...devices.filter((d) => d.status === 'active').map((d) => d.public_key),
+      recoveryRecipient,
+    ]),
+  )
+
+  const { secrets } = await api<{
+    secrets: { id: string; version: number; deleted: boolean; ciphertext_b64: string }[]
+  }>(baseUrl, '/sync/all', { token: device.deviceToken })
+  const live = secrets.filter((s) => !s.deleted)
+
+  let done = 0
+  opts.onProgress?.({ done, total: live.length })
+  for (const s of live) {
+    try {
+      const content = await decryptContent(base64ToBytes(s.ciphertext_b64), opts.recoveryKey)
+      const sealed = await sealContent(content, recipients)
+      await api(baseUrl, '/sync/push', {
+        method: 'POST',
+        token: device.deviceToken,
+        body: {
+          items: [
+            {
+              id: s.id,
+              ciphertext_b64: bytesToBase64(sealed),
+              base_version: s.version,
+              recipients,
+            },
+          ],
+        },
+      })
+    } catch {
+      // Not recovery-sealed (or a concurrent edit); leave it and move on. The
+      // browser simply won't be a recipient of that one until it's re-shared.
+    }
+    done += 1
+    opts.onProgress?.({ done, total: live.length })
+  }
+  return device
 }
