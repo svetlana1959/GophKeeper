@@ -250,7 +250,7 @@ func respond(w http.ResponseWriter, status int, v any) {
 // a device joins now that the CLI no longer bootstraps accounts.
 func mustLink(t *testing.T, sess *app.Session) {
 	t.Helper()
-	if err := sess.Link(context.Background(), "GK-CODE"); err != nil {
+	if err := sess.Link(context.Background(), "GK-CODE", false); err != nil {
 		t.Fatalf("Link: %v", err)
 	}
 }
@@ -579,12 +579,16 @@ func TestLink(t *testing.T) {
 	}
 	defer sess.Close()
 
-	if err := sess.Link(context.Background(), "GK-CODE"); err != nil {
+	if err := sess.Link(context.Background(), "GK-CODE", false); err != nil {
 		t.Fatalf("Link: %v", err)
 	}
 	// Already linked now.
-	if err := sess.Link(context.Background(), "GK-CODE"); !errors.Is(err, app.ErrAlreadyLinked) {
+	if err := sess.Link(context.Background(), "GK-CODE", false); !errors.Is(err, app.ErrAlreadyLinked) {
 		t.Fatalf("second Link err = %v, want ErrAlreadyLinked", err)
+	}
+	// --force clears the stale local binding and re-links.
+	if err := sess.Link(context.Background(), "GK-CODE", true); err != nil {
+		t.Fatalf("forced re-Link err = %v, want success", err)
 	}
 }
 

@@ -246,13 +246,20 @@ func (s *Session) ListDevices(ctx context.Context, pin string) ([]DeviceInfo, er
 // Link binds this device to an existing account using a pairing code. The
 // account's secrets arrive once a key-holding device reshares them on its next
 // sync; run `goph sync` afterwards to pull them.
-func (s *Session) Link(ctx context.Context, code string) error {
+func (s *Session) Link(ctx context.Context, code string, force bool) error {
 	if s.cfg.Remote == "" {
 		// The pairing code does not yet carry the server URL (see design §5.4),
 		// so the remote must already be configured on this device.
 		return fmt.Errorf("%w: run 'goph init --remote <url>' on this device first", ErrNoRemote)
 	}
 	st := s.db.Sync()
+	if force {
+		// The device was removed server-side; drop the stale local binding so we
+		// can re-join. Local secrets and this device's keypair are kept.
+		if err := st.DeleteState(); err != nil {
+			return err
+		}
+	}
 	if _, err := st.GetState(); err == nil {
 		return ErrAlreadyLinked
 	} else if !errors.Is(err, syncstate.ErrNoState) {
