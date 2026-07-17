@@ -1,5 +1,7 @@
 # goph — GophKeeper CLI
 
+[![coverage](https://raw.githubusercontent.com/svetlana1959/GophKeeper/badges/cli-coverage.svg)](https://github.com/svetlana1959/GophKeeper/actions/workflows/ci-cli.yaml)
+
 Zero-knowledge, distributed secret manager. Secrets are encrypted client-side
 with [age](https://github.com/FiloSottile/age) and stored in a local SQLite
 vault; plaintext never touches disk.
@@ -52,6 +54,25 @@ goph delete github        # soft-delete (tombstone)
 ```
 
 See [docs/](docs/) for the recorded demo.
+
+## Development
+
+Common tasks are wrapped in the [Makefile](Makefile):
+
+```sh
+make build         # build ./bin/goph
+make test          # run the suite with the race detector
+make cover         # write coverage.out (cross-package) and print the total
+make cover-html    # open the per-file HTML coverage report
+make cover-check   # enforce the coverage threshold locally
+make vet           # go vet ./...
+```
+
+Coverage is enforced in CI at **≥ 80%** total via
+[go-test-coverage](https://github.com/vladopajic/go-test-coverage) (see
+[`.testcoverage.yml`](.testcoverage.yml)); a PR that drops below the threshold
+fails the build. The badge above is regenerated on every push to `dev`/`main`
+and served from the orphan `badges` branch.
 
 ## Releasing
 
