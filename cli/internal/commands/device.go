@@ -1,6 +1,7 @@
 package commands
 
 import (
+	"crypto/sha256"
 	"fmt"
 	"text/tabwriter"
 	"time"
@@ -15,8 +16,56 @@ func newDeviceCmd() *cobra.Command {
 		Use:   "device",
 		Short: "Manage the devices linked to your account",
 	}
-	cmd.AddCommand(newDeviceInviteCmd(), newDeviceLsCmd(), newDeviceRevokeCmd())
+	cmd.AddCommand(
+		newDeviceInviteCmd(),
+		newDeviceLsCmd(),
+		newDeviceRevokeCmd(),
+		newDeviceApproveCmd(),
+	)
 	return cmd
+}
+
+// fingerprint is a short, human-comparable code derived from a device's public
+// key. The browser shows the same code so the user can confirm they're approving
+// the right device.
+func fingerprint(publicKey string) string {
+	h := sha256.Sum256([]byte(publicKey))
+	return fmt.Sprintf("%02x%02x·%02x%02x", h[0], h[1], h[2], h[3])
+}
+
+func newDeviceApproveCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "approve <device-id|name>",
+		Short: "Approve a device (e.g. a browser) so it can decrypt your secrets",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return withSession(func(sess *app.Session) error {
+				pin, err := pinIfNeeded(cmd, sess)
+				if err != nil {
+					return err
+				}
+				dev, err := sess.FindDevice(cmd.Context(), pin, args[0])
+				if err != nil {
+					return err
+				}
+				ok, err := confirm(cmd, fmt.Sprintf(
+					"Approve %q (fingerprint %s)?", dev.Name, fingerprint(dev.PublicKey)))
+				if err != nil {
+					return err
+				}
+				if !ok {
+					fmt.Fprintln(cmd.OutOrStdout(), "Cancelled.")
+					return nil
+				}
+				if _, err := sess.ApproveDevice(cmd.Context(), pin, dev.ID); err != nil {
+					return err
+				}
+				fmt.Fprintf(cmd.OutOrStdout(),
+					"Approved %q — it can now decrypt your secrets.\n", dev.Name)
+				return nil
+			})
+		},
+	}
 }
 
 func newDeviceRevokeCmd() *cobra.Command {

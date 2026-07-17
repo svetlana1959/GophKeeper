@@ -135,6 +135,84 @@ func (s *Session) resolveDeviceID(
 	}
 }
 
+// resolveDevice resolves an id or name to the full device (keys and all).
+func (s *Session) resolveDevice(
+	ctx context.Context, client *remote.Client, target string,
+) (remote.Device, error) {
+	devices, err := client.ListDevices(ctx)
+	if err != nil {
+		return remote.Device{}, fmt.Errorf("app: list devices: %w", err)
+	}
+	var byName []remote.Device
+	for _, d := range devices {
+		if d.ID == target {
+			return d, nil
+		}
+		if d.Name == target {
+			byName = append(byName, d)
+		}
+	}
+	switch len(byName) {
+	case 0:
+		return remote.Device{}, fmt.Errorf("app: no device with id or name %q", target)
+	case 1:
+		return byName[0], nil
+	default:
+		return remote.Device{}, fmt.Errorf(
+			"app: name %q is ambiguous (%d devices); use the id", target, len(byName))
+	}
+}
+
+// FindDevice returns a device by id or name — for showing its fingerprint before
+// the user approves it.
+func (s *Session) FindDevice(ctx context.Context, pin, target string) (remote.Device, error) {
+	client, _, _, _, err := s.connect(ctx, pin)
+	if err != nil {
+		return remote.Device{}, err
+	}
+	return s.resolveDevice(ctx, client, target)
+}
+
+// ApproveDevice vouches for a device (e.g. a browser that self-enrolled) and
+// reshares the vault so it becomes a recipient. This is the whole action — after
+// it returns, the approved device can decrypt with its own key, no separate sync.
+func (s *Session) ApproveDevice(ctx context.Context, pin, target string) (remote.Device, error) {
+	client, _, state, _, err := s.connect(ctx, pin)
+	if err != nil {
+		return remote.Device{}, err
+	}
+	signPriv, err := s.unlockSigning(pin)
+	if err != nil {
+		return remote.Device{}, err
+	}
+	if signPriv == "" {
+		return remote.Device{}, fmt.Errorf("app: this device has no signing key; re-init to manage trust")
+	}
+	dev, err := s.resolveDevice(ctx, client, target)
+	if err != nil {
+		return remote.Device{}, err
+	}
+
+	_, err = s.publishChained(ctx, client, state.DeviceID,
+		func(nextSeq int64, prevHash string) (trust.Cert, error) {
+			return trust.Sign(trust.Cert{
+				Kind: trust.KindVouch, AccountID: state.AccountID, IssuerID: state.DeviceID,
+				Seq: nextSeq, PrevHash: prevHash,
+				SubjectID: dev.ID, SubjectEncPub: dev.PublicKey, SubjectSignPub: dev.SignPublicKey,
+				IssuedAt: time.Now().Unix(),
+			}, signPriv)
+		})
+	if err != nil {
+		return dev, err
+	}
+
+	// Reshare: the now-trusted device is added to every secret's recipient set.
+	if _, err := s.Sync(ctx, pin); err != nil {
+		return dev, fmt.Errorf("app: approve: reshare failed: %w", err)
+	}
+	return dev, nil
+}
+
 // ListDevices returns the account's devices, flagging the local one. It never
 // creates an account: a device that has not linked/synced yet gets ErrNotLinked
 // rather than silently registering just to satisfy a read.
