@@ -97,7 +97,9 @@ function VaultAccessCard() {
           <span className="flex flex-col gap-1">
             <span className="text-foreground text-sm font-medium">Stay signed in on this browser</span>
             <span className="text-muted-foreground text-xs">
-              Save the device key here so reloads don't need re-linking. Protect it with a PIN.
+              Save the device key here so reloads don't need re-linking. A PIN encrypts it at rest;
+              even so, a key kept in the browser is only as safe as the browser — on a shared or
+              untrusted device, turn this off and unlock fresh each time.
             </span>
           </span>
           <input
