@@ -43,7 +43,7 @@ func newFakeBackend(publicKey string) *fakeBackend {
 func (f *fakeBackend) handler(t *testing.T) http.Handler {
 	mux := http.NewServeMux()
 
-	mux.HandleFunc("POST /auth/challenge", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("POST /api/auth/challenge", func(w http.ResponseWriter, r *http.Request) {
 		if f.unknownDevice {
 			writeJSON(w, http.StatusUnauthorized, map[string]string{"detail": "unknown device"})
 			return
@@ -64,7 +64,7 @@ func (f *fakeBackend) handler(t *testing.T) http.Handler {
 		})
 	})
 
-	mux.HandleFunc("POST /auth/verify", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("POST /api/auth/verify", func(w http.ResponseWriter, r *http.Request) {
 		var body struct {
 			ChallengeToken string `json:"challenge_token"`
 			Nonce          string `json:"nonce"`
@@ -81,7 +81,7 @@ func (f *fakeBackend) handler(t *testing.T) http.Handler {
 		})
 	})
 
-	mux.HandleFunc("GET /auth/whoami", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("GET /api/auth/whoami", func(w http.ResponseWriter, r *http.Request) {
 		if r.Header.Get("Authorization") != "Bearer "+f.issuedToken {
 			writeJSON(w, http.StatusUnauthorized, map[string]string{"detail": "missing bearer token"})
 			return
@@ -89,7 +89,7 @@ func (f *fakeBackend) handler(t *testing.T) http.Handler {
 		writeJSON(w, http.StatusOK, remote.Identity{DeviceID: "dev-1", AccountID: "acc-1"})
 	})
 
-	mux.HandleFunc("POST /sync/push", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("POST /api/sync/push", func(w http.ResponseWriter, r *http.Request) {
 		if !f.authed(r) {
 			writeJSON(w, http.StatusUnauthorized, map[string]string{"detail": "unauthorized"})
 			return
@@ -123,7 +123,7 @@ func (f *fakeBackend) handler(t *testing.T) http.Handler {
 		writeJSON(w, http.StatusOK, map[string]any{"results": results})
 	})
 
-	mux.HandleFunc("GET /sync/changes", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("GET /api/sync/changes", func(w http.ResponseWriter, r *http.Request) {
 		if !f.authed(r) {
 			writeJSON(w, http.StatusUnauthorized, map[string]string{"detail": "unauthorized"})
 			return
@@ -147,7 +147,7 @@ func (f *fakeBackend) handler(t *testing.T) http.Handler {
 		writeJSON(w, http.StatusOK, map[string]any{"secrets": out, "cursor": cursor})
 	})
 
-	mux.HandleFunc("GET /devices", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("GET /api/devices", func(w http.ResponseWriter, r *http.Request) {
 		if !f.authed(r) {
 			writeJSON(w, http.StatusUnauthorized, map[string]string{"detail": "unauthorized"})
 			return
@@ -158,7 +158,7 @@ func (f *fakeBackend) handler(t *testing.T) http.Handler {
 		})
 	})
 
-	mux.HandleFunc("POST /enroll/invite", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("POST /api/enroll/invite", func(w http.ResponseWriter, r *http.Request) {
 		if !f.authed(r) {
 			writeJSON(w, http.StatusUnauthorized, map[string]string{"detail": "unauthorized"})
 			return
@@ -168,7 +168,7 @@ func (f *fakeBackend) handler(t *testing.T) http.Handler {
 		})
 	})
 
-	mux.HandleFunc("POST /enroll/join", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("POST /api/enroll/join", func(w http.ResponseWriter, r *http.Request) {
 		var body struct {
 			CodeHash  string `json:"code_hash"`
 			Name      string `json:"device_name"`
@@ -188,7 +188,7 @@ func (f *fakeBackend) handler(t *testing.T) http.Handler {
 		})
 	})
 
-	mux.HandleFunc("POST /trust/certs", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("POST /api/trust/certs", func(w http.ResponseWriter, r *http.Request) {
 		if !f.authed(r) {
 			writeJSON(w, http.StatusUnauthorized, map[string]string{"detail": "unauthorized"})
 			return
@@ -200,7 +200,7 @@ func (f *fakeBackend) handler(t *testing.T) http.Handler {
 		writeJSON(w, http.StatusCreated, cert)
 	})
 
-	mux.HandleFunc("GET /trust/certs", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("GET /api/trust/certs", func(w http.ResponseWriter, r *http.Request) {
 		if !f.authed(r) {
 			writeJSON(w, http.StatusUnauthorized, map[string]string{"detail": "unauthorized"})
 			return

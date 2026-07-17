@@ -53,7 +53,7 @@ type Client struct {
 // New builds a client for baseURL (trailing slash optional).
 func New(baseURL string) *Client {
 	return &Client{
-		baseURL: strings.TrimRight(baseURL, "/"),
+		baseURL: strings.TrimRight(baseURL, "/") + "/api",
 		http:    &http.Client{Timeout: 30 * time.Second},
 	}
 }

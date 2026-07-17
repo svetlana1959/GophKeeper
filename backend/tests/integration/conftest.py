@@ -41,9 +41,15 @@ async def database():
 
 @pytest.fixture
 async def api_client(database):
-    """Call the real FastAPI dependency graph against the test database."""
+    """Call the real FastAPI dependency graph against the test database.
+
+    The base URL carries the ``/api`` mount (see ``create_app``), so tests and
+    helpers address endpoints by their router path — ``/stats/overview``, not
+    ``/api/stats/overview``. httpx joins the two, which keeps the prefix in one
+    place if it ever moves again.
+    """
     app = create_app()
     app.state.database = database
     transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://localhost") as client:
+    async with AsyncClient(transport=transport, base_url="http://localhost/api") as client:
         yield client
