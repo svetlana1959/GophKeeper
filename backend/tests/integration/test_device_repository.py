@@ -37,7 +37,9 @@ async def test_list_for_account_returns_all_statuses_scoped_to_the_account(datab
     async with SqlAlchemyUnitOfWork(database) as uow:
         await uow.accounts.add(Account(id=account_id))
         await uow.accounts.add(Account(id=other_account_id))
-        await uow.devices.add(Device(active_id, account_id, "laptop", "key-active", status=ACTIVE))
+        await uow.devices.add(
+            Device(active_id, account_id, "laptop", "key-active", "sign-active", status=ACTIVE)
+        )
         await uow.devices.add(
             Device(revoked_id, account_id, "phone", "key-revoked", status=REVOKED)
         )
@@ -52,3 +54,10 @@ async def test_list_for_account_returns_all_statuses_scoped_to_the_account(datab
     assert set(by_id) == {active_id, revoked_id}
     assert by_id[active_id].is_active is True
     assert by_id[revoked_id].is_active is False
+    # Columns map to the right fields (not transposed) and round-trip intact.
+    active = by_id[active_id]
+    assert (active.device_name, active.public_key, active.sign_public_key) == (
+        "laptop",
+        "key-active",
+        "sign-active",
+    )

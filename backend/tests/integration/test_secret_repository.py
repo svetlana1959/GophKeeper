@@ -36,6 +36,25 @@ async def test_get_returns_stored_secret_or_raises_when_absent(database):
             await uow.secrets.get(uuid4())
 
 
+async def test_uow_rollback_discards_only_pre_rollback_work(database):
+    # rollback() must undo work done before it while leaving a later commit intact.
+    # Asserting "add then rollback then absent" wouldn't discriminate — closing the
+    # session discards uncommitted work regardless — so this rolls back one write,
+    # commits a second, and checks that exactly the second survived. A no-op
+    # rollback would carry the first into the commit and fail the not-found check.
+    discarded, kept = uuid4(), uuid4()
+    async with SqlAlchemyUnitOfWork(database) as uow:
+        await uow.secrets.add(Secret(discarded, "acc", ciphertext=b"x"))
+        await uow.rollback()
+        await uow.secrets.add(Secret(kept, "acc", ciphertext=b"y"))
+        await uow.commit()
+
+    async with SqlAlchemyUnitOfWork(database) as uow:
+        with pytest.raises(SecretNotFound):
+            await uow.secrets.get(discarded)
+        assert (await uow.secrets.get(kept)).id == kept
+
+
 async def test_activity_counts_bucket_by_day_and_scope_account(database):
     account_id = str(uuid4())
     day = datetime(2026, 7, 14, 12, tzinfo=UTC)

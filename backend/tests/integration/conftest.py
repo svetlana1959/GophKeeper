@@ -97,17 +97,22 @@ async def database(connection) -> DatabaseAdapter:
 async def api_client(database):
     """Call the real FastAPI dependency graph against the test database.
 
-    ``create_app`` builds its own adapter for production, but httpx's
-    ASGITransport does not run lifespan events, so that adapter never connects
-    and this override is what the dependency graph resolves. Load-bearing: if
-    lifespan is ever run here, the app would talk to its own pool and escape the
-    test's transaction.
+    Isolation is the ``app.state.database`` override below — nothing else.
+    ``get_database`` reads ``request.app.state.database`` at request time, so every
+    request runs against this test's rollback adapter. Keep that line: it, not the
+    skipped lifespan, is what keeps the suite off the configured database. (httpx's
+    ASGITransport happening not to run lifespan only means ``create_app``'s own
+    adapter never connects — a spared connection, not the safeguard. Wiring lifespan
+    back in would not break isolation; removing this override would, pointing every
+    test at ``settings.database.url``.)
 
-    TODO: look into rewriting create_app
+    Caveat: all sessions in a test share one connection (see ``_RollbackAdapter``),
+    so this client cannot serve genuinely concurrent requests — two in flight at
+    once would collide on the single asyncpg connection. The tests here are
+    sequential, which is fine; a concurrency test would need a different fixture.
 
-    The base URL carries the ``/api`` mount, so tests and helpers address
-    endpoints by their router path — ``/stats/overview``, not
-    ``/api/stats/overview``.
+    The base URL carries the ``/api`` mount, so tests and helpers address endpoints
+    by their router path — ``/stats/overview``, not ``/api/stats/overview``.
     """
     app = create_app()
     app.state.database = database

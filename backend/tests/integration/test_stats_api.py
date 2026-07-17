@@ -85,6 +85,9 @@ async def test_stats_require_a_valid_active_device_session(api_client, database)
     await _revoke(database, device.id)
     for path in _STATS_PATHS:
         assert (await api_client.get(path, headers=bearer(device.token))).status_code == 401
+    # A revoked device can't re-authenticate to get a fresh token either.
+    rechallenge = await api_client.post("/auth/challenge", json={"public_key": device.public_key})
+    assert rechallenge.status_code == 401
 
 
 async def test_empty_account_reports_zeroed_stats(api_client):
@@ -103,6 +106,8 @@ async def test_empty_account_reports_zeroed_stats(api_client):
         "revoked_devices": 0,
         "pending_devices": 0,
     }
+    # Counts are ints, not floats that happen to equal an integer.
+    assert all(type(value) is int for value in overview.json().values())
     assert security.json() == {
         "status": "good",
         "trusted_devices": 1,
@@ -228,6 +233,13 @@ async def test_multidevice_sync_and_revocation_flow(api_client, database, monkey
     pull = await api_client.get("/sync/changes", params={"since": 0}, headers=bearer(second.token))
     assert pull.json()["secrets"][0]["id"] == str(secret_id)
     cursor = pull.json()["cursor"]
+
+    # The author is auto-enrolled as a recipient even though it sealed only to
+    # `second` — so `first` can pull its own secret back on another session.
+    author_pull = await api_client.get(
+        "/sync/changes", params={"since": 0}, headers=bearer(first.token)
+    )
+    assert author_pull.json()["secrets"][0]["id"] == str(secret_id)
 
     # Update, then delete — the second device sees each version via its cursor.
     await _push(
