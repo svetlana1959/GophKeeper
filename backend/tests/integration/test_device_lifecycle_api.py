@@ -83,3 +83,26 @@ async def test_heartbeat_requires_a_device_session(api_client):
         "/devices/heartbeat", headers=bearer(account.token), json={"ttl_seconds": 3600}
     )
     assert res.status_code == 401, res.text
+
+
+async def test_web_session_deletes_a_device_scoped_to_its_account(api_client):
+    account = await register_account(api_client, label="del")
+    device = await join_device(api_client, inviter_token=account.token, name="laptop")
+
+    res = await api_client.delete(f"/devices/{device.id}", headers=bearer(account.token))
+    assert res.status_code == 204, res.text
+
+    listed = await api_client.get("/devices", headers=bearer(account.token))
+    assert all(d["id"] != str(device.id) for d in listed.json())
+
+
+async def test_cannot_delete_another_accounts_device(api_client):
+    mine = await register_account(api_client, label="del-mine")
+    theirs = await register_account(api_client, label="del-theirs")
+    victim = await join_device(api_client, inviter_token=theirs.token, name="victim")
+
+    res = await api_client.delete(f"/devices/{victim.id}", headers=bearer(mine.token))
+    assert res.status_code == 404, res.text
+    # Still there for its real owner.
+    listed = await api_client.get("/devices", headers=bearer(theirs.token))
+    assert any(d["id"] == str(victim.id) for d in listed.json())

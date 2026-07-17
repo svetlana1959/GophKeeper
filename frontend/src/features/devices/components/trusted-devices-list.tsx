@@ -1,15 +1,25 @@
-import { MoreVertical, Plus } from 'lucide-react'
+import { useState } from 'react'
+import { MoreVertical, Plus, Trash2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { Device } from '@/api/devices'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { DeviceIcon } from '@/features/dashboard/components/device-icon'
 import { SectionCard } from '@/features/dashboard/components/section-card'
 import { EmptyState } from '@/features/dashboard/components/atoms'
 import { useDevices } from '@/features/dashboard/use-devices'
 import { useEnrollment } from '@/features/enrollment/enrollment-context'
 import { isOnline, lastActiveLabel } from '../device-display'
+import { RemoveDeviceDialog } from './remove-device-dialog'
 
 function DeviceRow({ device }: { device: Device }) {
   const online = isOnline(device)
+  const [removing, setRemoving] = useState(false)
+
   return (
     <div className="flex items-center gap-4 py-4">
       <DeviceIcon name={device.device_name} />
@@ -31,13 +41,21 @@ function DeviceRow({ device }: { device: Device }) {
         />
         {online ? 'Online' : 'Offline'}
       </span>
-      <button
-        type="button"
-        aria-label="Device options"
-        className="text-muted-foreground hover:text-foreground transition-colors"
-      >
-        <MoreVertical className="size-4" />
-      </button>
+      <DropdownMenu>
+        <DropdownMenuTrigger
+          aria-label="Device options"
+          className="text-muted-foreground hover:text-foreground rounded-md p-1 transition-colors outline-none data-[state=open]:text-foreground"
+        >
+          <MoreVertical className="size-4" />
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem data-variant="destructive" onSelect={() => setRemoving(true)}>
+            <Trash2 className="size-4" />
+            Remove device
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <RemoveDeviceDialog device={device} open={removing} onOpenChange={setRemoving} />
     </div>
   )
 }

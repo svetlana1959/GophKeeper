@@ -22,4 +22,7 @@ export const devicesApi = {
     const { data } = await http.get('/devices')
     return z.array(deviceSchema).parse(data)
   },
+  async remove(id: string): Promise<void> {
+    await http.delete(`/devices/${id}`)
+  },
 }

@@ -45,6 +45,9 @@ class FakeDeviceRepository:
     async def save(self, device: Device) -> None:
         self.devices[device.id] = device
 
+    async def delete(self, device_id: UUID) -> None:
+        self.devices.pop(device_id, None)
+
     async def delete_expired(self, *, now: datetime) -> int:
         expired = [
             d.id
@@ -128,6 +131,28 @@ async def test_fetch_missing_device_raises():
 
     with pytest.raises(DeviceNotFound):
         await service.fetch(uuid4(), account_id=uuid4())
+
+
+async def test_delete_removes_own_device():
+    uow = FakeUnitOfWork()
+    account_id = uuid4()
+    device = Device(id=uuid4(), account_id=account_id, device_name="d", public_key="age1")
+    await uow.devices.add(device)
+
+    await DeviceService(uow).delete(device.id, account_id=account_id)
+
+    assert device.id not in uow.devices.devices
+    assert uow.committed
+
+
+async def test_delete_other_account_device_is_not_found():
+    uow = FakeUnitOfWork()
+    device = Device(id=uuid4(), account_id=uuid4(), device_name="d", public_key="age1")
+    await uow.devices.add(device)
+
+    with pytest.raises(DeviceNotFound):
+        await DeviceService(uow).delete(device.id, account_id=uuid4())
+    assert device.id in uow.devices.devices  # untouched
 
 
 def test_capped_expiry_caps_at_max_and_none_never_expires():

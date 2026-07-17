@@ -7,7 +7,7 @@ creation lives on the web (`/accounts`).
 
 from uuid import UUID
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, status
 
 from gophkeeper.api.deps import get_account_id, get_principal, provide
 from gophkeeper.api.schemas.device import DeviceResponse, HeartbeatRequest
@@ -81,3 +81,26 @@ async def fetch_device(
     """
     device = await service.fetch(device_id, account_id=principal.account_id)
     return DeviceResponse.from_domain(device)
+
+
+@router.delete(
+    "/{device_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Remove a device from the account",
+    responses={
+        401: {"description": "Missing, invalid, or expired bearer token."},
+        404: {"description": "No such device in the caller's account."},
+    },
+)
+async def delete_device(
+    device_id: UUID,
+    account_id: UUID = Depends(get_account_id),
+    service: DeviceService = Depends(provide(DeviceService)),
+) -> None:
+    """Remove a device from the caller's account (account or device session).
+
+    A hard delete: the device can no longer authenticate, and cascades drop its
+    recipient rows and issued trust certs. A device in another account is 404.
+    The web gates this behind the recovery key before calling it.
+    """
+    await service.delete(device_id, account_id=account_id)

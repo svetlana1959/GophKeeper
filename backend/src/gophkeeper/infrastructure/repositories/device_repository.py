@@ -115,6 +115,14 @@ class SqlAlchemyDeviceRepository(DeviceRepository):
             _to_params(device),
         )
 
+    async def delete(self, device_id: UUID) -> None:
+        """Hard-delete a single device by id. Cascades clean up its recipient rows
+        and issued trust certs. Idempotent — deleting an absent id is a no-op."""
+        await self._session.execute(
+            text("DELETE FROM devices WHERE id = :id"),
+            {"id": device_id},
+        )
+
     async def delete_expired(self, *, now: datetime) -> int:
         """Hard-delete every device past its declared expiry, returning the count.
 

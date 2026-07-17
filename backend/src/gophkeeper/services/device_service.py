@@ -60,6 +60,16 @@ class DeviceService:
             await uow.commit()
             return device
 
+    async def delete(self, device_id: UUID, *, account_id: UUID) -> None:
+        """Remove a device from the caller's account. A device in another account
+        is reported as not found rather than disclosed or touched."""
+        async with self._uow as uow:
+            device = await uow.devices.get(device_id)
+            if device.account_id != account_id:
+                raise DeviceNotFound(device_id)
+            await uow.devices.delete(device_id)
+            await uow.commit()
+
     async def reap_expired(self, *, now: datetime | None = None) -> int:
         """The background sweep: delete devices past their declared expiry, plus
         the long-idle backstop that catches devices which declared none. Returns
