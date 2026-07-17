@@ -1,25 +1,17 @@
 /// <reference types="vitest/config" />
 import { fileURLToPath, URL } from 'node:url'
 import { defineConfig } from 'vite'
-import type { ProxyOptions } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 
-// Dev-only: proxy API paths to the backend so the browser talks same-origin and
-// avoids CORS. In production nginx serves the SPA and proxies the same paths.
+// Dev-only: proxy the API to the backend so the browser talks same-origin and
+// avoids CORS. In production nginx serves the SPA and proxies /api.
+//
+// Everything the API serves lives under /api, so client routes (/devices,
+// /settings, …) can no longer collide with it: only /api is proxied and the rest
+// falls through to the SPA, which keeps direct loads and refreshes working
+// without sniffing the Accept header.
 const apiTarget = process.env.VITE_API_TARGET || 'http://localhost:8080'
-const proxied = ['/api']
-
-// Some client routes (e.g. /devices) share a prefix with an API path. Proxy only
-// real API calls (XHR/fetch) and let full-page navigations fall through to the SPA
-// so client-side routing works on direct load/refresh.
-const apiProxy: ProxyOptions = {
-  target: apiTarget,
-  changeOrigin: true,
-  bypass(req) {
-    if (req.headers.accept?.includes('text/html')) return req.url
-  },
-}
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
@@ -29,7 +21,9 @@ export default defineConfig({
     },
   },
   server: {
-    proxy: Object.fromEntries(proxied.map((path) => [path, apiProxy])),
+    proxy: {
+      '/api': { target: apiTarget, changeOrigin: true },
+    },
   },
   test: {
     globals: true,

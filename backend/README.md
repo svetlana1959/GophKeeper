@@ -83,8 +83,8 @@ make migrate   # apply migrations
 make logs      # tail the API
 ```
 
-The API is then at http://localhost:8080 (`/docs` for Swagger, `/health` for a
-liveness check).
+The API is then at http://localhost:8080. Endpoints are served under `/api`
+(`/api/health` for a liveness check); Swagger stays at `/docs`.
 
 Without Docker (needs a reachable Postgres):
 
