@@ -81,6 +81,40 @@ jobs:
         working-directory: cli
         run: go run github.com/vladopajic/go-test-coverage/v2@v2.18.8 --config=./.testcoverage.yml
 
+  # Regenerate the coverage badge and commit it to the orphan `badges` branch,
+  # which the README's badge points at. Push-only (not PRs, which can't be
+  # trusted with write access), and only after tests pass.
+  coverage-badge:
+    name: Update coverage badge
+    if: github.event_name == 'push'
+    needs: test
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Set up Go
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version-file: cli/go.mod
+          cache-dependency-path: cli/go.sum
+
+      - name: Generate coverage profile
+        working-directory: cli
+        run: go test -covermode=atomic -coverpkg=./... -coverprofile=coverage.out ./...
+
+      - name: Commit coverage badge
+        working-directory: cli
+        run: |
+          go run github.com/vladopajic/go-test-coverage/v2@v2.18.8 \
+            --config=./.testcoverage.yml \
+            --git-token=${{ secrets.GITHUB_TOKEN }} \
+            --git-repository=${{ github.repository }} \
+            --git-branch=badges \
+            --git-file-name=cli-coverage.svg
+
   build:
     name: Cross-compile
     runs-on: ubuntu-24.04
