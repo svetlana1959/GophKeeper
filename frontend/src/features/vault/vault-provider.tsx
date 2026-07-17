@@ -241,7 +241,8 @@ export function VaultProvider({ children }: { children: ReactNode }) {
       error,
       link,
       persisted,
-      canPersist: hasDeviceKey && persisted === null,
+      // Can save the current device key, or add a PIN to an unprotected one.
+      canPersist: hasDeviceKey && (persisted === null || !persisted.protected),
       unlockWithRecoveryKey,
       unlockWithSavedDevice,
       linkDevice,

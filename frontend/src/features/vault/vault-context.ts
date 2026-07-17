@@ -25,8 +25,8 @@ export interface VaultContextValue {
   link: LinkState | null
   /** This browser's saved device, if it was persisted for reload-free unlock. */
   persisted: PersistedDeviceMeta | null
-  /** True when the current unlock holds a device key that can be persisted
-   *  (i.e. unlocked via link, not via the device-free recovery key). */
+  /** True when there's a device key in memory that can be saved, or a PIN added
+   *  to an unprotected saved key. False after a device-free recovery unlock. */
   canPersist: boolean
   /** Unlock by decrypting the vault with the account recovery key. */
   unlockWithRecoveryKey: (recoveryKey: string) => Promise<void>

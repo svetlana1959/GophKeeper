@@ -108,27 +108,35 @@ function VaultAccessCard() {
           />
         </label>
 
-        <div className="border-border/60 border-t pt-5">
+        <div className="border-border/60 flex flex-col gap-4 border-t pt-5">
           {persisted ? (
-            <div className="flex flex-col gap-3">
-              <p className="text-foreground flex items-center gap-2 text-sm font-medium">
-                <ShieldCheck className="text-primary size-4" strokeWidth={2} />
-                This browser is saved
-                <span className="text-muted-foreground font-normal">
-                  · {persisted.protected ? 'PIN-protected' : 'no PIN — unprotected'}
-                </span>
+            <p className="text-foreground flex items-center gap-2 text-sm font-medium">
+              <ShieldCheck
+                className={persisted.protected ? 'text-primary size-4' : 'text-muted-foreground size-4'}
+                strokeWidth={2}
+              />
+              This browser is saved
+              <span className="text-muted-foreground font-normal">
+                · {persisted.protected ? 'PIN-protected' : 'no PIN — unprotected'}
+              </span>
+            </p>
+          ) : null}
+
+          {canPersist ? (
+            <div className="flex flex-col gap-2">
+              <p className="text-foreground text-sm font-medium">
+                {persisted ? 'Protect with a PIN' : 'Save this browser'}
               </p>
-              <Button variant="outline" onClick={forgetDevice} className="w-fit">
-                <Trash2 className="size-4" />
-                Forget this browser
-              </Button>
-            </div>
-          ) : canPersist ? (
-            <div className="flex flex-col gap-3">
-              <p className="text-foreground text-sm font-medium">Save this browser</p>
+              {!persisted ? (
+                <p className="text-muted-foreground text-xs">
+                  Skip re-linking next time. Set a PIN to encrypt the saved key (recommended).
+                </p>
+              ) : null}
               <div className="flex flex-wrap items-end gap-3">
                 <label className="flex flex-col gap-1">
-                  <span className="text-muted-foreground text-xs">PIN (optional)</span>
+                  <span className="text-muted-foreground text-xs">
+                    PIN {persisted ? '' : '(optional)'}
+                  </span>
                   <input
                     type="password"
                     inputMode="numeric"
@@ -139,16 +147,27 @@ function VaultAccessCard() {
                     className="border-input text-foreground placeholder:text-muted-foreground focus-visible:border-primary focus-visible:ring-primary/25 h-11 w-32 rounded-lg border bg-transparent px-3 font-mono text-sm focus-visible:ring-2 focus-visible:outline-none"
                   />
                 </label>
-                <Button onClick={() => void save()} className="shrink-0">
-                  {saved ? 'Saved' : 'Save this browser'}
+                <Button
+                  onClick={() => void save()}
+                  disabled={Boolean(persisted) && !pin.trim()}
+                  className="shrink-0"
+                >
+                  {saved ? 'Saved' : persisted ? 'Set PIN' : 'Save this browser'}
                 </Button>
               </div>
             </div>
-          ) : (
+          ) : !persisted ? (
             <p className="text-muted-foreground text-sm">
               Unlock this browser as a device (link and approve it) to save it here.
             </p>
-          )}
+          ) : null}
+
+          {persisted ? (
+            <Button variant="outline" onClick={forgetDevice} className="w-fit">
+              <Trash2 className="size-4" />
+              Forget this browser
+            </Button>
+          ) : null}
         </div>
       </div>
     </SettingsCard>

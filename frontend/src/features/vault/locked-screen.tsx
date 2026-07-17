@@ -97,7 +97,6 @@ function VaultSavedDeviceScreen() {
 function VaultUnlockScreen() {
   const { unlockWithRecoveryKey, linkDevice, status, error } = useVault()
   const [showRecovery, setShowRecovery] = useState(false)
-  const [pin, setPin] = useState('')
   const [key, setKey] = useState('')
   const busy = status === 'unlocking'
 
@@ -119,73 +118,61 @@ function VaultUnlockScreen() {
       </div>
 
       <div className="flex w-full flex-col gap-3">
-        <label className="text-left">
-          <span className="text-foreground text-sm font-medium">PIN (optional, recommended)</span>
-          <input
-            type="password"
-            inputMode="numeric"
-            value={pin}
-            onChange={(e) => setPin(e.target.value)}
-            placeholder="Set a PIN to keep this browser protected"
-            autoComplete="off"
-            className={PIN_INPUT_CLASS}
-          />
-        </label>
-        <Button onClick={() => void linkDevice(pin.trim() || undefined)} className="w-full">
+        <Button onClick={() => void linkDevice()} className="w-full">
           <Laptop className="size-4" strokeWidth={2} /> Link this browser
         </Button>
-        <p className="text-muted-foreground text-left text-xs">
-          A PIN encrypts the device key stored on this browser. Without one it's saved unprotected —
-          anyone using this device could open your vault.
-        </p>
+        {!showRecovery ? (
+          <Button
+            variant="outline"
+            onClick={() => setShowRecovery(true)}
+            className="w-full"
+          >
+            <KeyRound className="size-4" strokeWidth={2} /> Unlock with recovery key
+          </Button>
+        ) : (
+          <form
+            onSubmit={(e) => {
+              e.preventDefault()
+              submitRecovery()
+            }}
+            className="border-border/60 flex flex-col gap-3 border-t pt-4"
+          >
+            <label className="text-left">
+              <span className="text-foreground text-sm font-medium">Recovery key</span>
+              <input
+                type="password"
+                value={key}
+                onChange={(e) => setKey(e.target.value)}
+                placeholder="AGE-SECRET-KEY-1…"
+                autoComplete="off"
+                spellCheck={false}
+                autoFocus
+                className={PIN_INPUT_CLASS}
+              />
+            </label>
+            <Button type="submit" disabled={!key.trim() || busy} className="w-full">
+              {busy ? (
+                <>
+                  <Loader2 className="size-4 animate-spin" /> Unlocking…
+                </>
+              ) : (
+                <>
+                  <KeyRound className="size-4" strokeWidth={2} /> Unlock vault
+                </>
+              )}
+            </Button>
+            <p className="text-muted-foreground text-left text-xs">
+              Your most powerful key — anyone with it can read everything. It never leaves this
+              browser. Prefer approving from another device when you can.
+            </p>
+          </form>
+        )}
       </div>
 
-      {!showRecovery ? (
-        <button
-          type="button"
-          onClick={() => setShowRecovery(true)}
-          className="text-muted-foreground hover:text-foreground text-sm underline-offset-4 hover:underline"
-        >
-          No other device? Unlock with your recovery key
-        </button>
-      ) : (
-        <form
-          onSubmit={(e) => {
-            e.preventDefault()
-            submitRecovery()
-          }}
-          className="flex w-full flex-col gap-3"
-        >
-          <label className="text-left">
-            <span className="text-foreground text-sm font-medium">Recovery key</span>
-            <input
-              type="password"
-              value={key}
-              onChange={(e) => setKey(e.target.value)}
-              placeholder="AGE-SECRET-KEY-1…"
-              autoComplete="off"
-              spellCheck={false}
-              autoFocus
-              className={PIN_INPUT_CLASS}
-            />
-          </label>
-          <Button type="submit" variant="outline" disabled={!key.trim() || busy} className="w-full">
-            {busy ? (
-              <>
-                <Loader2 className="size-4 animate-spin" /> Unlocking…
-              </>
-            ) : (
-              <>
-                <KeyRound className="size-4" strokeWidth={2} /> Unlock with recovery key
-              </>
-            )}
-          </Button>
-          <p className="text-muted-foreground text-left text-xs">
-            The recovery key is your most powerful key — anyone with it can read everything. It never
-            leaves this browser. Prefer approving from another device when you can.
-          </p>
-        </form>
-      )}
+      <p className="text-muted-foreground border-border/60 w-full border-t pt-4 text-xs">
+        Once linked, this browser stays signed in. Add a PIN in Settings to protect the key it saves
+        here.
+      </p>
 
       {error ? <p className="text-destructive text-sm">{error}</p> : null}
     </Card>
