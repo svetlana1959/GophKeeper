@@ -9,6 +9,9 @@ export interface LinkState {
   phase: 'enrolling' | 'awaiting'
   /** How this browser appears in the CLI's approve prompt. */
   deviceName: string
+  /** The device id to approve — unambiguous even when names repeat. Null until
+   *  enrolled. */
+  deviceId: string | null
   /** Key fingerprint to compare against the CLI — null until enrolled. */
   fingerprint: string | null
 }

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Check, KeyRound, Laptop, Loader2, Lock, Terminal } from 'lucide-react'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { CopyButton } from '@/features/enrollment/components/copy-button'
 import { useVault } from './vault-context'
 
 export function VaultLockedScreen() {
@@ -93,6 +94,10 @@ function VaultLinkingScreen() {
   const { link, cancelLink } = useVault()
   if (!link) return null
 
+  // Approve by id, not name — a browser's name ("Firefox on Linux") repeats
+  // across re-links, so the CLI can't resolve it unambiguously.
+  const command = link.deviceId ? `goph device approve ${link.deviceId}` : 'goph device approve …'
+
   return (
     <Card className="mx-auto flex max-w-xl flex-col items-center gap-6 p-8 text-center">
       <span className="bg-primary/10 text-primary flex size-14 items-center justify-center rounded-2xl">
@@ -103,13 +108,15 @@ function VaultLinkingScreen() {
           {link.phase === 'enrolling' ? 'Linking this browser…' : 'Waiting for approval'}
         </h2>
         <p className="text-muted-foreground mt-2 text-sm">
-          On a device you already have, run this and confirm the fingerprint matches:
+          This browser is <span className="text-foreground font-medium">{link.deviceName}</span>. On
+          a device you already have, run this and confirm the fingerprint matches:
         </p>
       </div>
 
       <div className="border-border bg-muted/40 flex w-full items-center gap-2 rounded-lg border px-3 py-2.5 text-left font-mono text-sm">
         <Terminal className="text-muted-foreground size-4 shrink-0" strokeWidth={2} />
-        <code className="text-foreground truncate">goph device approve "{link.deviceName}"</code>
+        <code className="text-foreground grow truncate">{command}</code>
+        {link.deviceId ? <CopyButton value={command} className="shrink-0" /> : null}
       </div>
 
       <div className="text-left">

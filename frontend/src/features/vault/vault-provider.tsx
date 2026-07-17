@@ -88,14 +88,14 @@ export function VaultProvider({ children }: { children: ReactNode }) {
     }
     setError(null)
     const deviceName = browserLabel()
-    setLink({ phase: 'enrolling', deviceName, fingerprint: null })
+    setLink({ phase: 'enrolling', deviceName, deviceId: null, fingerprint: null })
     pollAbort.current = false
     try {
       const enrolled = await enrollBrowserDevice({ accountToken, deviceName })
       if (pollAbort.current) return
       device.current = enrolled
       const fingerprint = await deviceFingerprint(enrolled.recipient)
-      setLink({ phase: 'awaiting', deviceName, fingerprint })
+      setLink({ phase: 'awaiting', deviceName, deviceId: enrolled.deviceId, fingerprint })
 
       // Wait for an existing device to run `goph device approve`, which vouches
       // for us and reshares the vault. Once anything decrypts under our own key,
