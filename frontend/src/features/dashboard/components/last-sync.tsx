@@ -1,7 +1,7 @@
 import { RefreshCw } from 'lucide-react'
 import { formatSyncTimestamp } from '@/lib/format'
 
-export function LastSync({ lastSyncAt }: { lastSyncAt: string | undefined }) {
+export function LastSync({ lastSyncAt }: { lastSyncAt: string | null | undefined }) {
   return (
     <div className="text-foreground flex items-center gap-3 text-[15px]">
       <RefreshCw className="text-primary size-5" strokeWidth={2} />

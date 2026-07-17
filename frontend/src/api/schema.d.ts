@@ -385,10 +385,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /**
-         * Get Dashboard overview statistics
-         * @description Return temporary static counts for the Dashboard overview. No secret ciphertext is inspected.
-         */
+        /** Overview */
         get: operations["overview_api_stats_overview_get"];
         put?: never;
         post?: never;
@@ -405,10 +402,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /**
-         * Get Dashboard activity series
-         * @description Return a temporary static daily series for the selected Dashboard period.
-         */
+        /** Activity */
         get: operations["activity_api_stats_activity_get"];
         put?: never;
         post?: never;
@@ -425,10 +419,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /**
-         * Get Dashboard security summary
-         * @description Return temporary static device, alert, and synchronization statistics.
-         */
+        /** Security */
         get: operations["security_api_stats_security_get"];
         put?: never;
         post?: never;
@@ -483,17 +474,17 @@ export interface components {
             date: string;
             /**
              * Created
-             * @description Mock number of entries created on this date.
+             * @description Latest secret states first persisted on this UTC date.
              */
             created: number;
             /**
              * Updated
-             * @description Mock number of entries updated on this date.
+             * @description Latest non-deleted mutations on this UTC date.
              */
             updated: number;
             /**
              * Deleted
-             * @description Mock number of entries deleted on this date.
+             * @description Latest tombstones persisted on this UTC date.
              */
             deleted: number;
         };
@@ -834,7 +825,7 @@ export interface components {
             period: components["schemas"]["StatsPeriod"];
             /**
              * Points
-             * @description Daily activity points in chronological order.
+             * @description Daily latest-mutation points in chronological order.
              */
             points: components["schemas"]["ActivityPointResponse"][];
         };
@@ -842,27 +833,27 @@ export interface components {
         StatsOverviewResponse: {
             /**
              * Passwords
-             * @description Mock count of password entries.
+             * @description Client-provided password count; zero until available.
              */
             passwords: number;
             /**
              * Bank Cards
-             * @description Mock count of bank card entries.
+             * @description Client-provided card count; zero until available.
              */
             bank_cards: number;
             /**
              * Notes
-             * @description Mock count of secure notes.
+             * @description Client-provided note count; zero until available.
              */
             notes: number;
             /**
              * Files
-             * @description Mock count of encrypted files.
+             * @description Client-provided file count; zero until available.
              */
             files: number;
             /**
              * Trusted Devices
-             * @description Number of trusted devices.
+             * @description Number of active trusted devices.
              */
             trusted_devices: number;
             /**
@@ -870,6 +861,11 @@ export interface components {
              * @description Number of revoked devices.
              */
             revoked_devices: number;
+            /**
+             * Pending Devices
+             * @description Number of devices awaiting approval.
+             */
+            pending_devices: number;
         };
         /**
          * StatsPeriod
@@ -881,13 +877,13 @@ export interface components {
         StatsSecurityResponse: {
             /**
              * Status
-             * @description Mock aggregate security status.
-             * @constant
+             * @description Warning when revoked or pending devices exist; good otherwise.
+             * @enum {string}
              */
-            status: "good";
+            status: "good" | "warning";
             /**
              * Trusted Devices
-             * @description Number of trusted devices.
+             * @description Number of active trusted devices.
              */
             trusted_devices: number;
             /**
@@ -896,16 +892,20 @@ export interface components {
              */
             revoked_devices: number;
             /**
+             * Pending Devices
+             * @description Number of devices awaiting approval.
+             */
+            pending_devices: number;
+            /**
              * Alerts
-             * @description Number of active security alerts.
+             * @description Persisted active security alerts; zero until implemented.
              */
             alerts: number;
             /**
              * Last Sync At
-             * Format: date-time
-             * @description UTC timestamp of the latest mock synchronization.
+             * @description Latest successful account sync, or null until such events are persisted.
              */
-            last_sync_at: string;
+            last_sync_at: string | null;
         };
         /** TrustCertBody */
         TrustCertBody: {
@@ -1732,7 +1732,9 @@ export interface operations {
     overview_api_stats_overview_get: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                authorization?: string | null;
+            };
             path?: never;
             cookie?: never;
         };
@@ -1747,15 +1749,25 @@ export interface operations {
                     "application/json": components["schemas"]["StatsOverviewResponse"];
                 };
             };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
         };
     };
     activity_api_stats_activity_get: {
         parameters: {
             query?: {
-                /** @description Activity window: 7d, 30d, or 90d. */
                 period?: components["schemas"]["StatsPeriod"];
             };
-            header?: never;
+            header?: {
+                authorization?: string | null;
+            };
             path?: never;
             cookie?: never;
         };
@@ -1784,7 +1796,9 @@ export interface operations {
     security_api_stats_security_get: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                authorization?: string | null;
+            };
             path?: never;
             cookie?: never;
         };
@@ -1797,6 +1811,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["StatsSecurityResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

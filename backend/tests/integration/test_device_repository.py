@@ -91,3 +91,19 @@ async def test_list_for_account_returns_all_statuses(database):
     assert set(by_id) == {active_id, revoked_id}
     assert by_id[active_id].is_active is True
     assert by_id[revoked_id].is_active is False
+
+
+async def test_list_for_account_excludes_other_accounts(database):
+    account_id = uuid4()
+    other_account_id = uuid4()
+    async with SqlAlchemyUnitOfWork(database) as uow:
+        await uow.accounts.add(Account(id=account_id))
+        await uow.accounts.add(Account(id=other_account_id))
+        await uow.devices.add(Device(uuid4(), account_id, "mine", "mine-key"))
+        await uow.devices.add(Device(uuid4(), other_account_id, "other", "other-key"))
+        await uow.commit()
+
+    async with SqlAlchemyUnitOfWork(database) as uow:
+        devices = await uow.devices.list_for_account(account_id)
+
+    assert [device.device_name for device in devices] == ["mine"]
