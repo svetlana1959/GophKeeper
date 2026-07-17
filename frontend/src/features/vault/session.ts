@@ -125,6 +125,22 @@ export async function enrollBrowserDevice(opts: {
   return { deviceId: join.device.id, identity, recipient, deviceToken: verify.access_token }
 }
 
+/** Whether this device has been approved — i.e. an existing device published a
+ *  vouch cert naming it. This is the approval signal, read from the trust log,
+ *  and it does NOT depend on the vault having any secrets to reshare (an empty
+ *  vault would otherwise leave the approve poll waiting forever). */
+export async function isDeviceApproved(opts: {
+  token: string
+  deviceId: string
+  baseUrl?: string
+}): Promise<boolean> {
+  const baseUrl = opts.baseUrl ?? DEFAULT_BASE
+  const { certs } = await api<{
+    certs: { kind: string; subject_id: string }[]
+  }>(baseUrl, '/trust/certs', { token: opts.token })
+  return certs.some((c) => c.kind === 'vouch' && c.subject_id === opts.deviceId)
+}
+
 /** Re-authenticate an already-enrolled device (e.g. one restored from storage)
  *  for a fresh session token — the age challenge/response, no new enrollment. A
  *  401 here means the device was reaped or revoked; the caller should re-link. */

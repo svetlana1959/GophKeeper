@@ -16,6 +16,7 @@ import {
   enrollBrowserDevice,
   heartbeatDevice,
   isAccountRecoveryKey,
+  isDeviceApproved,
   pullAndDecrypt,
   reauthenticateDevice,
   type BrowserDevice,
@@ -157,15 +158,21 @@ export function VaultProvider({ children }: { children: ReactNode }) {
       setLink({ phase: 'awaiting', deviceName, deviceId: enrolled.deviceId, fingerprint })
 
       // Wait for an existing device to run `goph device approve`, which vouches
-      // for us and reshares the vault. Once anything decrypts under our own key,
-      // approval has landed — unlock in memory.
+      // for us (a trust cert) and reshares the vault. We watch the trust log for
+      // that vouch — not for decrypted secrets, since an empty vault has nothing
+      // to reshare and would leave us waiting forever.
       while (!pollAbort.current) {
-        const decrypted = await pullAndDecrypt({
+        const approved = await isDeviceApproved({
           token: enrolled.deviceToken,
-          identity: enrolled.identity,
+          deviceId: enrolled.deviceId,
         })
         if (pollAbort.current) return
-        if (decrypted.length > 0) {
+        if (approved) {
+          const decrypted = await pullAndDecrypt({
+            token: enrolled.deviceToken,
+            identity: enrolled.identity,
+          })
+          if (pollAbort.current) return
           unlockIdentity.current = enrolled.identity
           setHasDeviceKey(true)
           setSecrets(decrypted)
