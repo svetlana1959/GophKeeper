@@ -1,23 +1,107 @@
 import { useState } from 'react'
-import { Check, KeyRound, Laptop, Loader2, Lock, Terminal } from 'lucide-react'
+import { Check, KeyRound, Laptop, Loader2, Lock, ShieldCheck, Terminal } from 'lucide-react'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { CopyButton } from '@/features/enrollment/components/copy-button'
 import { useVault } from './vault-context'
 
 export function VaultLockedScreen() {
-  const { link } = useVault()
+  const { link, persisted } = useVault()
   if (link) return <VaultLinkingScreen />
+  if (persisted) return <VaultSavedDeviceScreen />
   return <VaultUnlockScreen />
+}
+
+const PIN_INPUT_CLASS =
+  'border-input text-foreground placeholder:text-muted-foreground focus-visible:border-primary focus-visible:ring-primary/25 mt-1.5 h-11 w-full rounded-lg border bg-transparent px-3 font-mono text-sm focus-visible:ring-2 focus-visible:outline-none'
+
+function VaultSavedDeviceScreen() {
+  const { persisted, unlockWithSavedDevice, forgetDevice, status, error } = useVault()
+  const [pin, setPin] = useState('')
+  const busy = status === 'unlocking'
+  const needsPin = persisted?.protected ?? false
+
+  const submit = () => {
+    if (busy) return
+    if (needsPin && !pin.trim()) return
+    void unlockWithSavedDevice(needsPin ? pin.trim() : undefined)
+  }
+
+  return (
+    <Card className="mx-auto flex max-w-xl flex-col items-center gap-6 p-8 text-center">
+      <span className="bg-primary/10 text-primary flex size-14 items-center justify-center rounded-2xl">
+        <ShieldCheck className="size-7" strokeWidth={1.75} />
+      </span>
+      <div>
+        <h2 className="text-foreground text-xl font-bold">Unlock this browser</h2>
+        <p className="text-muted-foreground mt-2 text-sm">
+          This browser is already linked as a device.{' '}
+          {needsPin ? 'Enter your PIN to unlock.' : 'Unlock to read your secrets.'}
+        </p>
+      </div>
+
+      <form
+        onSubmit={(e) => {
+          e.preventDefault()
+          submit()
+        }}
+        className="flex w-full flex-col gap-3"
+      >
+        {needsPin ? (
+          <label className="text-left">
+            <span className="text-foreground text-sm font-medium">PIN</span>
+            <input
+              type="password"
+              inputMode="numeric"
+              value={pin}
+              onChange={(e) => setPin(e.target.value)}
+              placeholder="••••"
+              autoComplete="off"
+              autoFocus
+              className={PIN_INPUT_CLASS}
+            />
+          </label>
+        ) : null}
+        {error ? <p className="text-destructive text-left text-sm">{error}</p> : null}
+        <Button type="submit" disabled={busy || (needsPin && !pin.trim())} className="w-full">
+          {busy ? (
+            <>
+              <Loader2 className="size-4 animate-spin" /> Unlocking…
+            </>
+          ) : (
+            <>
+              <KeyRound className="size-4" strokeWidth={2} /> Unlock vault
+            </>
+          )}
+        </Button>
+      </form>
+
+      {!needsPin ? (
+        <p className="text-muted-foreground text-xs">
+          This browser stays signed in without a PIN — anyone using this device can open your vault.
+          Add a PIN in Settings.
+        </p>
+      ) : null}
+
+      <button
+        type="button"
+        onClick={forgetDevice}
+        className="text-muted-foreground hover:text-foreground border-border/60 w-full border-t pt-4 text-xs underline-offset-4 hover:underline"
+      >
+        Not you? Forget this browser and start over
+      </button>
+    </Card>
+  )
 }
 
 function VaultUnlockScreen() {
   const { unlockWithRecoveryKey, linkDevice, status, error } = useVault()
   const [showRecovery, setShowRecovery] = useState(false)
+  const [pin, setPin] = useState('')
   const [key, setKey] = useState('')
   const busy = status === 'unlocking'
 
-  const submit = () => {
+  const submitRecovery = () => {
     if (key.trim() && !busy) void unlockWithRecoveryKey(key.trim())
   }
 
@@ -34,9 +118,27 @@ function VaultUnlockScreen() {
         </p>
       </div>
 
-      <Button onClick={() => void linkDevice()} className="w-full">
-        <Laptop className="size-4" strokeWidth={2} /> Link this browser
-      </Button>
+      <div className="flex w-full flex-col gap-3">
+        <label className="text-left">
+          <span className="text-foreground text-sm font-medium">PIN (optional, recommended)</span>
+          <input
+            type="password"
+            inputMode="numeric"
+            value={pin}
+            onChange={(e) => setPin(e.target.value)}
+            placeholder="Set a PIN to keep this browser protected"
+            autoComplete="off"
+            className={PIN_INPUT_CLASS}
+          />
+        </label>
+        <Button onClick={() => void linkDevice(pin.trim() || undefined)} className="w-full">
+          <Laptop className="size-4" strokeWidth={2} /> Link this browser
+        </Button>
+        <p className="text-muted-foreground text-left text-xs">
+          A PIN encrypts the device key stored on this browser. Without one it's saved unprotected —
+          anyone using this device could open your vault.
+        </p>
+      </div>
 
       {!showRecovery ? (
         <button
@@ -50,7 +152,7 @@ function VaultUnlockScreen() {
         <form
           onSubmit={(e) => {
             e.preventDefault()
-            submit()
+            submitRecovery()
           }}
           className="flex w-full flex-col gap-3"
         >
@@ -64,7 +166,7 @@ function VaultUnlockScreen() {
               autoComplete="off"
               spellCheck={false}
               autoFocus
-              className="border-input text-foreground placeholder:text-muted-foreground focus-visible:border-primary focus-visible:ring-primary/25 mt-1.5 h-11 w-full rounded-lg border bg-transparent px-3 font-mono text-sm focus-visible:ring-2 focus-visible:outline-none"
+              className={PIN_INPUT_CLASS}
             />
           </label>
           <Button type="submit" variant="outline" disabled={!key.trim() || busy} className="w-full">

@@ -1,5 +1,6 @@
 import { createContext, useContext } from 'react'
 import type { DecryptedSecret } from './session'
+import type { PersistedDeviceMeta } from './device-store'
 
 export type VaultStatus = 'locked' | 'unlocking' | 'unlocked'
 
@@ -22,12 +23,25 @@ export interface VaultContextValue {
   error: string | null
   /** Non-null while linking this browser as a device via the approve flow. */
   link: LinkState | null
+  /** This browser's saved device, if it was persisted for reload-free unlock. */
+  persisted: PersistedDeviceMeta | null
+  /** True when the current unlock holds a device key that can be persisted
+   *  (i.e. unlocked via link, not via the device-free recovery key). */
+  canPersist: boolean
   /** Unlock by decrypting the vault with the account recovery key. */
   unlockWithRecoveryKey: (recoveryKey: string) => Promise<void>
-  /** Enroll this browser as a device and wait for another device to approve it. */
-  linkDevice: () => Promise<void>
+  /** Unlock using this browser's saved device key. PIN required iff protected. */
+  unlockWithSavedDevice: (pin?: string) => Promise<void>
+  /** Enroll this browser as a device and wait for another device to approve it.
+   *  On success, if persistence is enabled, saves the key (PIN-encrypted if given). */
+  linkDevice: (pin?: string) => Promise<void>
   /** Abandon an in-progress approve flow. */
   cancelLink: () => void
+  /** Save the current device key on this browser so reloads skip re-linking.
+   *  A PIN encrypts it at rest; omit it to store unprotected (opt-out). */
+  saveDevice: (pin?: string) => Promise<void>
+  /** Forget the saved device on this browser (clears local key material). */
+  forgetDevice: () => void
   /** Wipe the decryption key and decrypted secrets from memory. */
   lock: () => void
 }

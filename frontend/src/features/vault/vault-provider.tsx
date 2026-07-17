@@ -1,6 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { tokenStore } from '@/api/http'
 import { deviceFingerprint } from './crypto'
+import {
+  clearPersistedDevice,
+  peekPersistedDevice,
+  persistDevice,
+  unlockPersistedDevice,
+  WrongPinError,
+  type PersistedDeviceMeta,
+} from './device-store'
+import { loadVaultSettings } from './vault-settings'
 import { VaultContext, type LinkState, type VaultStatus } from './vault-context'
 import {
   browserLabel,
@@ -8,12 +17,14 @@ import {
   heartbeatDevice,
   isAccountRecoveryKey,
   pullAndDecrypt,
+  reauthenticateDevice,
   type BrowserDevice,
   type DecryptedSecret,
 } from './session'
 
 // Auto-lock after inactivity: wipe the decryption key + decrypted secrets from
-// memory. MVP holds everything in memory only — a reload locks.
+// memory. The saved (encrypted) device key survives, so unlocking again is a PIN
+// away — no re-link.
 const IDLE_LOCK_MS = 15 * 60 * 1000
 
 // How often to check whether an approving device has reshared the vault to us.
@@ -23,15 +34,21 @@ const APPROVE_POLL_MS = 3000
 // isn't reaped while open. Well under the declared TTL.
 const HEARTBEAT_MS = 5 * 60 * 1000
 
+function is401(e: unknown): boolean {
+  return e instanceof Error && / 401 /.test(` ${e.message} `)
+}
+
 export function VaultProvider({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<VaultStatus>('locked')
   const [secrets, setSecrets] = useState<DecryptedSecret[]>([])
   const [error, setError] = useState<string | null>(null)
   const [link, setLink] = useState<LinkState | null>(null)
+  const [persisted, setPersisted] = useState<PersistedDeviceMeta | null>(() => peekPersistedDevice())
+  const [hasDeviceKey, setHasDeviceKey] = useState(false)
 
   // The unlock key (recovery key or this browser's device key) stays in a ref,
-  // out of React state/devtools. The enrolled device — including its private
-  // key — lives here too while the approve flow runs.
+  // out of React state/devtools. The live device — including its private key —
+  // lives here too while unlocked or while the approve flow runs.
   const unlockIdentity = useRef<string | null>(null)
   const device = useRef<BrowserDevice | null>(null)
   const pollAbort = useRef(false)
@@ -40,6 +57,7 @@ export function VaultProvider({ children }: { children: ReactNode }) {
     pollAbort.current = true
     unlockIdentity.current = null
     device.current = null
+    setHasDeviceKey(false)
     setSecrets([])
     setError(null)
     setLink(null)
@@ -74,13 +92,49 @@ export function VaultProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
+  const unlockWithSavedDevice = useCallback(async (pin?: string) => {
+    setError(null)
+    setStatus('unlocking')
+    try {
+      const saved = await unlockPersistedDevice(pin) // throws WrongPinError
+      const token = await reauthenticateDevice({ identity: saved.identity }) // may 401
+      const decrypted = await pullAndDecrypt({ token, identity: saved.identity })
+      device.current = {
+        deviceId: saved.deviceId,
+        identity: saved.identity,
+        recipient: saved.recipient,
+        deviceToken: token,
+      }
+      unlockIdentity.current = saved.identity
+      setHasDeviceKey(true)
+      setSecrets(decrypted)
+      setStatus('unlocked')
+    } catch (e) {
+      if (e instanceof WrongPinError) {
+        setError(e.message)
+        setStatus('locked')
+        return
+      }
+      if (is401(e)) {
+        // The device was reaped or revoked server-side; the saved key is dead.
+        clearPersistedDevice()
+        setPersisted(null)
+        setError('This browser is no longer linked — link it again.')
+        setStatus('locked')
+        return
+      }
+      setError(e instanceof Error ? e.message : 'Could not unlock the vault.')
+      setStatus('locked')
+    }
+  }, [])
+
   const cancelLink = useCallback(() => {
     pollAbort.current = true
     device.current = null
     setLink(null)
   }, [])
 
-  const linkDevice = useCallback(async () => {
+  const linkDevice = useCallback(async (pin?: string) => {
     const accountToken = tokenStore.get()
     if (!accountToken) {
       setError('Your session expired — sign in again.')
@@ -88,10 +142,15 @@ export function VaultProvider({ children }: { children: ReactNode }) {
     }
     setError(null)
     const deviceName = browserLabel()
+    const settings = loadVaultSettings()
     setLink({ phase: 'enrolling', deviceName, deviceId: null, fingerprint: null })
     pollAbort.current = false
     try {
-      const enrolled = await enrollBrowserDevice({ accountToken, deviceName })
+      const enrolled = await enrollBrowserDevice({
+        accountToken,
+        deviceName,
+        ttlSeconds: settings.ttlSeconds,
+      })
       if (pollAbort.current) return
       device.current = enrolled
       const fingerprint = await deviceFingerprint(enrolled.recipient)
@@ -108,7 +167,12 @@ export function VaultProvider({ children }: { children: ReactNode }) {
         if (pollAbort.current) return
         if (decrypted.length > 0) {
           unlockIdentity.current = enrolled.identity
+          setHasDeviceKey(true)
           setSecrets(decrypted)
+          if (settings.persist) {
+            await persistDevice(enrolled, { pin, ttlSeconds: settings.ttlSeconds })
+            setPersisted(peekPersistedDevice())
+          }
           setStatus('unlocked')
           setLink(null)
           return
@@ -123,8 +187,20 @@ export function VaultProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
+  const saveDevice = useCallback(async (pin?: string) => {
+    if (!device.current) throw new Error('No device key to save — link this browser first.')
+    const settings = loadVaultSettings()
+    await persistDevice(device.current, { pin, ttlSeconds: settings.ttlSeconds })
+    setPersisted(peekPersistedDevice())
+  }, [])
+
+  const forgetDevice = useCallback(() => {
+    clearPersistedDevice()
+    setPersisted(null)
+  }, [])
+
   // Keep an unlocked browser device alive while the tab is open. Only devices
-  // (approve flow) have a token to beat with; recovery unlock has none.
+  // (link / saved-device unlock) have a token to beat with; recovery unlock has none.
   useEffect(() => {
     if (status !== 'unlocked' || !device.current) return
     const token = device.current.deviceToken
@@ -152,8 +228,36 @@ export function VaultProvider({ children }: { children: ReactNode }) {
   }, [status, lock])
 
   const value = useMemo(
-    () => ({ status, secrets, error, link, unlockWithRecoveryKey, linkDevice, cancelLink, lock }),
-    [status, secrets, error, link, unlockWithRecoveryKey, linkDevice, cancelLink, lock],
+    () => ({
+      status,
+      secrets,
+      error,
+      link,
+      persisted,
+      canPersist: hasDeviceKey && persisted === null,
+      unlockWithRecoveryKey,
+      unlockWithSavedDevice,
+      linkDevice,
+      cancelLink,
+      saveDevice,
+      forgetDevice,
+      lock,
+    }),
+    [
+      status,
+      secrets,
+      error,
+      link,
+      persisted,
+      hasDeviceKey,
+      unlockWithRecoveryKey,
+      unlockWithSavedDevice,
+      linkDevice,
+      cancelLink,
+      saveDevice,
+      forgetDevice,
+      lock,
+    ],
   )
   return <VaultContext.Provider value={value}>{children}</VaultContext.Provider>
 }
