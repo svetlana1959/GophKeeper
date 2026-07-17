@@ -7,7 +7,14 @@
 // the same `/api` the rest of the app talks to.
 
 import { generatePairingCode } from '@/lib/pairing-code'
-import { base64ToBytes, bytesToBase64, decryptContent, decryptRaw, generateDeviceIdentity, recipientOf } from './crypto'
+import {
+  base64ToBytes,
+  bytesToBase64,
+  decryptContent,
+  decryptRaw,
+  generateDeviceIdentity,
+  recipientOf,
+} from './crypto'
 
 const DEFAULT_BASE = '/api'
 
@@ -110,9 +117,11 @@ export interface DecryptedSecret {
   version: number
 }
 
-/** Pull the account's ciphertext (as a device) and decrypt every live secret with
- *  the given identity — the recovery key today, the device's own key once resharing
- *  lands. Undecryptable secrets (not sealed to this identity) are skipped. */
+/** Pull the account's ciphertext and decrypt every live secret with the given
+ *  identity — the recovery key today, the device's own key once resharing lands.
+ *  Reads /sync/all (account-scoped): the recovery key is a recipient in the
+ *  ciphertext but not a device, so the recipient-scoped /changes wouldn't return
+ *  anything. Secrets not sealed to this identity are skipped. */
 export async function pullAndDecrypt(opts: {
   deviceToken: string
   identity: string
@@ -121,7 +130,7 @@ export async function pullAndDecrypt(opts: {
   const baseUrl = opts.baseUrl ?? DEFAULT_BASE
   const { secrets } = await api<{
     secrets: { id: string; version: number; deleted: boolean; ciphertext_b64: string }[]
-  }>(baseUrl, '/sync/changes?since=0', { token: opts.deviceToken })
+  }>(baseUrl, '/sync/all', { token: opts.deviceToken })
 
   const out: DecryptedSecret[] = []
   for (const s of secrets) {

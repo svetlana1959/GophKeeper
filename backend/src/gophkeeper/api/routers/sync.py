@@ -4,9 +4,11 @@ Both are scoped to the authenticated device's account (from get_principal), so a
 device can only ever sync its own account's secrets.
 """
 
+from uuid import UUID
+
 from fastapi import APIRouter, Depends, Query
 
-from gophkeeper.api.deps import get_principal, provide
+from gophkeeper.api.deps import get_account_id, get_principal, provide
 from gophkeeper.api.schemas.sync import (
     ChangedSecretResponse,
     ChangesResponse,
@@ -90,4 +92,28 @@ async def changes(
     return ChangesResponse(
         secrets=[ChangedSecretResponse.from_domain(s) for s in secrets],
         cursor=cursor,
+    )
+
+
+@router.get(
+    "/all",
+    response_model=ChangesResponse,
+    summary="Read the whole account's ciphertext (recovery / full decrypt)",
+    responses=_UNAUTHORIZED,
+)
+async def all_secrets(
+    account_id: UUID = Depends(get_account_id),
+    service: SyncService = Depends(provide(SyncService)),
+) -> ChangesResponse:
+    """Return every live secret in the account, regardless of recipient.
+
+    For a client that decrypts with the recovery key — which is a recipient in the
+    ciphertext but not a device, so it can't use the recipient-scoped `/changes`.
+    Payloads are opaque; a caller that isn't a recipient still can't read them.
+    Accepts either a web (account) or a device session.
+    """
+    secrets = await service.all_for_account(str(account_id))
+    return ChangesResponse(
+        secrets=[ChangedSecretResponse.from_domain(s) for s in secrets],
+        cursor=max((s.seq for s in secrets), default=0),
     )
