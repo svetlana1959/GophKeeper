@@ -16,6 +16,8 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 from gophkeeper.api.errors import register_exception_handlers
 from gophkeeper.api.routers import account, auth, device, enroll, stats, sync, trust
 from gophkeeper.infrastructure.adapters.database import SqlAlchemyAdapter
+from gophkeeper.infrastructure.unit_of_work import SqlAlchemyUnitOfWork
+from gophkeeper.services.device_service import DeviceService
 from gophkeeper.settings.settings import settings
 
 _TAGS_METADATA = [
@@ -64,6 +66,20 @@ _TAGS_METADATA = [
 ]
 
 
+async def _reap_expired_devices_forever(database: SqlAlchemyAdapter, interval: int) -> None:
+    """Periodically delete devices past their self-declared expiry. Runs for the
+    lifetime of the process; failures are logged and retried on the next tick so
+    a transient DB blip never kills the sweep."""
+    while True:
+        await asyncio.sleep(interval)
+        try:
+            reaped = await DeviceService(SqlAlchemyUnitOfWork(database)).reap_expired()
+            if reaped:
+                logging.info("reaped %d expired device(s)", reaped)
+        except Exception as exc:  # noqa: BLE001 — never let the sweep die
+            logging.warning("device reaper failed: %s", exc)
+
+
 def create_app() -> FastAPI:
     logging.basicConfig(level=settings.run_settings.logging_level)
 
@@ -79,7 +95,13 @@ def create_app() -> FastAPI:
                 logging.warning("database not ready, retrying: %s", exc)
                 await asyncio.sleep(3)
         logging.info("database ready")
+        reaper = asyncio.create_task(
+            _reap_expired_devices_forever(
+                database, settings.security.device_reap_interval_seconds
+            )
+        )
         yield
+        reaper.cancel()
         await database.disconnect()
 
     app = FastAPI(

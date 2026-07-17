@@ -8,6 +8,7 @@ filter or a missing account predicate would silently skew every account's stats,
 so it's asserted directly here.
 """
 
+from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
 import pytest
@@ -61,3 +62,32 @@ async def test_list_for_account_returns_all_statuses_scoped_to_the_account(datab
         "key-active",
         "sign-active",
     )
+
+
+async def test_delete_expired_reaps_only_past_devices_and_round_trips_expiry(database):
+    account_id = uuid4()
+    now = datetime.now(UTC)
+    expired_id, live_id, never_id = uuid4(), uuid4(), uuid4()
+
+    async with SqlAlchemyUnitOfWork(database) as uow:
+        await uow.accounts.add(Account(id=account_id))
+        await uow.devices.add(
+            Device(expired_id, account_id, "stale", "k-stale", expires_at=now - timedelta(hours=1))
+        )
+        await uow.devices.add(
+            Device(live_id, account_id, "fresh", "k-fresh", expires_at=now + timedelta(hours=1))
+        )
+        await uow.devices.add(Device(never_id, account_id, "cli", "k-cli"))
+        await uow.commit()
+
+    async with SqlAlchemyUnitOfWork(database) as uow:
+        reaped = await uow.devices.delete_expired(now=now)
+        await uow.commit()
+
+    assert reaped == 1
+    async with SqlAlchemyUnitOfWork(database) as uow:
+        remaining = {d.id: d for d in await uow.devices.list_for_account(account_id)}
+    assert set(remaining) == {live_id, never_id}
+    # expires_at round-trips through the column, and NULL stays NULL.
+    assert remaining[live_id].expires_at is not None
+    assert remaining[never_id].expires_at is None

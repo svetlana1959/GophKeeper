@@ -10,7 +10,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends
 
 from gophkeeper.api.deps import get_account_id, get_principal, provide
-from gophkeeper.api.schemas.device import DeviceResponse
+from gophkeeper.api.schemas.device import DeviceResponse, HeartbeatRequest
 from gophkeeper.security.principal import DevicePrincipal
 from gophkeeper.services.device_service import DeviceService
 
@@ -35,6 +35,30 @@ async def list_devices(
     """
     devices = await service.list_for_account(account_id)
     return [DeviceResponse.from_domain(d) for d in devices]
+
+
+@router.post(
+    "/heartbeat",
+    response_model=DeviceResponse,
+    summary="Keep this device alive",
+    responses={401: {"description": "Missing, invalid, expired, or revoked bearer token."}},
+)
+async def heartbeat(
+    body: HeartbeatRequest,
+    principal: DevicePrincipal = Depends(get_principal),
+    service: DeviceService = Depends(provide(DeviceService)),
+) -> DeviceResponse:
+    """Extend this device's expiry while it's in use.
+
+    A self-declaring device (a browser) calls this periodically so it survives as
+    long as it stays active; stop calling and it expires and is reaped. Only the
+    caller's own session is affected — an already-expired device can't get here,
+    it fails authentication first.
+    """
+    device = await service.heartbeat(
+        principal.device_id, account_id=principal.account_id, ttl_seconds=body.ttl_seconds
+    )
+    return DeviceResponse.from_domain(device)
 
 
 @router.get(

@@ -1,5 +1,6 @@
 """SQLAlchemy implementation of the DeviceRepository port."""
 
+from datetime import datetime
 from typing import Any
 from uuid import UUID
 
@@ -17,6 +18,7 @@ _COLUMNS = (
     "sign_public_key",
     "status",
     "last_seen_at",
+    "expires_at",
     "updated_at",
 )
 _COLUMN_LIST = ", ".join(_COLUMNS)
@@ -32,6 +34,7 @@ def _to_params(device: Device) -> dict[str, Any]:
         "sign_public_key": device.sign_public_key,
         "status": device.status,
         "last_seen_at": device.last_seen_at,
+        "expires_at": device.expires_at,
         "updated_at": device.updated_at,
     }
 
@@ -45,6 +48,7 @@ def _from_row(row: RowMapping) -> Device:
         sign_public_key=row["sign_public_key"],
         status=row["status"],
         last_seen_at=row["last_seen_at"],
+        expires_at=row["expires_at"],
         updated_at=row["updated_at"],
     )
 
@@ -104,8 +108,22 @@ class SqlAlchemyDeviceRepository(DeviceRepository):
                 "sign_public_key = :sign_public_key, "
                 "status = :status, "
                 "last_seen_at = :last_seen_at, "
+                "expires_at = :expires_at, "
                 "updated_at = :updated_at "
                 "WHERE id = :id"
             ),
             _to_params(device),
         )
+
+    async def delete_expired(self, *, now: datetime) -> int:
+        """Hard-delete every device past its declared expiry, returning the count.
+
+        Devices with no expiry (``expires_at IS NULL``) are never touched. The
+        secret_recipients and trust_certs foreign keys cascade, so a reaped
+        device leaves no dangling rows behind.
+        """
+        result = await self._session.execute(
+            text("DELETE FROM devices WHERE expires_at IS NOT NULL AND expires_at < :now"),
+            {"now": now},
+        )
+        return result.rowcount or 0

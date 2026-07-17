@@ -14,6 +14,7 @@ from gophkeeper.domain.device import ACTIVE, Device
 from gophkeeper.domain.errors import DeviceAlreadyExists, InvalidInvite, InviteNotFound
 from gophkeeper.domain.invite import Invite
 from gophkeeper.domain.unit_of_work import UnitOfWork
+from gophkeeper.services.device_service import capped_expiry
 from gophkeeper.settings.settings import settings
 
 
@@ -47,9 +48,14 @@ class EnrollmentService:
         public_key: str,
         sign_public_key: str,
         join_mac: str,
+        ttl_seconds: int | None = None,
     ) -> tuple[Device, str]:
         """Admit a device, consuming the invite. Returns the device and the
-        inviter's MAC'd roster (for the joiner to adopt as anchors)."""
+        inviter's MAC'd roster (for the joiner to adopt as anchors).
+
+        ``ttl_seconds`` lets a self-declaring device (e.g. a browser) set how long
+        it should live; the server caps it. CLI devices pass ``None`` and never
+        expire."""
         async with self._uow as uow:
             invite = await uow.invites.find_by_code_hash(code_hash)
             if invite is None or not invite.is_valid():
@@ -66,6 +72,7 @@ class EnrollmentService:
                 public_key=public_key,
                 sign_public_key=sign_public_key,
                 status=ACTIVE,
+                expires_at=capped_expiry(ttl_seconds),
             )
             await uow.devices.add(device)
             invite.join_mac = join_mac
