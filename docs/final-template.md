@@ -219,14 +219,14 @@ Scene 9 (6:00–6:20), voiced by Svetlana over on-screen name/role cards: Svetla
 
 # 4. Team Contributions
 
-| Team Member | Role | Final Product Contribution | Final Video Contribution |
+| Team Member | Role | Final Product Contribution | 
 |---|---|---|---|
-| Svetlana Maltseva | Team Lead, Product Manager | Sprint planning and backlog management across all sprints; final demo scenario; sprint/final reports (Issues #141, #138, and equivalents each sprint) | Problem Statement and Target Audience narration; Team Contributions segment; oversees final video assembly |
-| Elina Akhmetzyanova | Design, Documentation |Responsible for UI/UX design and documentation. Designed the GophKeeper desktop and mobile interfaces in both light and dark themes, created the project landing page, prepared UI mockups for core application flows, and contributed to the project reports and documentation | Challenges & Lessons Learned narration; visual/title sequence |
-| Arseny Lashkevich | DevOps Engineer | Owns and maintains all CI pipelines (`ci-backend`, `ci-cli`, `ci-frontend`, `release-cli`) and Docker builds for cli/backend/frontend; approved the device-trust/sync PR (#121); led the M4 device trust graph (PR #145); release manager — signed and published `v0.1.0`, `v0.2.0`, and `v1.0.0` | Cold-open pitch appearance; Track/Acceptance Criteria and architecture/DevOps narration |
-| Aleksander Goncharov | CLI Engineer | Delivered multi-device secret synchronization (`app/sync.go`, PR #126) and the local vault/crypto/remote layers; drove CLI test coverage to 82% with an enforced 80% floor and a live coverage badge (PRs #156, #157) | Leads and narrates the CLI Live Demo segment |
-| Emil Nabiullin | Frontend Developer | Shipped the original landing page, adaptive layout, and registration/authorization pages (PRs #116, #134, #136, Issue #109); the subsequent full TypeScript/Tailwind frontend rewrite and dashboard (PR #148) and the recovery-key/add-device flow (PR #147) were merged under the GitHub handle `Perchinka`, consistent with the Frontend Developer role | Cold-open voiceover; leads the Web Live Demo segment |
-| Malik Nurullin | Backend Developer | Implemented the account/device/secret/sync services and repositories on FastAPI + SQLAlchemy (PR #121) | Cold-open "victim" role and its payoff shot; Industrial Track Highlight (before/after) narration |
+| Svetlana Maltseva | Team Lead, Product Manager | Sprint planning and backlog management across all sprints; final demo scenario; sprint/final reports (Issues #141, #138, and equivalents each sprint) | 
+| Elina Akhmetzyanova | Design, Documentation |Responsible for UI/UX design and documentation. Designed the GophKeeper desktop and mobile interfaces in both light and dark themes, created the project landing page, prepared UI mockups for core application flows, and contributed to the project reports and documentation | 
+| Arseny Lashkevich | DevOps Engineer | Owns and maintains all CI pipelines (`ci-backend`, `ci-cli`, `ci-frontend`, `release-cli`) and Docker builds for cli/backend/frontend; approved the device-trust/sync PR (#121); led the M4 device trust graph (PR #145); release manager — signed and published `v0.1.0`, `v0.2.0`, and `v1.0.0` | 
+| Aleksander Goncharov | CLI Engineer | Delivered multi-device secret synchronization (`app/sync.go`, PR #126) and the local vault/crypto/remote layers; drove CLI test coverage to 82% with an enforced 80% floor and a live coverage badge (PRs #156, #157) |
+| Emil Nabiullin | Frontend Developer | Shipped the original landing page, adaptive layout, and registration/authorization pages (PRs #116, #134, #136, Issue #109); the subsequent full TypeScript/Tailwind frontend rewrite and dashboard (PR #148) and the recovery-key/add-device flow (PR #147) were merged under the GitHub handle `Perchinka`, consistent with the Frontend Developer role | 
+| Malik Nurullin | Backend Developer | Implemented the account/device/secret/sync services and repositories on FastAPI + SQLAlchemy (PR #121) |
 
 
 ---
