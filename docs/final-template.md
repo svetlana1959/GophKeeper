@@ -206,7 +206,7 @@ Scene 9 (6:00–6:20), voiced by Svetlana over on-screen name/role cards: Svetla
  
 # 3. Video Production
  
-| Team Member | Project Role | Narration / Video Section | Recording / Screen Capture / Editing Responsibility |
+| Team Member | Project Role | Narration / Video Section | 
 |---|---|---|---|
 | Svetlana Maltseva | Team Lead, Product Manager | Problem Statement & Solution voiceover (Scene 4); Team Contributions voiceover (Scene 9) |
 | Elina Akhmetzyanova | Design, Documentation | Live Demo — web-portion voiceover (Scene 6): landing, registration, login, dashboard | 
