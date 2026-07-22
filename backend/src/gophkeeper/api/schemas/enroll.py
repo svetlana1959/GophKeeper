@@ -41,6 +41,15 @@ class JoinRequest(BaseModel):
     join_mac: str = Field(
         default="", description="HMAC binding the joiner's keys to the code, for the inviter."
     )
+    ttl_seconds: int | None = Field(
+        default=None,
+        gt=0,
+        description=(
+            "How long this device should live, in seconds from now — set by "
+            "self-declaring devices (e.g. a browser) that expire when idle. The "
+            "server caps it. Omit for devices that never expire (the CLI)."
+        ),
+    )
 
 
 class JoinResponse(BaseModel):

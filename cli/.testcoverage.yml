@@ -1,0 +1,12 @@
+# Coverage thresholds enforced by go-test-coverage.
+# https://github.com/vladopajic/go-test-coverage
+#
+# The profile is produced with `-coverpkg=./...` (see the Makefile `cover`
+# target), so cross-package coverage counts — a test in internal/app that
+# exercises internal/vault credits vault, matching how the code actually runs.
+profile: coverage.out
+
+# Only the overall figure is gated (per the project's chosen policy). Individual
+# packages are free to sit lower as long as the whole stays healthy.
+threshold:
+  total: 80

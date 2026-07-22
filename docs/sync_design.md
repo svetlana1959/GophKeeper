@@ -161,10 +161,10 @@ The first `goph sync` on a device with no account:
 - logs `account.created`.
 
 ### 5.3 Sync loop (steady state)
-- **Pull** — `GET /sync/changes?since=<seq>` → every secret in the account the
+- **Pull** — `GET /api/sync/changes?since=<seq>` → every secret in the account the
   device is a recipient of with `seq > since`, **including tombstones**, plus the
   new high-water `seq`. Client applies, advances its cursor.
-- **Push** — `POST /sync/push` → batch of locally changed secrets, each with
+- **Push** — `POST /api/sync/push` → batch of locally changed secrets, each with
   `base_version`. Server upserts by UUID (idempotent — safe to retry), bumps
   `version` + `seq`, or returns `409 VersionConflict` on a stale write.
 
@@ -330,7 +330,7 @@ These are conscious gaps, surfaced in review, to close in later milestones. They
 are recorded here so they are decisions, not surprises.
 
 - **Reshare trusts the server's device list (M4).** `applyReshare` seals secrets
-  to the public keys returned by `GET /devices`. A malicious server could report
+  to the public keys returned by `GET /api/devices`. A malicious server could report
   a rogue device and the honest client would seal plaintext to it — weakening
   the zero-knowledge guarantee that §6 relies on. The mitigation is a
   client-owned trusted-device allow-list (populated only from confirmed
@@ -377,11 +377,11 @@ schema change.
 
 **Endpoints**
 
-- `POST /accounts` — register `{email, password, recovery_pubkey?}` → web session.
-- `POST /accounts/login` — `{email, password}` → web session.
-- `GET /accounts/me` — current account incl. `recovery_pubkey`; accepts a **web
+- `POST /api/accounts` — register `{email, password, recovery_pubkey?}` → web session.
+- `POST /api/accounts/login` — `{email, password}` → web session.
+- `GET /api/accounts/me` — current account incl. `recovery_pubkey`; accepts a **web
   or device** token (the CLI reads its recovery key here).
-- `POST /enroll/invite` — accepts a **web or device** principal (via
+- `POST /api/enroll/invite` — accepts a **web or device** principal (via
   `get_account_id`), so the browser can mint a CLI device's code.
 
 **CLI onboarding — link, don't register.** Every device, including the first,
@@ -389,11 +389,11 @@ joins via an invite:
 
 1. Web: register (browser mints the recovery keypair, sends only the pubkey,
    shows the private half once) → logged-in session.
-2. Web "Link a device" → `POST /enroll/invite` → shows `goph link <code>`.
-3. CLI: `goph link <code>` → `POST /enroll/join` → device enrolled (first device
+2. Web "Link a device" → `POST /api/enroll/invite` → shows `goph link <code>`.
+3. CLI: `goph link <code>` → `POST /api/enroll/join` → device enrolled (first device
    becomes the first key-holder).
 4. CLI `goph sync` authenticates (age challenge) and, in reshare, reads
-   `GET /accounts/me` and seals every secret to the devices **plus the recovery
+   `GET /api/accounts/me` and seals every secret to the devices **plus the recovery
    key** (mirrored locally as a trusted recipient; the server drops it from the
    pull mirror since it is a key, not a device).
 
@@ -413,7 +413,7 @@ generation (other dev).
 
 Closes the §9 gap "reshare trusts the server's device list." Reshare must seal
 plaintext only to keys the *client* has verified belong to account devices —
-never to whatever `GET /devices` returns, since a malicious server could inject a
+never to whatever `GET /api/devices` returns, since a malicious server could inject a
 rogue recipient and break the zero-knowledge guarantee of §6.
 
 **Two orthogonal layers.**
@@ -495,8 +495,8 @@ reachable *only* through `A` becomes unreachable and is dropped — the cascade.
 Remaining devices then **rotate keys** (the tested reshare path guarantees a
 removed recipient loses future access). Self-revoke is always permitted.
 
-**Transport — dedicated trust log (option A).** `POST /trust/certs` publishes one
-cert; `GET /trust/certs?since=<cursor>` returns new certs in order (same cursor
+**Transport — dedicated trust log (option A).** `POST /api/trust/certs` publishes one
+cert; `GET /api/trust/certs?since=<cursor>` returns new certs in order (same cursor
 pattern as `/sync/changes`). Kept separate from `/devices` and `/sync` on
 purpose: trust is a first-class, client-verified artifact, and re-entangling it
 with the server's device list is the very bug being fixed. The server relays but

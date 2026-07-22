@@ -116,6 +116,17 @@ class SyncService:
         cursor = max((s.seq for s in secrets), default=since)
         return secrets, cursor
 
+    async def all_for_account(self, account_id: str) -> list[Secret]:
+        """Every live secret in the account, regardless of recipient.
+
+        Unlike ``changes`` (which is scoped to a device's recipient set), this is
+        the whole account's ciphertext — needed by a client that decrypts with the
+        recovery key, which is a recipient in the ciphertext but not a device. The
+        payloads stay opaque; a caller that isn't a recipient still can't read them.
+        """
+        async with self._uow as uow:
+            return await uow.secrets.list_for_account(account_id)
+
     async def _apply_recipients(
         self, uow: UnitOfWork, account_id: str, device_id: UUID, item: PushItem
     ) -> None:

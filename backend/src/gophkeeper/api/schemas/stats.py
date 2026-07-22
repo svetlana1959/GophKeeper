@@ -17,31 +17,37 @@ class StatsPeriod(StrEnum):
 
 
 class StatsOverviewResponse(BaseModel):
-    passwords: int = Field(description="Mock count of password entries.")
-    bank_cards: int = Field(description="Mock count of bank card entries.")
-    notes: int = Field(description="Mock count of secure notes.")
-    files: int = Field(description="Mock count of encrypted files.")
-    trusted_devices: int = Field(description="Number of trusted devices.")
+    passwords: int = Field(description="Client-provided password count; zero until available.")
+    bank_cards: int = Field(description="Client-provided card count; zero until available.")
+    notes: int = Field(description="Client-provided note count; zero until available.")
+    files: int = Field(description="Client-provided file count; zero until available.")
+    trusted_devices: int = Field(description="Number of active trusted devices.")
     revoked_devices: int = Field(description="Number of revoked devices.")
+    pending_devices: int = Field(description="Number of devices awaiting approval.")
 
 
 class ActivityPointResponse(BaseModel):
     date: Date = Field(description="UTC calendar date represented by this point.")
-    created: int = Field(description="Mock number of entries created on this date.")
-    updated: int = Field(description="Mock number of entries updated on this date.")
-    deleted: int = Field(description="Mock number of entries deleted on this date.")
+    created: int = Field(description="Latest secret states first persisted on this UTC date.")
+    updated: int = Field(description="Latest non-deleted mutations on this UTC date.")
+    deleted: int = Field(description="Latest tombstones persisted on this UTC date.")
 
 
 class StatsActivityResponse(BaseModel):
     period: StatsPeriod = Field(description="Time window represented by the activity points.")
     points: list[ActivityPointResponse] = Field(
-        description="Daily activity points in chronological order."
+        description="Daily latest-mutation points in chronological order."
     )
 
 
 class StatsSecurityResponse(BaseModel):
-    status: Literal["good"] = Field(description="Mock aggregate security status.")
-    trusted_devices: int = Field(description="Number of trusted devices.")
+    status: Literal["good", "warning"] = Field(
+        description="Warning when revoked or pending devices exist; good otherwise."
+    )
+    trusted_devices: int = Field(description="Number of active trusted devices.")
     revoked_devices: int = Field(description="Number of revoked devices.")
-    alerts: int = Field(description="Number of active security alerts.")
-    last_sync_at: datetime = Field(description="UTC timestamp of the latest mock synchronization.")
+    pending_devices: int = Field(description="Number of devices awaiting approval.")
+    alerts: int = Field(description="Persisted active security alerts; zero until implemented.")
+    last_sync_at: datetime | None = Field(
+        description="Latest successful account sync, or null until such events are persisted."
+    )

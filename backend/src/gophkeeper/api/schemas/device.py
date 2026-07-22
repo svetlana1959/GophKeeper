@@ -18,6 +18,10 @@ class DeviceResponse(BaseModel):
     )
     status: str = Field(description="Trust lifecycle: pending | active | revoked.")
     last_seen_at: datetime | None = Field(description="Last authenticated call, if any.")
+    expires_at: datetime | None = Field(
+        default=None,
+        description="When the device expires and is reaped; null if it never expires.",
+    )
     updated_at: datetime
 
     @classmethod
@@ -30,5 +34,13 @@ class DeviceResponse(BaseModel):
             sign_public_key=device.sign_public_key,
             status=device.status,
             last_seen_at=device.last_seen_at,
+            expires_at=device.expires_at,
             updated_at=device.updated_at,
         )
+
+
+class HeartbeatRequest(BaseModel):
+    ttl_seconds: int = Field(
+        gt=0,
+        description="Extend this device's expiry to now + this many seconds (server-capped).",
+    )

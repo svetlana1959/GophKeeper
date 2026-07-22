@@ -25,6 +25,7 @@ type Dirty struct {
 type Repository interface {
 	GetState() (*State, error) // ErrNoState before the first sync
 	SaveState(s *State) error
+	DeleteState() error                                  // forget the account binding (force re-link)
 	MarkDirty(secretID string) error                     // a local change needs push
 	MarkSynced(secretID string, serverVersion int) error // reconciled with the server
 	ListDirty() ([]Dirty, error)                         // secrets needing push

@@ -252,15 +252,17 @@ uvicorn gophkeeper.main:app --host 127.0.0.1 --port 8080 --env-file .env --reloa
 
 ## REST API Endpoints Overview
 
+Every endpoint is served under the **`/api`** prefix. Swagger (`/docs`) and the OpenAPI schema (`/openapi.json`) stay at the root.
+
 ### Device Authentication (`auth`)
 
 These endpoints are used by CLI devices to prove ownership of their private key via an **age challenge/response** mechanism without exposing keys to the network.
 
 | Method | Endpoint | Description | Auth Required |
 | --- | --- | --- | --- |
-| **POST** | `/auth/challenge` | Start login: get base64 challenge ciphertext encrypted to the device's public key | No |
-| **POST** | `/auth/verify` | Submit the decrypted challenge nonce to receive a session Bearer token | No |
-| **GET** | `/auth/whoami` | Identify the account and device bound to the current session | **Yes** |
+| **POST** | `/api/auth/challenge` | Start login: get base64 challenge ciphertext encrypted to the device's public key | No |
+| **POST** | `/api/auth/verify` | Submit the decrypted challenge nonce to receive a session Bearer token | No |
+| **GET** | `/api/auth/whoami` | Identify the account and device bound to the current session | **Yes** |
 
 ---
 
@@ -270,9 +272,10 @@ Web-level credentials management (email/password). These sessions identify the a
 
 | Method | Endpoint | Description | Auth Required |
 | --- | --- | --- | --- |
-| **POST** | `/accounts` | Register a new account (stores the browser-generated `recovery_pubkey` only) | No |
-| **POST** | `/accounts/login` | Log in to an account with email & password to receive a web session token | No |
-| **GET** | `/accounts/me` | Fetch the current account's details and its recovery public key | **Yes** |
+| **POST** | `/api/accounts` | Register a new account (stores the browser-generated `recovery_pubkey` only) | No |
+| **POST** | `/api/accounts/login` | Log in to an account with email & password to receive a web session token | No |
+| **GET** | `/api/accounts/me` | Fetch the current account's details and its recovery public key | **Yes** |
+| **PUT** | `/api/accounts/me/recovery` | Set the account's recovery public key, once (409 if one is already set) | **Yes** |
 
 ---
 
@@ -282,8 +285,8 @@ Endpoints for pushing and pulling encrypted items. The server relays and orders 
 
 | Method | Endpoint | Description | Auth Required |
 | --- | --- | --- | --- |
-| **GET** | `/sync/changes` | Pull encrypted secrets modified since a cursor (`?since=<seq>`) | **Yes** |
-| **POST** | `/sync/push` | Batch-push local creations, updates, or tombstones under optimistic concurrency | **Yes** |
+| **GET** | `/api/sync/changes` | Pull encrypted secrets modified since a cursor (`?since=<seq>`) | **Yes** |
+| **POST** | `/api/sync/push` | Batch-push local creations, updates, or tombstones under optimistic concurrency | **Yes** |
 
 ---
 
@@ -293,9 +296,9 @@ Used to link new devices into an existing account utilizing temporary high-entro
 
 | Method | Endpoint | Description | Auth Required |
 | --- | --- | --- | --- |
-| **POST** | `/enroll/invite` | Register a client-generated pairing invite (stores code hash and MAC'd roster) | **Yes** |
-| **POST** | `/enroll/join` | Consume an invite code to instantly register a new device under the account | No (Code Hash verified) |
-| **GET** | `/enroll/invite/{invite_id}` | Poll an invite status to retrieve the join proof (the redeeming device and its join MAC) | **Yes** |
+| **POST** | `/api/enroll/invite` | Register a client-generated pairing invite (stores code hash and MAC'd roster) | **Yes** |
+| **POST** | `/api/enroll/join` | Consume an invite code to instantly register a new device under the account | No (Code Hash verified) |
+| **GET** | `/api/enroll/invite/{invite_id}` | Poll an invite status to retrieve the join proof (the redeeming device and its join MAC) | **Yes** |
 
 ---
 
@@ -305,8 +308,8 @@ Endpoints to view registered endpoints in the client's account.
 
 | Method | Endpoint | Description | Auth Required |
 | --- | --- | --- | --- |
-| **GET** | `/devices` | List all devices linked to the caller's account | **Yes** |
-| **GET** | `/devices/{device_id}` | Retrieve details of a specific device within the caller's account | **Yes** |
+| **GET** | `/api/devices` | List all devices linked to the caller's account | **Yes** |
+| **GET** | `/api/devices/{device_id}` | Retrieve details of a specific device within the caller's account | **Yes** |
 
 ---
 
@@ -316,8 +319,8 @@ Manages the account's append-only trust log containing signed certificates.
 
 | Method | Endpoint | Description | Auth Required |
 | --- | --- | --- | --- |
-| **POST** | `/trust/certs` | Publish a signed vouch or revoke certificate (`vouch` / `revoke` log chain) | **Yes (Issuer device)** |
-| **GET** | `/trust/certs` | Pull all published trust log certificates since a sequence cursor (`?since=<seq>`) | **Yes** |
+| **POST** | `/api/trust/certs` | Publish a signed vouch or revoke certificate (`vouch` / `revoke` log chain) | **Yes (Issuer device)** |
+| **GET** | `/api/trust/certs` | Pull all published trust log certificates since a sequence cursor (`?since=<seq>`) | **Yes** |
 
 ---
 
@@ -327,10 +330,10 @@ Provides telemetry data for the web UI integration and deployment health probes.
 
 | Method | Endpoint | Description | Auth Required |
 | --- | --- | --- | --- |
-| **GET** | `/stats/overview` | Fetch static dashboard card counts (passwords, notes, active/revoked devices) | No |
-| **GET** | `/stats/activity` | Fetch chronological mock timeline series of events (`?period=[7d|30d|90d]`) | No |
-| **GET** | `/stats/security` | Fetch mock aggregate security health, active alerts, and last sync time | No |
-| **GET** | `/health` | Liveness check (returns `{"status": "ok"}`) | No |
+| **GET** | `/api/stats/overview` | Account device counts (active/revoked/pending). Category counts are `0` until clients supply privacy-preserving counters | **Yes** |
+| **GET** | `/api/stats/activity` | Daily activity series from secret metadata (`?period=[7d|30d|90d]`) | **Yes** |
+| **GET** | `/api/stats/security` | Device-based security summary; `last_sync_at` is `null` until sync events are persisted | **Yes** |
+| **GET** | `/api/health` | Liveness check (returns `{"status": "ok"}`) | No |
 
 ---
 

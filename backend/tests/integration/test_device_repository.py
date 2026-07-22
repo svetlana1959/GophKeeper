@@ -1,5 +1,14 @@
-"""Integration tests for DeviceRepository."""
+"""Narrow DeviceRepository test — the SQL contract stats depends on.
 
+Device persistence round-trips through the API in the sync/revocation flow
+(test_stats_api.py). What that flow doesn't pin down at the SQL layer is that
+``list_for_account`` returns *every* status (not just active ones) and stays
+scoped to one account — the query the security summary counts over. A status
+filter or a missing account predicate would silently skew every account's stats,
+so it's asserted directly here.
+"""
+
+from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
 import pytest
@@ -12,82 +21,126 @@ from gophkeeper.infrastructure.unit_of_work import SqlAlchemyUnitOfWork
 pytestmark = pytest.mark.integration
 
 
-async def test_store_and_fetch_device(database):
-    account_id = uuid4()
-    device_id = uuid4()
-    async with SqlAlchemyUnitOfWork(database) as uow:
-        await uow.accounts.add(Account(id=account_id))
-        await uow.devices.add(
-            Device(
-                id=device_id,
-                account_id=account_id,
-                device_name="laptop",
-                public_key="age1testpublickey",
-                status=ACTIVE,
-            )
-        )
-        await uow.commit()
-
-    async with SqlAlchemyUnitOfWork(database) as uow:
-        fetched = await uow.devices.get(device_id)
-
-    assert fetched.device_name == "laptop"
-    assert fetched.public_key == "age1testpublickey"
-    assert fetched.is_active is True
-
-
-async def test_rollback_discards_uncommitted_device(database):
-    account_id = uuid4()
-    device_id = uuid4()
-    async with SqlAlchemyUnitOfWork(database) as uow:
-        await uow.accounts.add(Account(id=account_id))
-        await uow.devices.add(
-            Device(
-                id=device_id,
-                account_id=account_id,
-                device_name="phone",
-                public_key="age1phonekey",
-                status=ACTIVE,
-            )
-        )
-        await uow.rollback()
-
+async def test_get_unknown_device_raises(database):
+    # SyncService catches this branch; DeviceService.fetch reraises its own, so the
+    # repository's own not-found is only reachable here.
     async with SqlAlchemyUnitOfWork(database) as uow:
         with pytest.raises(DeviceNotFound):
-            await uow.devices.get(device_id)
+            await uow.devices.get(uuid4())
 
 
-async def test_list_for_account_returns_all_statuses(database):
+async def test_list_for_account_returns_all_statuses_scoped_to_the_account(database):
     account_id = uuid4()
+    other_account_id = uuid4()
     active_id = uuid4()
     revoked_id = uuid4()
 
     async with SqlAlchemyUnitOfWork(database) as uow:
         await uow.accounts.add(Account(id=account_id))
+        await uow.accounts.add(Account(id=other_account_id))
         await uow.devices.add(
-            Device(
-                id=active_id,
-                account_id=account_id,
-                device_name="laptop",
-                public_key="key1",
-                status=ACTIVE,
-            )
+            Device(active_id, account_id, "laptop", "key-active", "sign-active", status=ACTIVE)
         )
         await uow.devices.add(
-            Device(
-                id=revoked_id,
-                account_id=account_id,
-                device_name="phone",
-                public_key="key2",
-                status=REVOKED,
-            )
+            Device(revoked_id, account_id, "phone", "key-revoked", status=REVOKED)
         )
+        await uow.devices.add(Device(uuid4(), other_account_id, "intruder", "key-other"))
         await uow.commit()
 
     async with SqlAlchemyUnitOfWork(database) as uow:
         devices = await uow.devices.list_for_account(account_id)
 
     by_id = {d.id: d for d in devices}
+    # Only this account's devices, and revoked ones are kept (not filtered out).
     assert set(by_id) == {active_id, revoked_id}
     assert by_id[active_id].is_active is True
     assert by_id[revoked_id].is_active is False
+    # Columns map to the right fields (not transposed) and round-trip intact.
+    active = by_id[active_id]
+    assert (active.device_name, active.public_key, active.sign_public_key) == (
+        "laptop",
+        "key-active",
+        "sign-active",
+    )
+
+
+async def test_delete_expired_reaps_only_past_devices_and_round_trips_expiry(database):
+    account_id = uuid4()
+    now = datetime.now(UTC)
+    expired_id, live_id, never_id = uuid4(), uuid4(), uuid4()
+
+    async with SqlAlchemyUnitOfWork(database) as uow:
+        await uow.accounts.add(Account(id=account_id))
+        await uow.devices.add(
+            Device(expired_id, account_id, "stale", "k-stale", expires_at=now - timedelta(hours=1))
+        )
+        await uow.devices.add(
+            Device(live_id, account_id, "fresh", "k-fresh", expires_at=now + timedelta(hours=1))
+        )
+        await uow.devices.add(Device(never_id, account_id, "cli", "k-cli"))
+        await uow.commit()
+
+    async with SqlAlchemyUnitOfWork(database) as uow:
+        reaped = await uow.devices.delete_expired(now=now)
+        await uow.commit()
+
+    assert reaped == 1
+    async with SqlAlchemyUnitOfWork(database) as uow:
+        remaining = {d.id: d for d in await uow.devices.list_for_account(account_id)}
+    assert set(remaining) == {live_id, never_id}
+    # expires_at round-trips through the column, and NULL stays NULL.
+    assert remaining[live_id].expires_at is not None
+    assert remaining[never_id].expires_at is None
+
+
+async def test_delete_inactive_uses_last_seen_then_falls_back_to_updated_at(database):
+    account_id = uuid4()
+    now = datetime.now(UTC)
+    cutoff = now - timedelta(days=90)
+    seen_recently, seen_long_ago, never_seen_old = uuid4(), uuid4(), uuid4()
+
+    async with SqlAlchemyUnitOfWork(database) as uow:
+        # Recovery key present → the account can be reaped (it can restore).
+        await uow.accounts.add(Account(id=account_id, recovery_pubkey="age1recovery"))
+        recent = Device(seen_recently, account_id, "active", "k-active")
+        recent.last_seen_at = now - timedelta(days=1)
+        stale = Device(seen_long_ago, account_id, "stale", "k-stale")
+        stale.last_seen_at = now - timedelta(days=120)
+        # Never authenticated: falls back to updated_at, which we age past cutoff.
+        pending = Device(never_seen_old, account_id, "pending", "k-pending")
+        pending.updated_at = now - timedelta(days=200)
+        for d in (recent, stale, pending):
+            await uow.devices.add(d)
+        await uow.commit()
+
+    async with SqlAlchemyUnitOfWork(database) as uow:
+        reaped = await uow.devices.delete_inactive(cutoff=cutoff)
+        await uow.commit()
+
+    assert reaped == 2
+    async with SqlAlchemyUnitOfWork(database) as uow:
+        remaining = {d.id for d in await uow.devices.list_for_account(account_id)}
+    assert remaining == {seen_recently}
+
+
+async def test_delete_inactive_spares_accounts_without_a_recovery_key(database):
+    # No recovery key → reaping the device would strand the vault, so the backstop
+    # must leave it alone no matter how idle it is.
+    account_id = uuid4()
+    now = datetime.now(UTC)
+    device_id = uuid4()
+
+    async with SqlAlchemyUnitOfWork(database) as uow:
+        await uow.accounts.add(Account(id=account_id, recovery_pubkey=None))
+        stale = Device(device_id, account_id, "lonely", "k-lonely")
+        stale.last_seen_at = now - timedelta(days=365)
+        await uow.devices.add(stale)
+        await uow.commit()
+
+    async with SqlAlchemyUnitOfWork(database) as uow:
+        reaped = await uow.devices.delete_inactive(cutoff=now - timedelta(days=90))
+        await uow.commit()
+
+    assert reaped == 0
+    async with SqlAlchemyUnitOfWork(database) as uow:
+        assert {d.id for d in await uow.devices.list_for_account(account_id)} == {device_id}

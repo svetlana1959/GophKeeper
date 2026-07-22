@@ -40,6 +40,17 @@ func (r *syncRepo) SaveState(s *syncstate.State) error {
 	return nil
 }
 
+// DeleteState forgets this device's account binding (device id + cursor) so Link
+// can re-bind. Used by `goph link --force` after the device was removed
+// server-side, which leaves the local binding stale but intact. Local secrets and
+// the device keypair are untouched — a fresh sync re-pulls and re-pushes them.
+func (r *syncRepo) DeleteState() error {
+	if _, err := r.db.Exec(`DELETE FROM sync_state WHERE id = 1`); err != nil {
+		return fmt.Errorf("vault: delete sync state: %w", err)
+	}
+	return nil
+}
+
 func (r *syncRepo) MarkDirty(secretID string) error {
 	// Preserve server_version (the last reconciled version) — only flip dirty.
 	_, err := r.db.Exec(`

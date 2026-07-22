@@ -77,6 +77,7 @@ async def join(
         public_key=body.public_key,
         sign_public_key=body.sign_public_key,
         join_mac=body.join_mac,
+        ttl_seconds=body.ttl_seconds,
     )
     roster = [RosterEntry(**e) for e in json.loads(roster_json)]
     return JoinResponse(device=DeviceResponse.from_domain(device), roster=roster)

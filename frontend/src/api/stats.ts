@@ -1,9 +1,11 @@
 import { z } from 'zod'
 import { http } from './http'
 
-// Dashboard statistics. The backend currently serves mock data from unauthenticated
-// `/stats/*` endpoints; the shapes below mirror the OpenAPI schema so the UI is
-// ready when they become account-scoped.
+// Dashboard statistics. `/stats/*` is account-scoped and requires the web session
+// token (attached by the http interceptor); the shapes below mirror the OpenAPI
+// schema. Counts the server cannot derive without decrypting — the per-category
+// totals, `alerts`, `last_sync_at` — come back as 0/null until the client supplies
+// privacy-preserving counters and sync events are persisted.
 
 export const statsOverviewSchema = z.object({
   passwords: z.number(),
@@ -20,7 +22,10 @@ export const statsSecuritySchema = z.object({
   trusted_devices: z.number(),
   revoked_devices: z.number(),
   alerts: z.number(),
-  last_sync_at: z.string(),
+  // Null until the backend persists sync events — not an error, and not optional:
+  // the field is always present. A required z.string() here fails the whole parse,
+  // which silently empties the security card rather than just the timestamp.
+  last_sync_at: z.string().nullable(),
 })
 export type StatsSecurity = z.infer<typeof statsSecuritySchema>
 
