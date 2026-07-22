@@ -235,7 +235,7 @@ Scene 9 (6:00–6:20), voiced by Svetlana over on-screen name/role cards: Svetla
 
 | Deliverable | Link |
 |---|---|
-| Final video | |
+| Final video | https://disk.yandex.ru/i/lOrYrwljABsd1w |
 | Final Presentation| https://disk.yandex.ru/i/P3fEyvHSTdwPkw | 
 | Final deployed version | http://10.93.27.16/ |
 | Final codebase | https://github.com/svetlana1959/GophKeeper — frozen at https://github.com/svetlana1959/GophKeeper/commit/2cbfa573ff106dcafc1add82a953558d98cf788a (tag `v1.0.0`) |
