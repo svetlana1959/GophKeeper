@@ -45,9 +45,7 @@ class DeviceService:
         async with self._uow as uow:
             return await uow.devices.list_for_account(account_id)
 
-    async def heartbeat(
-        self, device_id: UUID, *, account_id: UUID, ttl_seconds: int
-    ) -> Device:
+    async def heartbeat(self, device_id: UUID, *, account_id: UUID, ttl_seconds: int) -> Device:
         """Extend a device's expiry to now + ``ttl_seconds`` (capped). Called by
         an active device to keep itself alive while in use; an already-expired
         device can't reach here because it fails authentication first."""

@@ -50,20 +50,14 @@ class FakeDeviceRepository:
 
     async def delete_expired(self, *, now: datetime) -> int:
         expired = [
-            d.id
-            for d in self.devices.values()
-            if d.expires_at is not None and d.expires_at < now
+            d.id for d in self.devices.values() if d.expires_at is not None and d.expires_at < now
         ]
         for device_id in expired:
             del self.devices[device_id]
         return len(expired)
 
     async def delete_inactive(self, *, cutoff: datetime) -> int:
-        stale = [
-            d.id
-            for d in self.devices.values()
-            if (d.last_seen_at or d.updated_at) < cutoff
-        ]
+        stale = [d.id for d in self.devices.values() if (d.last_seen_at or d.updated_at) < cutoff]
         for device_id in stale:
             del self.devices[device_id]
         return len(stale)
@@ -176,9 +170,7 @@ async def test_heartbeat_extends_expiry():
     )
     await uow.devices.add(device)
 
-    updated = await DeviceService(uow).heartbeat(
-        device.id, account_id=account_id, ttl_seconds=3600
-    )
+    updated = await DeviceService(uow).heartbeat(device.id, account_id=account_id, ttl_seconds=3600)
 
     assert updated.expires_at is not None
     assert updated.expires_at > datetime.now(UTC) + timedelta(seconds=3000)

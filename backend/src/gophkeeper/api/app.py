@@ -96,9 +96,7 @@ def create_app() -> FastAPI:
                 await asyncio.sleep(3)
         logging.info("database ready")
         reaper = asyncio.create_task(
-            _reap_expired_devices_forever(
-                database, settings.security.device_reap_interval_seconds
-            )
+            _reap_expired_devices_forever(database, settings.security.device_reap_interval_seconds)
         )
         yield
         reaper.cancel()
