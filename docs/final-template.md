@@ -157,8 +157,20 @@ Per the current `README.md` (verified against `v1.0.0`), the team's own stated r
 - Server-side revocation enforcement.
 - Browser-based recovery keys.
 
-Additionally, at the time of this report: PR #144 ("Feature/dashboard with api") remains open as a stale Draft — its functionality was superseded by the dashboard shipped through the frontend rewrite (PR #148) and does not need to be merged; PR #121 ("test: add backend unit tests") has been open since 30.06.2026 and is the one remaining unmerged PR that predates the freeze.
+---
 
+## 1.11 Core Concept
+ 
+**The pitch:** a cloud secret manager built on a Zero-Knowledge architecture — the server never has access to secret contents — using the `age` protocol (described in the concept doc as "an efficient and secure alternative to PGP") instead of a classic single-master-password scheme, combined with a model of distributed trust between a user's own devices, by analogy to how Git/sops handle multi-key encryption. Each device generates its own keypair; access to a shared secret store is granted by adding a new device's public key to the list of authorized recipients for specific secrets.
+ 
+**Two architectural decisions from the concept carried straight into the shipped product:**
+ 
+- **Atomic, per-secret encryption** — each secret (or logical folder) is encrypted as an independent object rather than one monolithic file, specifically to avoid sync "split-brain" conflicts when two devices update different secrets at once, and to allow fine-grained access control per secret/folder. This reasoning is echoed later in `docs/sync_design.md` and realized in the shipped `secret_seq`-based sync cursor (section 1.5).
+- **Asynchronous key-exchange queue** — a new device leaves a request (with its public key) in the cloud without needing to be online at the same time as an already-trusted device; the trusted device picks up the request whenever it next comes online, decrypts, re-encrypts to the new device's key, and returns it. This is the same shape as the pairing-code/invite mechanism that shipped (`POST /api/enroll/invite`, `POST /api/enroll/join` — section 1.4), later extended into the client-verified device trust graph (PR #145).
+**One open question the concept doc left for later, resolved differently in the shipped product:** the concept floated an optional "hybrid master-password" login — deriving a local master key from a strong password via Argon2id and storing an encrypted copy of that key on the server — explicitly flagged in the document itself as a trade-off ("reduces the overall Zero-Knowledge security level... introduces a classic brute-force vulnerability... if the cloud database is fully compromised"), with the decision left open. The shipped product did not take that trade-off; instead it ships a **separate recovery key** — an offline key independent of the password/device keys, with only its public half ever uploaded to the server (`PUT /api/accounts/me/recovery`, section 1.4) — avoiding the exact brute-force exposure the concept doc had flagged.
+ 
+**Business framing** (`business_model_and_licensing.pdf`): the concept was pitched from the start as straddling two markets — B2C password management (positioned against Bitwarden/1Password) and B2B/DevOps secrets management (positioned against HashiCorp Vault/Infisical) — the same two-segment framing used in the competitor analysis in section 1.6, plus the dual-licensing (AGPLv3/SSPL + commercial) and freemium/tiered monetization model summarized there.
+ 
 ---
 
 ## 2.3 Video Structure
@@ -210,7 +222,7 @@ Scene 9 (6:00–6:20), voiced by Svetlana over on-screen name/role cards: Svetla
 | Team Member | Role | Final Product Contribution | Final Video Contribution |
 |---|---|---|---|
 | Svetlana Maltseva | Team Lead, Product Manager | Sprint planning and backlog management across all sprints; final demo scenario; sprint/final reports (Issues #141, #138, and equivalents each sprint) | Problem Statement and Target Audience narration; Team Contributions segment; oversees final video assembly |
-| Elina Akhmetzyanova | Design, Documentation | Figma UI/UX design incl. dark theme and mobile screens (Registration/Login/Dashboard); sprint report templates and documentation (Issues #142, #139, #102, #131, and equivalents) | Challenges & Lessons Learned narration; visual/title sequence |
+| Elina Akhmetzyanova | Design, Documentation |Responsible for UI/UX design and documentation. Designed the GophKeeper desktop and mobile interfaces in both light and dark themes, created the project landing page, prepared UI mockups for core application flows, and contributed to the project reports and documentation | Challenges & Lessons Learned narration; visual/title sequence |
 | Arseny Lashkevich | DevOps Engineer | Owns and maintains all CI pipelines (`ci-backend`, `ci-cli`, `ci-frontend`, `release-cli`) and Docker builds for cli/backend/frontend; approved the device-trust/sync PR (#121); led the M4 device trust graph (PR #145); release manager — signed and published `v0.1.0`, `v0.2.0`, and `v1.0.0` | Cold-open pitch appearance; Track/Acceptance Criteria and architecture/DevOps narration |
 | Aleksander Goncharov | CLI Engineer | Delivered multi-device secret synchronization (`app/sync.go`, PR #126) and the local vault/crypto/remote layers; drove CLI test coverage to 82% with an enforced 80% floor and a live coverage badge (PRs #156, #157) | Leads and narrates the CLI Live Demo segment |
 | Emil Nabiullin | Frontend Developer | Shipped the original landing page, adaptive layout, and registration/authorization pages (PRs #116, #134, #136, Issue #109); the subsequent full TypeScript/Tailwind frontend rewrite and dashboard (PR #148) and the recovery-key/add-device flow (PR #147) were merged under the GitHub handle `Perchinka`, consistent with the Frontend Developer role | Cold-open voiceover; leads the Web Live Demo segment |
@@ -223,8 +235,9 @@ Scene 9 (6:00–6:20), voiced by Svetlana over on-screen name/role cards: Svetla
 
 | Deliverable | Link |
 |---|---|
-| Final video | *[ЗАПОЛНИТЬ: ссылка на финальное видео после публикации]* |
-| Final deployed version | http://10.93.27.16/ *(project VM; confirm the deployed build matches commit `2cbfa573` before submission)* |
+| Final video | |
+| Final Presentation| https://disk.yandex.ru/i/P3fEyvHSTdwPkw | 
+| Final deployed version | http://10.93.27.16/ |
 | Final codebase | https://github.com/svetlana1959/GophKeeper — frozen at https://github.com/svetlana1959/GophKeeper/commit/2cbfa573ff106dcafc1add82a953558d98cf788a (tag `v1.0.0`) |
 | README | https://github.com/svetlana1959/GophKeeper/blob/main/README.md |
 | API documentation | Swagger UI: `http://10.93.27.16/docs` (or `http://localhost:8080/docs` locally); OpenAPI schema: `/openapi.json` |
